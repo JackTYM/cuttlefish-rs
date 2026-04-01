@@ -1031,7 +1031,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 3 — Sandbox + VCS
 
-- [ ] 12. cuttlefish-sandbox: Docker Container Lifecycle
+- [x] 12. cuttlefish-sandbox: Docker Container Lifecycle
 
   **What to do**:
   - Implement `Sandbox` trait using `bollard` crate for Docker API:
@@ -1083,7 +1083,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(sandbox): add Docker container lifecycle management`
   - Pre-commit: `cargo test -p cuttlefish-sandbox`
 
-- [ ] 13. cuttlefish-sandbox: Resource Limits + Output Capture
+- [x] 13. cuttlefish-sandbox: Resource Limits + Output Capture
 
   **What to do**:
   - Implement streaming output capture from container exec:
@@ -1129,7 +1129,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(sandbox): add resource limits, output streaming, and cleanup`
   - Pre-commit: `cargo test -p cuttlefish-sandbox`
 
-- [ ] 14. cuttlefish-vcs: Git Operations via git2
+- [x] 14. cuttlefish-vcs: Git Operations via git2
 
   **What to do**:
   - Implement `VersionControl` trait using `git2`:
@@ -1178,7 +1178,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(vcs): add git operations via git2 (clone, branch, commit, push, diff)`
   - Pre-commit: `cargo test -p cuttlefish-vcs`
 
-- [ ] 15. cuttlefish-vcs: GitHub API Client (PAT Auth)
+- [x] 15. cuttlefish-vcs: GitHub API Client (PAT Auth)
 
   **What to do**:
   - Implement GitHub API client using `reqwest`:
@@ -1221,7 +1221,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(vcs): add GitHub API client with PAT auth and rate limiting`
   - Pre-commit: `cargo test -p cuttlefish-vcs`
 
-- [ ] 16. cuttlefish-sandbox: Template-Specific Docker Images
+- [x] 16. cuttlefish-sandbox: Template-Specific Docker Images
 
   **What to do**:
   - Create Dockerfile templates for common stacks:

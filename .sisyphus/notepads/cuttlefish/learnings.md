@@ -288,3 +288,146 @@ Both workflows validated as valid YAML. Ready for GitHub Actions execution.
 - `cargo clippy -p cuttlefish-core -- -D warnings` → 0 warnings
 - Evidence saved to `.sisyphus/evidence/task-11-context-manager.txt`
 
+## Task 12: cuttlefish-sandbox — Docker Container Lifecycle Management
+
+### Completed
+- ✅ `Cargo.toml` — Added bollard 0.18, cuttlefish-core, uuid, futures, async-trait, serde_json; declared `integration` feature
+- ✅ `src/docker.rs` — `DockerSandbox` implementing full `Sandbox` trait: create, exec, write_file, read_file, list_files, destroy
+- ✅ `src/lib.rs` — Exports `DockerSandbox`, re-exports `Sandbox` trait and supporting types
+- ✅ 10 unit tests pass (base64 roundtrip, edge cases, ExecOutput, SandboxConfig defaults)
+- ✅ `cargo clippy -p cuttlefish-sandbox -- -D warnings` → ZERO warnings
+- ✅ Integration tests behind `#[cfg(feature = "integration")]` for Docker-dependent tests
+
+### Key Patterns
+- **bollard API**: Two-step container lifecycle: `create_container` → `start_container`. Exec is `create_exec` → `start_exec` → `inspect_exec` for exit code.
+- **Container keep-alive**: `cmd: Some(vec!["tail", "-f", "/dev/null"])` keeps container running for exec commands.
+- **Resource limits**: `memory` in bytes (MB × 1024 × 1024), `nano_cpus` (cores × 1e9 as i64).
+- **Network isolation**: `network_mode: "none"` disables networking, `"bridge"` enables.
+- **File I/O via base64**: Inline base64 encode/decode avoids shell escaping issues. No external `base64` crate needed.
+- **StartExecResults**: Must match `StartExecResults::Attached` variant to get stdout/stderr streams.
+- **Feature gating**: `#[cfg(feature = "integration")]` requires `[features] integration = []` in Cargo.toml to avoid `unexpected_cfgs` warning.
+- **Dead code in cfg(test)**: Test-only helper functions still need `#[cfg(test)]` AND must be actually used in tests, otherwise `dead_code` warning triggers.
+
+### Verification
+- `cargo check -p cuttlefish-sandbox` → exits 0
+- `cargo clippy -p cuttlefish-sandbox -- -D warnings` → 0 warnings
+- `cargo test -p cuttlefish-sandbox` → 10 passed, 0 failed
+- Evidence saved to `.sisyphus/evidence/task-12-sandbox-clippy.txt`
+
+## Task 14: cuttlefish-vcs — Git Operations via git2
+
+### Completed
+- ✅ `Cargo.toml` — Added git2 0.19 (no default features), cuttlefish-core, async-trait; tempfile dev-dep
+- ✅ `src/git.rs` — `GitRepository` implementing full `VersionControl` trait: clone, checkout, commit, push, diff, log, current_branch
+- ✅ `src/lib.rs` — Exports `GitRepository`, re-exports `VersionControl` and `CommitInfo`
+- ✅ All 6 unit tests pass (no network required — uses tempfile local repos)
+- ✅ `cargo clippy -p cuttlefish-vcs -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **git2 is sync**: All git2 operations wrapped in `tokio::task::spawn_blocking` for async compatibility
+- **spawn_blocking JoinError**: `.map_err(|e| VcsError(format!("Task join: {e}")))?` pattern for handling JoinError
+- **PAT auth**: `git2::Cred::userpass_plaintext("oauth2", &token)` via `RemoteCallbacks::credentials`
+- **Initial commit**: Empty `parents` slice when `repo.head()` returns Err (no HEAD yet)
+- **Branch creation**: `repo.branch()` → `repo.set_head()` → `repo.checkout_head()` three-step flow
+- **Diff format**: `diff.print(DiffFormat::Patch, ...)` with line origin prefix (+/-/space)
+- **Short hash**: `oid.to_string()[..7]` for CommitInfo display
+- **No unwrap in lib code**: All `expect()` calls have descriptive messages; `unwrap_or_else` for fallback signatures
+- **Branch ref name**: Use `.ok_or_else()` instead of `.expect()` for branch ref name UTF-8 validation
+
+### Verification
+- `cargo test -p cuttlefish-vcs` → 6 passed, 0 failed
+- `cargo clippy -p cuttlefish-vcs -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-14-vcs-tests.txt`
+
+## Task 13: cuttlefish-sandbox — Resource Limits + Streaming Output Capture + Cleanup
+
+### Completed
+- ✅ `exec_with_timeout` — wraps `exec()` in `tokio::time::timeout`, returns `timed_out: true` on expiry
+- ✅ `list_cuttlefish_containers` — lists all containers with `cuttlefish-` name prefix via `ListContainersOptions` filter
+- ✅ `cleanup_stopped_containers` — removes exited/dead cuttlefish containers, returns removal count
+- ✅ Output size capping in `exec()` — truncates stdout/stderr at 1MB with `[OUTPUT TRUNCATED]` marker
+- ✅ `MAX_OUTPUT_BYTES` constant (1MB) for stream cap
+- ✅ 5 new tests (15 total): timeout output structure, truncation constants, truncation logic, under-limit check
+- ✅ `cargo clippy -p cuttlefish-sandbox -- -D warnings` → ZERO warnings
+- ✅ `cargo test -p cuttlefish-sandbox` → 15 passed
+
+### Key Patterns
+- **Timeout wrapping**: `tokio::time::timeout(Duration, future)` returns `Err(Elapsed)` on timeout — map to `ExecOutput { timed_out: true }`
+- **Container filtering**: `ListContainersOptions` with `filters` HashMap: `name → ["cuttlefish-"]`, `status → ["exited", "dead"]`
+- **Output capping**: Check buffer length after each chunk push; truncate + append marker + break on exceed
+- **No Docker in unit tests**: All tests validate data structures and logic only; Docker-dependent tests behind `integration` feature
+
+### Verification
+- `cargo test -p cuttlefish-sandbox` → 15 passed (10 existing + 5 new)
+- `cargo clippy -p cuttlefish-sandbox -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-13-sandbox-limits.txt`
+
+## Task 15: cuttlefish-vcs — GitHub API Client with PAT Authentication
+
+### Completed
+- ✅ `Cargo.toml` — Added reqwest 0.12 (json, rustls-tls), serde (workspace), serde_json 1
+- ✅ `src/github.rs` — `GitHubClient` with 6 async methods: create_repo, get_repo, create_pull_request, list_workflow_runs, get_workflow_run, get_workflow_run_logs_url
+- ✅ `src/lib.rs` — Exports `github` module and `GitHubClient`
+- ✅ 5 new tests (11 total): client creation, auth header, workflow states, serialization
+- ✅ `cargo clippy -p cuttlefish-vcs -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **Redirect handling**: `get_workflow_run_logs_url` builds a separate `reqwest::Client` with `Policy::none()` — `RequestBuilder` has no `.redirect()` method, only `ClientBuilder` does
+- **Status checks**: Use `status.is_redirection()` and `status.is_success()` instead of bare integer comparison (StatusCode doesn't impl `PartialEq<u16>`)
+- **Error body capture**: `response.text().await.unwrap_or_default()` is allowed — `unwrap_or_default()` is not flagged by `clippy::unwrap_used`
+- **expect() in constructor**: Acceptable for `Client::builder().build()` — TLS backend missing is a programming/environment error
+- **No real HTTP in tests**: All 5 tests validate struct construction, serialization, and data access patterns only
+
+### Verification
+- `cargo test -p cuttlefish-vcs` → 11 passed (6 existing + 5 new)
+- `cargo clippy -p cuttlefish-vcs -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-15-github-client.txt`
+
+
+## Task 16: Template-specific Docker Images + ImageRegistry
+
+**Completed**: 2026-04-01
+
+### Deliverables
+✅ Created 5 Dockerfiles in `docker/` directory:
+- `node-base.Dockerfile` — Node.js 22 + npm + git + curl
+- `python-base.Dockerfile` — Python 3.12 + pip + build-essential + git + curl
+- `rust-base.Dockerfile` — Rust 1.82 + cargo + pkg-config + libssl-dev + git + curl
+- `go-base.Dockerfile` — Go 1.22 + git + curl
+- `generic-base.Dockerfile` — Ubuntu 22.04 + build-essential + git + curl + wget + unzip + ca-certificates
+
+✅ Created `crates/cuttlefish-sandbox/src/images.rs`:
+- `ImageRegistry` struct with HashMap-based template → image mapping
+- `default_registry()` — pre-configured with 15+ template names
+- `resolve(template_name)` — resolves template to Docker image (fallback: ubuntu:22.04)
+- `register()` — custom template registration
+- `has_template()` — check if template exists
+- `list_templates()` — sorted list of all templates
+- `dockerfile_path()` — maps template to Dockerfile path
+- 8 comprehensive unit tests
+
+✅ Updated `crates/cuttlefish-sandbox/src/lib.rs`:
+- Exported `pub mod images`
+- Exported `pub use images::ImageRegistry`
+
+### Test Results
+- **23 tests passed** (15 existing + 8 new)
+- **0 warnings** from clippy with `-D warnings`
+- `cargo check` ✅
+- `cargo clippy` ✅
+- `cargo test` ✅
+- `cargo doc` ✅
+
+### Key Design Decisions
+1. **Public images by default** — Uses official Docker Hub images (node:22-slim, python:3.12-slim, etc.) rather than building custom images
+2. **Fallback to generic** — Unknown templates resolve to ubuntu:22.04
+3. **Dockerfile mapping** — `dockerfile_path()` enables future build-from-Dockerfile support
+4. **HashMap-based registry** — Simple, fast O(1) lookups; supports runtime registration
+
+### Template Coverage
+- **Node.js family**: node, nuxt, nuxt-cloudflare, typescript, node-express
+- **Python family**: python, python-fastapi, fastapi
+- **Rust family**: rust, rust-axum, axum
+- **Go family**: go, golang
+- **Generic**: generic, static-site
+

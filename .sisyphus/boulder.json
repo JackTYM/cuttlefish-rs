@@ -13,7 +13,12 @@
     "ses_2b5095c57ffe3S8mUxXpQoUTGz",
     "ses_2b50546b1ffexv8e0qTDSQ1PiD",
     "ses_2b5012724ffe5vKOBmS4plD8Nr",
-    "ses_2b4fe6038ffeRkiEgE6kwiR50v"
+    "ses_2b4fe6038ffeRkiEgE6kwiR50v",
+    "ses_2b4f3748fffeOhZYk6cIYn9aZ8",
+    "ses_2b4ed301dffeXsjDRj2S7xcccm",
+    "ses_2b4e9d346ffe6frySUdPu0ii3a",
+    "ses_2b4e64472ffeqzgSNRfEpB1kQv",
+    "ses_2b4e1eb00ffemym1QBWXCzCeoi"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -107,6 +112,42 @@
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
       "updated_at": "2026-04-01T21:53:03.928Z"
+    },
+    "todo:12": {
+      "task_key": "todo:12",
+      "task_label": "12",
+      "task_title": "cuttlefish-sandbox: Docker Container Lifecycle",
+      "session_id": "ses_2b4f3748fffeOhZYk6cIYn9aZ8",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-01T22:02:07.091Z"
+    },
+    "todo:13": {
+      "task_key": "todo:13",
+      "task_label": "13",
+      "task_title": "cuttlefish-sandbox: Resource Limits + Output Capture",
+      "session_id": "ses_2b4e9d346ffe6frySUdPu0ii3a",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-01T22:10:01.595Z"
+    },
+    "todo:15": {
+      "task_key": "todo:15",
+      "task_label": "15",
+      "task_title": "cuttlefish-vcs: GitHub API Client (PAT Auth)",
+      "session_id": "ses_2b4e64472ffeqzgSNRfEpB1kQv",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-01T22:14:57.023Z"
+    },
+    "todo:16": {
+      "task_key": "todo:16",
+      "task_label": "16",
+      "task_title": "cuttlefish-sandbox: Template-Specific Docker Images",
+      "session_id": "ses_2b4e1eb00ffemym1QBWXCzCeoi",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T22:17:33.549Z"
     }
   }
 }
