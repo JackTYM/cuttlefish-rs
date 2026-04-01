@@ -23,7 +23,11 @@
     "ses_2b4a2cd40ffe7HREC2Kx1LLYD9",
     "ses_2b49ebd37ffezq4y4iAzWBVgCD",
     "ses_2b49d5b8cffexkOkgz6ssET9HE",
-    "ses_2b49b9e38ffeXJolM8oGZ53izk"
+    "ses_2b49b9e38ffeXJolM8oGZ53izk",
+    "ses_2b498efb7ffeL8DRjU16ttPorE",
+    "ses_2b4960363ffetrTfaqChabxFTq",
+    "ses_2b493d655ffe29UkJr43Mva512",
+    "ses_2b491d946ffe6QbhLI2MY4eUIN"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -198,6 +202,33 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-04-01T23:34:05.752Z"
+    },
+    "todo:22": {
+      "task_key": "todo:22",
+      "task_label": "22",
+      "task_title": "cuttlefish-discord: Bot Setup + Slash Commands",
+      "session_id": "ses_2b498efb7ffeL8DRjU16ttPorE",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:37:44.578Z"
+    },
+    "todo:23": {
+      "task_key": "todo:23",
+      "task_label": "23",
+      "task_title": "cuttlefish-discord: Channel-Per-Project Management",
+      "session_id": "ses_2b493d655ffe29UkJr43Mva512",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:42:17.509Z"
+    },
+    "todo:27": {
+      "task_key": "todo:27",
+      "task_label": "27",
+      "task_title": "cuttlefish-api: REST Endpoints",
+      "session_id": "ses_2b491d946ffe6QbhLI2MY4eUIN",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:44:27.861Z"
     }
   }
 }

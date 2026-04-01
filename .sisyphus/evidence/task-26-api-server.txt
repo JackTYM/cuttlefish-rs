@@ -1,0 +1,61 @@
+=== CUTTLEFISH-API SETUP COMPLETE ===
+
+STEP 1: Updated Cargo.toml
+- Added axum 0.8 with ws and macros features
+- Added tower and tower-http for middleware
+- Added uuid for ID generation
+- Added serde_json for JSON handling
+- Added axum-test for dev dependencies
+
+STEP 2: Created src/ws.rs
+- ClientMessage enum: Chat, Ping
+- ServerMessage enum: Response, BuildLog, Diff, Pong, Error
+- ws_handler: WebSocket upgrade endpoint
+- handle_socket: Connection lifecycle management
+- 5 unit tests for serialization/deserialization
+
+STEP 3: Created src/routes.rs
+- AppState: Shared application state
+- HealthResponse: Health check response struct
+- health_handler: GET /health endpoint
+- not_found_handler: 404 fallback
+- 1 unit test for health handler
+
+STEP 4: Updated src/lib.rs
+- Module declarations for ws and routes
+- build_app function: Router construction
+- Exports: AppState, ClientMessage, ServerMessage
+- Middleware: TraceLayer, CorsLayer
+
+TEST RESULTS:
+✓ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured
+✓ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured
+
+CLIPPY RESULTS:
+✓ Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.97s
+✓ No warnings or errors
+
+COMPLIANCE:
+✓ #![deny(unsafe_code)] enforced
+✓ #![warn(missing_docs)] all public items documented
+✓ No unwrap() in production code
+✓ All async tests use #[tokio::test]
+✓ Error handling via Result types
+✓ Tracing for logging (debug, info, warn)
+
+ROUTES IMPLEMENTED:
+- GET /health → HealthResponse { status: "ok", version }
+- GET /ws → WebSocket upgrade handler
+- * (fallback) → 404 Not Found
+
+WEBSOCKET PROTOCOL:
+Client → Server:
+  { "type": "chat", "project_id": "...", "content": "..." }
+  { "type": "ping" }
+
+Server → Client:
+  { "type": "response", "project_id": "...", "agent": "...", "content": "..." }
+  { "type": "build_log", "project_id": "...", "line": "..." }
+  { "type": "diff", "project_id": "...", "patch": "..." }
+  { "type": "pong" }
+  { "type": "error", "message": "..." }

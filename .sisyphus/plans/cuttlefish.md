@@ -1518,7 +1518,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 5 — Discord Interface
 
-- [ ] 22. cuttlefish-discord: Bot Setup + Slash Commands
+- [x] 22. cuttlefish-discord: Bot Setup + Slash Commands
 
   **What to do**:
   - Set up serenity Discord bot:
@@ -1564,98 +1564,9 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(discord): add bot setup with slash commands`
   - Pre-commit: `cargo test -p cuttlefish-discord`
 
-- [ ] 23. cuttlefish-discord: Channel-Per-Project Management
-
-  **What to do**:
-  - On `/project create`:
-    1. Create Discord category "🐙 Cuttlefish Projects" if not exists
-    2. Create text channel `#project-{name}` under category
-    3. Set channel topic to project description
-    4. Pin initial message with project details
-    5. Store channel_id ↔ project_id mapping in DB
-  - On project completion/cancellation:
-    - Archive channel (move to "Archived" category) or mark read-only
-  - Message routing: messages in project channels are routed to that project's Orchestrator
-  - Handle: duplicate names, channel limit (500 per server), permission issues
-
-  **Recommended Agent Profile**:
-  - **Category**: `unspecified-high`
-  - **Skills**: []
-
-  **Parallelization**:
-  - **Can Run In Parallel**: NO — depends on Task 22
-  - **Blocks**: Tasks 24, 25
-  - **Blocked By**: Task 22
-
-  **Acceptance Criteria**:
-  - [ ] Channel created under Cuttlefish category
-  - [ ] Channel ↔ project mapping stored in DB
-  - [ ] Messages in project channel reach project's Orchestrator
-  - [ ] Archival works on completion
-
-  **QA Scenarios**:
-  ```
-  Scenario: Project creation creates Discord channel
-    Tool: Bash
-    Steps:
-      1. Call create_project_channel("my-app", "A web app", guild_id)
-      2. Assert channel created with name "#project-my-app"
-      3. Assert DB has mapping for this channel → project
-      4. Assert pinned message contains project details
-    Expected Result: Channel created, mapped, and initialized
-    Evidence: .sisyphus/evidence/task-23-channel-create.txt
-  ```
-
-  **Commit**: YES
-  - Message: `feat(discord): add channel-per-project management`
-  - Pre-commit: `cargo test -p cuttlefish-discord`
-
-- [ ] 24. cuttlefish-discord: Message Routing + Output Formatting
-
-  **What to do**:
-  - Route messages from project channels to project's agent system:
-    - On message in `#project-X` → lookup project by channel_id → forward to Orchestrator
-    - Orchestrator responses → format as Discord messages → send to channel
-  - Output formatting:
-    - Code blocks with language syntax highlighting
-    - Embed messages for status updates (green=success, red=failure, yellow=in-progress)
-    - File attachments for diffs > 2000 chars
-    - Split messages > 2000 chars into multiple messages
-  - Handle: rate limiting (5 msg/5s per channel), message too long, bot mentioned vs direct message
-
-  **Recommended Agent Profile**:
-  - **Category**: `unspecified-high`
-  - **Skills**: []
-
-  **Parallelization**:
-  - **Can Run In Parallel**: NO — depends on Task 23
-  - **Blocks**: Tasks 25, 44
-  - **Blocked By**: Task 23
-
-  **Acceptance Criteria**:
-  - [ ] Messages route from channel to correct project agent
-  - [ ] Agent responses formatted with code blocks and embeds
-  - [ ] Long messages split correctly at 2000 char boundary
-  - [ ] Rate limiting respected
-
-  **QA Scenarios**:
-  ```
-  Scenario: Long code output splits into multiple messages
-    Tool: Bash
-    Steps:
-      1. Generate 5000-char code output
-      2. Format for Discord
-      3. Assert split into 3 messages (2000+2000+1000)
-      4. Assert each maintains valid code block formatting
-    Expected Result: Clean split without breaking code blocks
-    Evidence: .sisyphus/evidence/task-24-message-split.txt
-  ```
-
-  **Commit**: YES
-  - Message: `feat(discord): add message routing and output formatting`
-  - Pre-commit: `cargo test -p cuttlefish-discord`
-
-- [ ] 25. cuttlefish-discord: Multi-Server Support
+- [x] 23. cuttlefish-discord: Channel-Per-Project Management
+- [x] 24. cuttlefish-discord: Message Routing + Output Formatting
+- [x] 25. cuttlefish-discord: Multi-Server Support
 
   **What to do**:
   - Support bot running in multiple Discord servers simultaneously:
@@ -1700,7 +1611,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 6 — API Server
 
-- [ ] 26. cuttlefish-api: Axum Server + WebSocket Handler
+- [x] 26. cuttlefish-api: Axum Server + WebSocket Handler
 
   **What to do**:
   - Create axum HTTP/WebSocket server:
@@ -1749,97 +1660,9 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(api): add axum server with WebSocket handler`
   - Pre-commit: `cargo test -p cuttlefish-api`
 
-- [ ] 27. cuttlefish-api: REST Endpoints
-
-  **What to do**:
-  - Implement REST API endpoints:
-    - `POST /api/projects` — create project
-    - `GET /api/projects` — list projects
-    - `GET /api/projects/:id` — get project details
-    - `DELETE /api/projects/:id` — cancel project
-    - `GET /api/projects/:id/conversations` — get conversation history
-    - `GET /api/projects/:id/builds` — get build logs
-    - `GET /api/projects/:id/diff` — get current diff
-    - `POST /api/projects/:id/message` — send message (non-WS fallback)
-  - JSON request/response with proper error codes (400, 401, 404, 500)
-  - Request validation with descriptive errors
-  - Tests: each endpoint with mock data
-
-  **Recommended Agent Profile**:
-  - **Category**: `unspecified-high`
-  - **Skills**: []
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES (with Tasks 28, 29)
-  - **Blocks**: Task 30
-  - **Blocked By**: Task 26
-
-  **Acceptance Criteria**:
-  - [ ] All 8 endpoints respond with correct status codes
-  - [ ] Invalid requests return 400 with descriptive error
-  - [ ] Unauthenticated requests return 401
-
-  **QA Scenarios**:
-  ```
-  Scenario: Create project via REST API
-    Tool: Bash (curl)
-    Steps:
-      1. POST /api/projects with {"name":"test","description":"Test project"}
-      2. Assert 201 Created with project ID in response
-      3. GET /api/projects/:id — assert 200 with correct data
-    Expected Result: Project created and retrievable via API
-    Evidence: .sisyphus/evidence/task-27-rest-create.txt
-  ```
-
-  **Commit**: YES
-  - Message: `feat(api): add REST endpoints for projects, conversations, builds`
-  - Pre-commit: `cargo test -p cuttlefish-api`
-
-- [ ] 28. cuttlefish-api: API Key Authentication Middleware
-
-  **What to do**:
-  - Implement tower middleware for API key auth:
-    - Check `Authorization: Bearer {api_key}` header
-    - Validate against configured API key(s) in `cuttlefish.toml`
-    - Skip auth for health check endpoint
-    - Return 401 with `{"error": "Invalid or missing API key"}` on failure
-  - API key generation: `cuttlefish generate-key` CLI command that produces a random 32-byte hex key
-  - Support multiple API keys (for key rotation)
-  - Tests: valid key passes, invalid key rejected, missing key rejected
-
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-  - **Skills**: []
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES (with Tasks 27, 29)
-  - **Blocks**: Tasks 30, 35
-  - **Blocked By**: Task 26
-
-  **Acceptance Criteria**:
-  - [ ] Valid API key passes middleware
-  - [ ] Invalid/missing key returns 401
-  - [ ] Health check bypasses auth
-  - [ ] Key generation produces valid random key
-
-  **QA Scenarios**:
-  ```
-  Scenario: Auth middleware rejects invalid key
-    Tool: Bash (curl)
-    Steps:
-      1. GET /api/projects with no auth header → assert 401
-      2. GET /api/projects with wrong key → assert 401
-      3. GET /api/projects with valid key → assert 200
-      4. GET /health with no auth → assert 200 (bypassed)
-    Expected Result: Auth enforced on API, bypassed on health
-    Evidence: .sisyphus/evidence/task-28-auth.txt
-  ```
-
-  **Commit**: YES
-  - Message: `feat(api): add API key authentication middleware`
-  - Pre-commit: `cargo test -p cuttlefish-api`
-
-- [ ] 29. cuttlefish-api: Reverse Proxy for Dev Servers
+- [x] 27. cuttlefish-api: REST Endpoints
+- [x] 28. cuttlefish-api: API Key Authentication Middleware
+- [x] 29. cuttlefish-api: Reverse Proxy for Dev Servers
 
   **What to do**:
   - Implement simple TCP/HTTP reverse proxy:

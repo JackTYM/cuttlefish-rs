@@ -8,8 +8,12 @@ rust-version = "1.94.0"
 workspace = true
 
 [dependencies]
+cuttlefish-core = { path = "../cuttlefish-core" }
+serenity = { version = "0.12", default-features = false, features = ["client", "cache", "gateway", "model", "http", "rustls_backend"] }
 tokio = { workspace = true }
-serde = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
