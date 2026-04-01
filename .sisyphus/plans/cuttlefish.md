@@ -1270,7 +1270,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 4 — Agent System
 
-- [ ] 17. cuttlefish-agents: Agent Trait + Message Bus
+- [x] 17. cuttlefish-agents: Agent Trait + Message Bus
 
   **What to do**:
   - Implement `MessageBus` using tokio broadcast/mpsc channels:
@@ -1329,7 +1329,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(agents): add agent runner, message bus, and tool calling protocol`
   - Pre-commit: `cargo test -p cuttlefish-agents`
 
-- [ ] 18. cuttlefish-agents: Orchestrator Agent
+- [x] 18. cuttlefish-agents: Orchestrator Agent
 
   **What to do**:
   - Implement `OrchestratorAgent` that implements `Agent` trait:
@@ -1375,7 +1375,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(agents): add Orchestrator agent with task delegation`
   - Pre-commit: `cargo test -p cuttlefish-agents`
 
-- [ ] 19. cuttlefish-agents: Coder Agent
+- [x] 19. cuttlefish-agents: Coder Agent
 
   **What to do**:
   - Implement `CoderAgent` that implements `Agent` trait:
@@ -1419,7 +1419,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(agents): add Coder agent with file ops and build execution`
   - Pre-commit: `cargo test -p cuttlefish-agents`
 
-- [ ] 20. cuttlefish-agents: Critic Agent
+- [x] 20. cuttlefish-agents: Critic Agent
 
   **What to do**:
   - Implement `CriticAgent` that implements `Agent` trait:
@@ -1464,7 +1464,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(agents): add Critic agent with code review and test execution`
   - Pre-commit: `cargo test -p cuttlefish-agents`
 
-- [ ] 21. cuttlefish-agents: Planner→Coder→Critic Loop
+- [x] 21. cuttlefish-agents: Planner→Coder→Critic Loop
 
   **What to do**:
   - Implement the full agent workflow loop:

@@ -1,0 +1,51 @@
+TASK: Create crates/cuttlefish-agents/src/orchestrator.rs
+
+DELIVERABLES COMPLETED:
+✓ Created orchestrator.rs with OrchestratorAgent implementation
+✓ Implements Agent trait from cuttlefish_core
+✓ Routes tasks to Coder/Critic agents via MessageBus
+✓ Includes PlannedTask and TaskStatus types
+✓ Full documentation on all public items (/// docs)
+✓ No unsafe code, no unwrap() in production paths
+✓ Comprehensive test coverage (3 tests)
+
+FILES MODIFIED:
+1. crates/cuttlefish-agents/src/orchestrator.rs (NEW)
+   - OrchestratorAgent struct with provider and bus
+   - PlannedTask struct with id, description, agent, status
+   - TaskStatus enum: Pending, Running, Completed, Failed
+   - Agent trait implementation with execute() method
+   - Task planning via model provider
+   - Task dispatch to agent topics
+   - Fallback to single coder task on JSON parse failure
+   - 3 unit tests with tokio::test
+
+2. crates/cuttlefish-agents/Cargo.toml (UPDATED)
+   - Added: cuttlefish-providers = { path = "../cuttlefish-providers" }
+
+3. crates/cuttlefish-agents/src/lib.rs (UPDATED)
+   - Added: pub mod orchestrator;
+   - Added: pub use orchestrator::OrchestratorAgent;
+
+VERIFICATION RESULTS:
+✓ cargo test -p cuttlefish-agents: 12 passed; 0 failed
+✓ cargo clippy -p cuttlefish-agents -- -D warnings: CLEAN (no warnings)
+✓ All public items have /// documentation
+✓ No unsafe code blocks
+✓ No unwrap() in production code paths
+✓ All tests use #[tokio::test] for async
+
+TEST COVERAGE:
+- test_orchestrator_dispatches_on_execute: Verifies task dispatch with valid JSON
+- test_orchestrator_fallback_on_bad_json: Verifies fallback to single coder task
+- test_task_status_default_is_pending: Verifies TaskStatus default
+
+ARCHITECTURE NOTES:
+- OrchestratorAgent depends on ModelProvider (trait) and TokioMessageBus
+- Follows dependency inversion: no concrete implementations in constructor
+- Task planning uses model provider for LLM-based planning
+- Dispatch uses message bus for async agent communication
+- Error handling uses AgentError from cuttlefish_core
+- All async operations properly awaited
+
+STATUS: COMPLETE ✓

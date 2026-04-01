@@ -1,0 +1,32 @@
+=== TASK: Create cuttlefish-agents/src/critic.rs ===
+
+FILE CREATED: /home/jack/Coding/Rust/cuttlefish-rs/crates/cuttlefish-agents/src/critic.rs
+
+CHANGES MADE:
+1. Created critic.rs with:
+   - CriticAgent struct implementing Agent trait
+   - ReviewResult, ReviewVerdict, ReviewIssue types
+   - JSON parsing for model responses with fallback to keyword detection
+   - Full test suite (5 tests)
+   - System prompt for code review
+
+2. Updated lib.rs:
+   - Added `pub mod critic;`
+   - Added exports: `pub use critic::{CriticAgent, ReviewResult, ReviewVerdict};`
+
+TEST RESULTS:
+$ cargo test -p cuttlefish-agents 2>&1 | grep "test result"
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+CLIPPY RESULTS:
+$ cargo clippy -p cuttlefish-agents -- -D warnings 2>&1 | tail -3
+    Checking cuttlefish-agents v0.1.0 (/home/jack/Coding/Rust/cuttlefish-rs/crates/cuttlefish-agents)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.61s
+
+STATUS: ✅ COMPLETE
+- All tests pass (20 passed)
+- Clippy clean (no warnings)
+- No unsafe code
+- All public items documented
+- No unwrap() in production code

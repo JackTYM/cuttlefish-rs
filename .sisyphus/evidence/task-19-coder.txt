@@ -1,0 +1,19 @@
+TASK: Create crates/cuttlefish-agents/src/coder.rs
+
+FILE CREATED: crates/cuttlefish-agents/src/coder.rs
+- CoderAgent struct implementing Agent trait
+- System prompt for code generation
+- parse_output_metadata helper for tracking files/commands
+- 3 unit tests (execution, context tracking, role verification)
+- All public items documented with ///
+- No unsafe code, no unwrap() in production
+
+INTEGRATION: Updated crates/cuttlefish-agents/src/lib.rs
+- Added: pub mod coder;
+- Added: pub use coder::CoderAgent;
+
+TEST RESULTS:
+✓ cargo test -p cuttlefish-agents: 15 passed; 0 failed
+✓ cargo clippy -p cuttlefish-agents -- -D warnings: Finished (no warnings)
+
+STATUS: Complete and verified

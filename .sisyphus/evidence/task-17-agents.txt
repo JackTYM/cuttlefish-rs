@@ -1,0 +1,44 @@
+=== CUTTLEFISH-AGENTS CRATE BUILD & TEST RESULTS ===
+
+FILES CREATED:
+1. src/bus.rs - TokioMessageBus implementation with broadcast channels
+2. src/tools.rs - ToolRegistry and ToolDefinition with 5 built-in tools
+3. src/runner.rs - AgentRunner and ToolExecutor with timeout enforcement
+4. src/lib.rs - Module exports and re-exports
+
+COMPILATION:
+✓ All files compile without errors
+✓ No unsafe code violations
+✓ No unwrap() in non-test code
+✓ All public items have /// doc comments
+
+TEST RESULTS:
+✓ 9 tests passed
+  - bus::tests::test_subscribe_then_publish
+  - bus::tests::test_multiple_subscribers
+  - bus::tests::test_isolated_topics
+  - tools::tests::test_defaults_has_5_tools
+  - tools::tests::test_register_custom
+  - tools::tests::test_all_definitions_count
+  - runner::tests::test_unknown_tool_returns_error
+  - runner::tests::test_simulate_command
+  - runner::tests::test_runner_config_defaults
+
+CLIPPY:
+✓ Clean - no warnings with -D warnings flag
+
+IMPLEMENTATION DETAILS:
+- TokioMessageBus: Arc<Mutex<HashMap>> for thread-safe topic management
+- ToolRegistry: HashMap-based registry with 5 default tools (read_file, write_file, execute_command, search_files, list_directory)
+- ToolExecutor: Handles tool calls with optional Docker sandbox support, falls back to simulation mode
+- AgentRunner: Enforces timeout (300s default) and iteration limits (25 default)
+- All async code uses tokio::test
+- Proper error handling with AgentError types
+- Tracing integration for debug/info/warn logging
+
+VERIFICATION:
+✓ cargo test -p cuttlefish-agents: PASS
+✓ cargo clippy -p cuttlefish-agents -- -D warnings: PASS
+✓ No unsafe code
+✓ No unwrap() in library code
+✓ All public items documented

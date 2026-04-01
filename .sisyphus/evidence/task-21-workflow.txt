@@ -1,0 +1,27 @@
+=== TASK 21: Create workflow.rs ===
+
+FILE CREATED: crates/cuttlefish-agents/src/workflow.rs
+- WorkflowEngine struct implementing Orchestrator→Coder→Critic loop
+- MAX_CODER_CRITIC_ITERATIONS = 5 (Metis guardrail)
+- WorkflowResult struct with success, iterations, final_verdict
+- execute() method with full workflow orchestration
+- 3 unit tests: approve, retry on reject, max iterations
+
+INTEGRATION: Updated src/lib.rs
+- Added: pub mod workflow;
+- Added: pub use workflow::{WorkflowEngine, WorkflowResult};
+
+TEST RESULTS:
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+CLIPPY RESULTS:
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.56s
+(No warnings or errors)
+
+VERIFICATION:
+✓ All tests pass
+✓ Clippy clean with -D warnings
+✓ No unsafe code
+✓ All public items documented
+✓ No unwrap() in production code
+✓ Proper error handling with Result<T, AgentError>

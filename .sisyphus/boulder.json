@@ -18,7 +18,12 @@
     "ses_2b4ed301dffeXsjDRj2S7xcccm",
     "ses_2b4e9d346ffe6frySUdPu0ii3a",
     "ses_2b4e64472ffeqzgSNRfEpB1kQv",
-    "ses_2b4e1eb00ffemym1QBWXCzCeoi"
+    "ses_2b4e1eb00ffemym1QBWXCzCeoi",
+    "ses_2b4a4dc75ffe55dOACpqq0q5Jn",
+    "ses_2b4a2cd40ffe7HREC2Kx1LLYD9",
+    "ses_2b49ebd37ffezq4y4iAzWBVgCD",
+    "ses_2b49d5b8cffexkOkgz6ssET9HE",
+    "ses_2b49b9e38ffeXJolM8oGZ53izk"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -148,6 +153,51 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-04-01T22:17:33.549Z"
+    },
+    "todo:17": {
+      "task_key": "todo:17",
+      "task_label": "17",
+      "task_title": "cuttlefish-agents: Agent Trait + Message Bus",
+      "session_id": "ses_2b4a4dc75ffe55dOACpqq0q5Jn",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:23:43.904Z"
+    },
+    "todo:18": {
+      "task_key": "todo:18",
+      "task_label": "18",
+      "task_title": "cuttlefish-agents: Orchestrator Agent",
+      "session_id": "ses_2b4a2cd40ffe7HREC2Kx1LLYD9",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:28:24.234Z"
+    },
+    "todo:19": {
+      "task_key": "todo:19",
+      "task_label": "19",
+      "task_title": "cuttlefish-agents: Coder Agent",
+      "session_id": "ses_2b49ebd37ffezq4y4iAzWBVgCD",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:29:49.943Z"
+    },
+    "todo:20": {
+      "task_key": "todo:20",
+      "task_label": "20",
+      "task_title": "cuttlefish-agents: Critic Agent",
+      "session_id": "ses_2b49d5b8cffexkOkgz6ssET9HE",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:31:38.566Z"
+    },
+    "todo:21": {
+      "task_key": "todo:21",
+      "task_label": "21",
+      "task_title": "cuttlefish-agents: Planner→Coder→Critic Loop",
+      "session_id": "ses_2b49b9e38ffeXJolM8oGZ53izk",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:34:05.752Z"
     }
   }
 }
