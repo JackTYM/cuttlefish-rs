@@ -1,0 +1,47 @@
+# Cuttlefish Configuration Example
+# Copy to cuttlefish.toml and edit as needed.
+# NEVER commit cuttlefish.toml — it may contain sensitive paths.
+
+# Secrets MUST be provided via environment variables:
+#   CUTTLEFISH_API_KEY   — API key for WebUI/TUI access
+#   DISCORD_BOT_TOKEN    — Discord bot token (if using Discord)
+#   AWS_ACCESS_KEY_ID    — AWS credentials (if using Bedrock)
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_DEFAULT_REGION
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+path = "cuttlefish.db"
+
+[sandbox]
+docker_socket = "unix:///var/run/docker.sock"
+memory_limit_mb = 2048
+cpu_limit = 2.0
+disk_limit_gb = 10
+max_concurrent = 5
+
+[discord]
+token_env_var = "DISCORD_BOT_TOKEN"
+guild_ids = []
+
+[providers.claude]
+provider_type = "bedrock"
+model = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+region = "us-east-1"
+
+[providers.claude-fast]
+provider_type = "bedrock"
+model = "anthropic.claude-3-haiku-20240307-v1:0"
+region = "us-east-1"
+
+[agents.orchestrator]
+category = "deep"
+
+[agents.coder]
+category = "deep"
+
+[agents.critic]
+category = "unspecified-high"

@@ -1,0 +1,40 @@
+[workspace]
+members = [
+    ".",
+    "crates/cuttlefish-core",
+    "crates/cuttlefish-db",
+    "crates/cuttlefish-providers",
+    "crates/cuttlefish-sandbox",
+    "crates/cuttlefish-vcs",
+    "crates/cuttlefish-agents",
+    "crates/cuttlefish-discord",
+    "crates/cuttlefish-api",
+    "crates/cuttlefish-tui",
+]
+resolver = "2"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+tracing = "0.1"
+thiserror = "2"
+anyhow = "1"
+
+[package]
+name = "cuttlefish-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.0"
+description = "Multi-agent, multi-model agentic coding platform"
+
+[dependencies]
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

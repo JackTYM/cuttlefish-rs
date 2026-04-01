@@ -1,0 +1,78 @@
+# Task 6: Project Documentation — Evidence
+
+## Deliverables Completed
+
+### ✓ README.md
+- Project overview with 🐙 emoji branding
+- Philosophy section explaining multi-model dispatch
+- Architecture overview (Agent Orchestra, Docker Sandbox, Persistent Context, Multi-Interface)
+- Complete crate structure table (9 crates with purposes)
+- Getting Started section with prerequisites, build, configure, run steps
+- MIT License
+
+**File**: `/home/jack/Coding/Rust/cuttlefish-rs/README.md` (1.8K)
+
+### ✓ CLAUDE.md
+- Project identity (Rust 2024, workspace, traits-first philosophy)
+- Non-negotiable rules:
+  - Code quality (deny unsafe, deny unwrap, warn missing_docs, no println, no global state)
+  - Error handling (thiserror for libs, anyhow for bins, errors in core)
+  - Architecture (traits in core, no trait definitions in impl crates, all I/O behind traits)
+- Crate dependency rules (clear hierarchy diagram)
+- Development workflow (TDD, clippy, test, commit convention)
+- Commit convention format with examples
+- Testing guidelines (unit tests, integration tests, mocks, async)
+- Configuration (cuttlefish.toml, example, env vars)
+
+**File**: `/home/jack/Coding/Rust/cuttlefish-rs/CLAUDE.md` (2.4K)
+
+### ✓ .gitignore
+- Rust build artifacts (/target/, Cargo.lock.bak)
+- Database files (*.db, *.sqlite, *.sqlite3, *.db-shm, *.db-wal)
+- User configuration (cuttlefish.toml)
+- Environment files (.env, .env.local, .env.*)
+- Secrets and credentials (*.pem, *.key, *.p12, *.pfx, oauth_tokens.json, tokens/)
+- Log files (*.log, logs/)
+- IDE files (.idea/, .vscode/, *.swp, *.swo)
+- macOS (.DS_Store)
+- Temp files (*.tmp, *.temp)
+
+**File**: `/home/jack/Coding/Rust/cuttlefish-rs/.gitignore` (415 bytes)
+
+### ✓ cuttlefish.example.toml
+- Valid TOML syntax (verified with Python tomllib)
+- Comprehensive comments explaining:
+  - File purpose and security guidance
+  - Required environment variables
+- Configuration sections:
+  - [server] — host, port
+  - [database] — path
+  - [sandbox] — docker_socket, memory_limit_mb, cpu_limit, disk_limit_gb, max_concurrent
+  - [discord] — token_env_var, guild_ids
+  - [providers.claude] — bedrock provider with Sonnet model
+  - [providers.claude-fast] — bedrock provider with Haiku model
+  - [agents.orchestrator] — category: deep
+  - [agents.coder] — category: deep
+  - [agents.critic] — category: unspecified-high
+
+**File**: `/home/jack/Coding/Rust/cuttlefish-rs/cuttlefish.example.toml` (1.1K)
+
+## Verification Results
+
+✓ All files created successfully
+✓ TOML syntax valid (Python tomllib parser)
+✓ No syntax errors in Markdown files
+✓ All files follow project conventions
+✓ No secrets in example config
+✓ Technical and clear (no marketing copy)
+
+## Files Summary
+
+| File | Size | Status |
+|------|------|--------|
+| README.md | 1.8K | ✓ Complete |
+| CLAUDE.md | 2.4K | ✓ Complete |
+| .gitignore | 415B | ✓ Complete |
+| cuttlefish.example.toml | 1.1K | ✓ Complete |
+
+All deliverables meet requirements. Task 6 complete.

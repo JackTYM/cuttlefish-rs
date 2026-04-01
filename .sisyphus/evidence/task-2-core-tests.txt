@@ -1,0 +1,27 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (target/debug/deps/cuttlefish_core-0582bbef769cc434)
+
+running 14 tests
+test error::tests::test_agent_error_display ... ok
+test error::tests::test_config_error_display ... ok
+test error::tests::test_api_error_display ... ok
+test config::tests::test_invalid_toml ... ok
+test error::tests::test_cuttlefish_error_from_config ... ok
+test error::tests::test_database_error_display ... ok
+test config::tests::test_default_values ... ok
+test error::tests::test_cuttlefish_error_from_io ... ok
+test error::tests::test_discord_error_display ... ok
+test error::tests::test_provider_error_display ... ok
+test error::tests::test_sandbox_error_display ... ok
+test error::tests::test_vcs_error_display ... ok
+test tracing::tests::test_init_tracing_can_be_called ... ok
+test config::tests::test_load_from_file_with_all_sections ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests cuttlefish_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,19 @@
+[package]
+name = "cuttlefish-tui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.0"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "cuttlefish-tui"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }

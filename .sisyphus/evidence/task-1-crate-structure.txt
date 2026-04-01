@@ -1,0 +1,12 @@
+total 44
+drwxr-xr-x 11 jack jack 4096 Apr  1 14:01 .
+drwxr-xr-x  7 jack jack 4096 Apr  1 14:01 ..
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-agents
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-api
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-core
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-db
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-discord
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-providers
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-sandbox
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-tui
+drwxr-xr-x  3 jack jack 4096 Apr  1 14:01 cuttlefish-vcs

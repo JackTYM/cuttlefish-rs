@@ -1,0 +1,29 @@
+=== GitHub Actions Workflow Validation ===
+Date: 2026-04-01
+
+YAML Validation Results:
+✓ ci.yml: valid YAML
+✓ release.yml: valid YAML
+
+Files Created:
+- .github/workflows/ci.yml
+- .github/workflows/release.yml
+
+CI Workflow Features:
+✓ Runs on push to main/master and pull requests
+✓ Rust 1.94.0 toolchain with rustfmt and clippy components
+✓ Cargo dependency caching (registry, git, target)
+✓ Format check (cargo fmt)
+✓ Linting (cargo clippy with -D warnings)
+✓ Test suite (cargo test)
+✓ Documentation check (cargo doc)
+
+Release Workflow Features:
+✓ Triggers on version tags (v*)
+✓ Builds release binary (cargo build --release)
+✓ Renames binary to cuttlefish-{version}-linux-x86_64
+✓ Creates GitHub Release with binary artifact
+✓ Generates release notes automatically
+✓ Uses GITHUB_TOKEN for authentication (no hardcoded secrets)
+
+All validation checks passed.
