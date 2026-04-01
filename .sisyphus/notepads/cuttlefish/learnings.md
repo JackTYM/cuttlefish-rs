@@ -173,3 +173,118 @@ Both workflows validated as valid YAML. Ready for GitHub Actions execution.
 - ✅ No syntax errors in Markdown
 - ✅ All files follow project conventions
 - ✅ Evidence saved to `.sisyphus/evidence/task-6-docs.txt`
+
+## Task 7: cuttlefish-providers — AWS Bedrock Provider + Streaming
+
+### Completed
+- ✅ `Cargo.toml` — Added aws-sdk-bedrockruntime, aws-config, aws-smithy-types, async-trait, futures, serde_json, cuttlefish-core dep
+- ✅ `src/bedrock.rs` — `BedrockProvider` implementing `ModelProvider` trait with `converse` API, message conversion, tool call extraction
+- ✅ `src/mock.rs` — `MockModelProvider` with canned response queue, default responses, streaming support
+- ✅ `src/lib.rs` — Module exports for bedrock/mock, re-export of `ModelProvider` trait
+- ✅ All 10 unit tests + 1 doctest pass
+- ✅ `cargo clippy -p cuttlefish-providers -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **AWS Document → serde_json**: `aws_smithy_types::Document` does NOT implement `serde::Serialize`. Must manually convert via recursive `document_to_json()` function.
+- **AWS Number**: `Number` is `Copy`, so use `*n` not `n.clone()`. Method is `to_f64_lossy()` not `to_f64()`.
+- **Bedrock API types**: `ToolUseBlock` fields (`tool_use_id`, `name`) are `String` not `Option<String>`. `input` is `Document` not `Option<Document>`.
+- **InferenceConfiguration**: `temperature()` takes `f32` not `f64`.
+- **Mock pattern**: `Arc<Mutex<Vec<String>>>` for thread-safe canned response queue. `expect("mutex poisoned")` is acceptable Rust pattern.
+- **Pseudo-streaming**: `stream()` method wraps `complete()` in `futures::stream::once(fut).flatten().boxed()` — real `converse_stream` deferred.
+- **StreamExt import**: `futures::StreamExt` must be imported separately from `futures::stream` for `.boxed()` method.
+
+### Verification
+- `cargo test -p cuttlefish-providers` → 10 passed + 1 doctest
+- `cargo clippy -p cuttlefish-providers -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-7-providers-tests.txt`
+
+## Task 9: cuttlefish-db — Conversation Storage + Sliding Window Queries
+
+### Completed
+- ✅ 4 new methods added to `Database` impl: `get_recent_messages_chrono`, `get_message_count`, `archive_and_summarize`, `get_nth_recent_message_timestamp`
+- ✅ 3 new tests: chrono order, message count, archive+summarize
+- ✅ All 7 tests pass (4 existing + 3 new)
+- ✅ `cargo clippy -p cuttlefish-db -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **Chrono ordering**: Subquery pattern `SELECT * FROM (SELECT ... ORDER BY DESC LIMIT ?) ORDER BY ASC` to get N most recent in oldest-first order
+- **Archive flow**: Two-step — UPDATE archived=1 on old messages, then INSERT summary as system message with cutoff timestamp
+- **Nth message offset**: `LIMIT 1 OFFSET n` to get the cutoff timestamp for sliding window
+- **SQLite datetime precision**: 1-second precision means rapid inserts get same timestamp. Tests verify count, not strict ordering.
+- **Existing code style**: Uses runtime `query_as::<_, T>` with `.bind()`, not compile-time `query_as!` macros. Follow same pattern.
+
+## Task 8: cuttlefish-providers — Claude Code OAuth PKCE Flow + CCH Signing
+
+### Completed
+- ✅ `src/oauth_flow.rs` — PKCE verifier/challenge generation, CCH body signing (xxHash64), auth URL builder, token types
+- ✅ `src/claude_oauth.rs` — `ClaudeOAuthProvider` implementing `ModelProvider` with spoofed CLI headers and CCH signing
+- ✅ `src/lib.rs` — Updated to export `claude_oauth` and `oauth_flow` modules
+- ✅ `Cargo.toml` — Added reqwest, base64, sha2, xxhash-rust dependencies
+- ✅ All 24 tests pass (10 existing + 14 new) + 1 doctest
+- ✅ `cargo clippy -p cuttlefish-providers -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **CCH algorithm**: xxHash64 with seed `0x6e52736ac806831e`, lower 20 bits, 5-char lowercase hex
+- **PKCE**: SHA256 of verifier, base64url (no padding) encoded as challenge
+- **URL encoding**: Custom `urlencoded()` function — colon `:` becomes `%3A`, test must match encoded form
+- **Billing header**: `cc_version=2.1.87.fingerprint; cc_entrypoint=cli; cch={hash};`
+- **System message handling**: Filtered from messages array, extracted to top-level `system` field
+- **No real HTTP in tests**: Only test request body construction and utility functions
+
+### Verification
+- `cargo test -p cuttlefish-providers` → 24 passed + 1 doctest
+- `cargo clippy -p cuttlefish-providers -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-8-claude-oauth-tests.txt`
+
+## Task 10: cuttlefish-db — Project Metadata + Template Storage + Discord Lookup
+
+### Completed
+- ✅ 5 extended project methods: `get_project_by_discord_channel`, `get_projects_by_guild`, `set_project_discord_channel`, `set_project_container`, `set_project_github_url`
+- ✅ 5 template CRUD methods: `create_template`, `get_template`, `list_templates`, `list_templates(language)`, `delete_template`
+- ✅ 2 new tests: `test_discord_channel_lookup`, `test_template_crud`
+- ✅ All 9 tests pass (7 existing + 2 new)
+- ✅ `cargo clippy -p cuttlefish-db -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **Discord lookup**: Uses indexed column `idx_projects_discord_channel` for fast channel→project resolution
+- **Guild queries**: Returns Vec sorted by `created_at DESC` for chronological listing
+- **Template CRUD**: Standard SQL patterns with parameterized queries (no injection risk)
+- **Optional filtering**: `list_templates(Option<&str>)` branches on language filter presence
+- **Delete return**: Returns `bool` indicating whether row was actually deleted (rows_affected > 0)
+- **All methods**: Return `Result<T, sqlx::Error>` for proper error propagation
+
+### Verification
+- `cargo test -p cuttlefish-db` → 9 passed (7 existing + 2 new)
+- `cargo clippy -p cuttlefish-db -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-10-db-templates.txt`
+
+## Task 11: cuttlefish-core — Context Manager (Sliding Window + Summaries)
+
+### Completed
+- ✅ `src/context.rs` — `ContextManager` struct with `build_context` and `trigger_summarization` methods
+- ✅ `ContextConfig` with `max_tokens`, `summarize_threshold`, `summarization_enabled` fields
+- ✅ `src/lib.rs` — Updated to export `context` module, re-exports `ContextManager` and `ContextConfig`
+- ✅ `Cargo.toml` — Added `cuttlefish-db` dependency, `sqlx` dev-dependency for tests
+- ✅ 4 new tests: empty context, within budget, respects budget, summarization at threshold
+- ✅ All 18 tests pass (14 existing + 4 new)
+- ✅ `cargo clippy -p cuttlefish-core -- -D warnings` → ZERO warnings
+
+### Key Patterns
+- **Dependency direction**: `cuttlefish-core → cuttlefish-db` is safe since `cuttlefish-db` does NOT depend on `cuttlefish-core`
+- **Inline mock**: Test uses `TestProvider` implementing `ModelProvider` directly (cannot use cuttlefish-providers — would be circular)
+- **Token estimation**: `content.len() / 4 + 1` — rough 4 chars/token approximation
+- **Summarization flow**: Check count → get cutoff timestamp → archive old messages → insert summary
+- **SQLite timestamp precision**: 1-second resolution means rapid inserts share timestamps; tests use explicit timestamps via raw SQL
+- **Error mapping**: `sqlx::Error` → `DatabaseError(e.to_string())` → `CuttlefishError::Database` via thiserror `#[from]`
+- **Provider errors**: `?` operator directly converts `ProviderError` to `CuttlefishError` via `From` impl
+
+### Gotchas
+- SQLite `datetime('now')` has 1-second precision. Rapid message inserts in tests share the same timestamp, causing `archive_and_summarize`'s `created_at < cutoff` to archive 0 rows. Fix: use explicit timestamps via `sqlx::query` with `db.pool()`.
+- `sqlx` must be an explicit dev-dependency even though it's a transitive dep via `cuttlefish-db` (Rust 2024 edition doesn't expose transitive deps directly).
+- `NamedTempFile` must be kept alive for test duration (return as `_tmp` binding) to prevent SQLite file deletion.
+
+### Verification
+- `cargo test -p cuttlefish-core` → 18 passed (14 existing + 4 new)
+- `cargo clippy -p cuttlefish-core -- -D warnings` → 0 warnings
+- Evidence saved to `.sisyphus/evidence/task-11-context-manager.txt`
+

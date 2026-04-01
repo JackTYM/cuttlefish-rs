@@ -1,0 +1,29 @@
+Task 9: cuttlefish-db — Conversation Storage + Sliding Window Queries
+=====================================================================
+Date: 2026-04-01
+
+cargo test -p cuttlefish-db:
+  running 7 tests
+  test tests::test_create_and_get_project ... ok
+  test tests::test_update_project_status ... ok
+  test tests::test_get_message_count ... ok
+  test tests::test_token_count ... ok
+  test tests::test_archive_and_summarize ... ok
+  test tests::test_insert_and_get_messages ... ok
+  test tests::test_get_recent_messages_chrono_order ... ok
+  test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+cargo clippy -p cuttlefish-db -- -D warnings:
+  Finished `dev` profile [unoptimized + debuginfo] target(s)
+  ZERO warnings
+
+Methods added:
+  - get_recent_messages_chrono(project_id, limit) -> Vec<Conversation>
+  - get_message_count(project_id) -> i64
+  - archive_and_summarize(project_id, before_created_at, summary_id, summary_content) -> u64
+  - get_nth_recent_message_timestamp(project_id, n) -> Option<String>
+
+Tests added (3 new, 4 existing preserved):
+  - test_get_recent_messages_chrono_order
+  - test_get_message_count
+  - test_archive_and_summarize

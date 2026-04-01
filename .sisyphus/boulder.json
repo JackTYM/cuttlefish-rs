@@ -8,7 +8,12 @@
     "ses_2b51ec25effezKCuwVQ44KsOBE",
     "ses_2b51b82b2ffel9Pcoj83P8qKto",
     "ses_2b516064fffe6EUTz7wLpBYl1n",
-    "ses_2b513a790ffegcrKBd2W3OHgtZ"
+    "ses_2b513a790ffegcrKBd2W3OHgtZ",
+    "ses_2b50f3a2cffeVsVoHroLLmLeU8",
+    "ses_2b5095c57ffe3S8mUxXpQoUTGz",
+    "ses_2b50546b1ffexv8e0qTDSQ1PiD",
+    "ses_2b5012724ffe5vKOBmS4plD8Nr",
+    "ses_2b4fe6038ffeRkiEgE6kwiR50v"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -66,6 +71,42 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-04-01T21:23:35.045Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "cuttlefish-providers: AWS Bedrock Provider + Streaming",
+      "session_id": "ses_2b50f3a2cffeVsVoHroLLmLeU8",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-01T21:31:53.160Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "cuttlefish-providers: Claude Code OAuth PKCE Flow",
+      "session_id": "ses_2b50546b1ffexv8e0qTDSQ1PiD",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-01T21:40:55.789Z"
+    },
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "cuttlefish-db: Project Metadata + Template Storage",
+      "session_id": "ses_2b5012724ffe5vKOBmS4plD8Nr",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T21:43:15.518Z"
+    },
+    "todo:11": {
+      "task_key": "todo:11",
+      "task_label": "11",
+      "task_title": "cuttlefish-core: Context Manager (Sliding Window + Summaries)",
+      "session_id": "ses_2b4fe6038ffeRkiEgE6kwiR50v",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-01T21:53:03.928Z"
     }
   }
 }

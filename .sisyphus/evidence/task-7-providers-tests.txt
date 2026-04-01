@@ -1,0 +1,23 @@
+
+running 10 tests
+test bedrock::tests::test_convert_assistant_message ... ok
+test bedrock::tests::test_convert_system_message_fails ... ok
+test bedrock::tests::test_convert_user_message ... ok
+test mock::tests::test_mock_name ... ok
+test mock::tests::test_mock_complete_returns_default_when_empty ... ok
+test mock::tests::test_mock_multiple_responses_consumed_in_order ... ok
+test mock::tests::test_mock_complete_with_canned_response ... ok
+test mock::tests::test_mock_default_has_response ... ok
+test mock::tests::test_mock_count_tokens ... ok
+test mock::tests::test_mock_stream_emits_text_and_usage ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/cuttlefish-providers/src/lib.rs - (line 10) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.47s; merged doctests compilation took 0.46s
+--- CLIPPY ---

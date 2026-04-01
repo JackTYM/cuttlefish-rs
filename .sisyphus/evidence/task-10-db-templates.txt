@@ -1,0 +1,76 @@
+TASK 10: cuttlefish-db — Project Metadata + Template Storage + Discord Lookup
+============================================================================
+
+DELIVERABLES COMPLETED:
+✅ Extended Database impl with 10 new methods
+✅ All new methods documented with /// docstrings
+✅ All tests passing (9 total: 7 existing + 2 new)
+✅ Zero clippy warnings
+
+NEW METHODS ADDED:
+─────────────────
+
+Project Metadata Methods (5):
+1. get_project_by_discord_channel(channel_id) → Option<Project>
+2. get_projects_by_guild(guild_id) → Vec<Project>
+3. set_project_discord_channel(project_id, channel_id, guild_id) → ()
+4. set_project_container(project_id, container_id) → ()
+5. set_project_github_url(project_id, github_url) → ()
+
+Template CRUD Methods (5):
+1. create_template(id, name, description, content_md, language) → ()
+2. get_template(name) → Option<Template>
+3. list_templates(language: Option) → Vec<Template>
+4. delete_template(name) → bool
+
+New Tests (2):
+1. test_discord_channel_lookup() - Verifies Discord channel lookup and assignment
+2. test_template_crud() - Verifies full CRUD lifecycle for templates
+
+TEST RESULTS:
+─────────────
+running 9 tests
+test tests::test_update_project_status ... ok
+test tests::test_create_and_get_project ... ok
+test tests::test_discord_channel_lookup ... ok
+test tests::test_template_crud ... ok
+test tests::test_get_message_count ... ok
+test tests::test_token_count ... ok
+test tests::test_insert_and_get_messages ... ok
+test tests::test_archive_and_summarize ... ok
+test tests::test_get_recent_messages_chrono_order ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured
+
+CLIPPY VERIFICATION:
+────────────────────
+✅ cargo clippy -p cuttlefish-db -- -D warnings
+   Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
+   (ZERO warnings)
+
+CODE QUALITY CHECKLIST:
+──────────────────────
+✅ No unsafe code (enforced by #![deny(unsafe_code)])
+✅ No unwrap() in library code (enforced by #![deny(clippy::unwrap_used)])
+✅ All public methods have /// documentation
+✅ All tests use expect() with descriptive messages
+✅ Proper error handling with Result types
+✅ Async/await patterns with sqlx
+✅ No global mutable state
+
+IMPLEMENTATION NOTES:
+────────────────────
+- All methods follow existing patterns in Database impl
+- Discord lookup uses indexed column (idx_projects_discord_channel)
+- Template CRUD uses standard SQL patterns
+- Tests use test_db() helper for isolated SQLite instances
+- All queries use parameterized bindings (no SQL injection risk)
+- Methods return Result<T, sqlx::Error> for proper error propagation
+
+FILE MODIFIED:
+──────────────
+crates/cuttlefish-db/src/lib.rs
+- Added 10 new public methods to impl Database block
+- Added 2 new test functions to #[cfg(test)] module
+- Total lines added: ~180 (methods + tests)
+- No existing code modified or removed

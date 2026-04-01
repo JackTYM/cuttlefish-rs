@@ -1,0 +1,37 @@
+
+running 24 tests
+test bedrock::tests::test_convert_assistant_message ... ok
+test bedrock::tests::test_convert_system_message_fails ... ok
+test bedrock::tests::test_convert_user_message ... ok
+test claude_oauth::tests::test_build_request_body_with_system ... ok
+test claude_oauth::tests::test_provider_name ... ok
+test mock::tests::test_mock_count_tokens ... ok
+test mock::tests::test_mock_complete_returns_default_when_empty ... ok
+test claude_oauth::tests::test_build_request_body_filters_system_messages ... ok
+test claude_oauth::tests::test_build_request_body_basic ... ok
+test mock::tests::test_mock_complete_with_canned_response ... ok
+test claude_oauth::tests::test_count_tokens_returns_estimate ... ok
+test oauth_flow::tests::test_cch_compute_returns_5_char_hex ... ok
+test mock::tests::test_mock_default_has_response ... ok
+test oauth_flow::tests::test_cch_differs_for_different_bodies ... ok
+test oauth_flow::tests::test_build_auth_url_contains_required_params ... ok
+test oauth_flow::tests::test_cch_is_deterministic ... ok
+test oauth_flow::tests::test_constants_have_expected_values ... ok
+test oauth_flow::tests::test_pkce_challenge_derives_from_verifier ... ok
+test mock::tests::test_mock_multiple_responses_consumed_in_order ... ok
+test oauth_flow::tests::test_pkce_challenge_is_deterministic ... ok
+test oauth_flow::tests::test_pkce_verifier_generates_non_empty ... ok
+test oauth_flow::tests::test_sign_request_body_replaces_placeholder ... ok
+test mock::tests::test_mock_name ... ok
+test mock::tests::test_mock_stream_emits_text_and_usage ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/cuttlefish-providers/src/lib.rs - (line 11) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.46s; merged doctests compilation took 0.44s
+--- CLIPPY ---

@@ -752,7 +752,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 2 — Providers + Storage
 
-- [ ] 7. cuttlefish-providers: AWS Bedrock Provider + Streaming
+- [x] 7. cuttlefish-providers: AWS Bedrock Provider + Streaming
 
   **What to do**:
   - Implement `ModelProvider` trait for AWS Bedrock
@@ -815,7 +815,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Files: `crates/cuttlefish-providers/src/*`
   - Pre-commit: `cargo test -p cuttlefish-providers`
 
-- [ ] 8. cuttlefish-providers: Claude Code OAuth PKCE Flow
+- [x] 8. cuttlefish-providers: Claude Code OAuth PKCE Flow
 
   **What to do**:
   - Implement full Claude Code OAuth emulation:
@@ -893,7 +893,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Files: `crates/cuttlefish-providers/src/claude_oauth/*`
   - Pre-commit: `cargo test -p cuttlefish-providers`
 
-- [ ] 9. cuttlefish-db: Conversation Storage + Sliding Window Queries
+- [x] 9. cuttlefish-db: Conversation Storage + Sliding Window Queries
 
   **What to do**:
   - Implement conversation CRUD with efficient windowed queries:
@@ -944,7 +944,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(db): add conversation storage with sliding window queries`
   - Pre-commit: `cargo test -p cuttlefish-db`
 
-- [ ] 10. cuttlefish-db: Project Metadata + Template Storage
+- [x] 10. cuttlefish-db: Project Metadata + Template Storage
 
   **What to do**:
   - Implement project CRUD: create, get, list, update status, delete
@@ -985,7 +985,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(db): add project metadata and template storage`
   - Pre-commit: `cargo test -p cuttlefish-db`
 
-- [ ] 11. cuttlefish-core: Context Manager (Sliding Window + Summaries)
+- [x] 11. cuttlefish-core: Context Manager (Sliding Window + Summaries)
 
   **What to do**:
   - Implement `ContextManager` struct that:

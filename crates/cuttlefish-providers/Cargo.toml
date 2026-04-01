@@ -8,8 +8,32 @@ rust-version = "1.94.0"
 workspace = true
 
 [dependencies]
+cuttlefish-core = { path = "../cuttlefish-core" }
+
+# AWS Bedrock
+aws-sdk-bedrockruntime = "1"
+aws-config = "1"
+aws-smithy-types = "1"
+
+# Async
 tokio = { workspace = true }
+async-trait = "0.1"
+futures = "0.3"
+
+# HTTP client for OAuth flow
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
 serde = { workspace = true }
+serde_json = "1"
+
+# Crypto / hashing
+base64 = "0.22"
+sha2 = "0.10"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+
+# Logging
 tracing = { workspace = true }
+
+# Error handling
 thiserror = { workspace = true }
-anyhow = { workspace = true }
