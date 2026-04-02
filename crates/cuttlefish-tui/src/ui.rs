@@ -3,14 +3,15 @@
 #![allow(dead_code)]
 
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    Frame,
 };
 
 use crate::app::{App, AppView};
+use crate::mascot::MascotWidget;
 
 /// Render the complete TUI layout.
 pub fn render(app: &App, frame: &mut Frame) {
@@ -51,6 +52,11 @@ fn render_header(app: &App, frame: &mut Frame, area: Rect) {
     } else {
         " Log  "
     };
+    let tab_mascot = if app.view == AppView::Mascot {
+        "[Mascot]"
+    } else {
+        " Mascot "
+    };
 
     let header = Paragraph::new(Line::from(vec![
         Span::styled(
@@ -63,6 +69,7 @@ fn render_header(app: &App, frame: &mut Frame, area: Rect) {
         Span::styled(tab_chat, Style::default().fg(Color::White)),
         Span::styled(tab_diff, Style::default().fg(Color::White)),
         Span::styled(tab_log, Style::default().fg(Color::White)),
+        Span::styled(tab_mascot, Style::default().fg(Color::White)),
         Span::raw(" | "),
         Span::raw(project),
         Span::raw(" | "),
@@ -78,7 +85,14 @@ fn render_main(app: &App, frame: &mut Frame, area: Rect) {
         AppView::Chat => render_chat(app, frame, area),
         AppView::Diff => render_diff(app, frame, area),
         AppView::Log => render_log(app, frame, area),
+        AppView::Mascot => render_mascot(frame, area),
     }
+}
+
+/// Render the cuttlefish mascot.
+fn render_mascot(frame: &mut Frame, area: Rect) {
+    let widget = MascotWidget::new();
+    frame.render_widget(widget, area);
 }
 
 /// Render the chat message list.

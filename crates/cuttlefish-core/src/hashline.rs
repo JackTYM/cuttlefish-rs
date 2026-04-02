@@ -285,7 +285,7 @@ mod tests {
             new_content: Some("    println!(\"world\");".to_string()),
         }];
 
-        let result = apply_edits(content, &edits).unwrap();
+        let result = apply_edits(content, &edits).expect("edit should succeed");
         assert!(result.contains("world"));
         assert!(!result.contains("hello"));
     }
@@ -309,7 +309,7 @@ mod tests {
         let lines = hash_file_lines(content);
         let hash = lines[0].hash.clone();
 
-        let result = insert_after(content, &hash, &["inserted".to_string()]).unwrap();
+        let result = insert_after(content, &hash, &["inserted".to_string()]).expect("insert should succeed");
         let new_lines: Vec<&str> = result.lines().collect();
         assert_eq!(new_lines.len(), 4);
         assert_eq!(new_lines[1], "inserted");

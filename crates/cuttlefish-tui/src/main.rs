@@ -4,6 +4,7 @@
 //! via WebSocket for real-time chat, build logs, and file diffs.
 
 mod app;
+mod mascot;
 mod ui;
 
 use clap::Parser;

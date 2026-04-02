@@ -1,14 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-950 text-white flex flex-col">
-    <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-4">
-      <NuxtLink to="/" class="text-cyan-400 hover:text-cyan-300">← Back</NuxtLink>
+  <div class="flex flex-col h-full">
+    <!-- Project Header with Tabs -->
+    <div class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-4 shrink-0">
+      <NuxtLink to="/" class="text-cyan-400 hover:text-cyan-300 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+      </NuxtLink>
       <span class="text-lg font-semibold">{{ route.params.id }}</span>
-      <span class="ml-auto text-sm" :class="connected ? 'text-green-400' : 'text-red-400'">
-        {{ connected ? '● Connected' : '● Disconnected' }}
-      </span>
-    </header>
+    </div>
 
-    <div class="bg-gray-900 border-b border-gray-800 px-6 flex gap-1">
+    <div class="bg-gray-900 border-b border-gray-800 px-6 flex gap-1 shrink-0">
       <button
         v-for="tab in tabs"
         :key="tab"
@@ -39,14 +41,14 @@
           </div>
         </div>
       </div>
-      <div class="border-t border-gray-800 p-4 flex gap-3">
+      <div class="border-t border-gray-800 p-4 flex gap-3 shrink-0">
         <input
           v-model="input"
           @keyup.enter="sendMessage"
           placeholder="Describe what you want to build..."
           class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500"
         />
-        <button @click="sendMessage" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm">Send</button>
+        <button @click="sendMessage" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg text-sm transition-colors">Send</button>
       </div>
     </div>
 

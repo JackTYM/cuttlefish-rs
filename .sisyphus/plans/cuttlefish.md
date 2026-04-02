@@ -2369,19 +2369,19 @@ Wave FINAL (Verification — after ALL tasks):
 
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `cargo clippy --workspace -- -D warnings` + `cargo test --workspace` + `cargo doc --workspace --no-deps`. Review all crates for: `as any` patterns, empty catches, dead code, commented-out code, unused imports. Check for AI slop: excessive comments, over-abstraction, generic names.
   Output: `Build [PASS/FAIL] | Clippy [PASS/FAIL] | Tests [N pass/N fail] | Docs [PASS/FAIL] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Start from clean state. Execute EVERY QA scenario from EVERY task. Test cross-feature integration: Discord→Agent→Docker→GitHub full flow. WebUI→Agent→Docker→GitHub flow. TUI→Server connection. Edge cases: empty project, invalid input, Docker timeout, GitHub auth failure.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff. Verify 1:1 — everything in spec was built, nothing beyond spec was built. Check "Must NOT do" compliance per task. Check "Must NOT Have" guardrails. Flag unaccounted changes.
   Output: `Tasks [N/N compliant] | Guardrails [N/N respected] | Unaccounted [CLEAN/N files] | VERDICT`
 

@@ -22,6 +22,8 @@ pub enum AppView {
     Diff,
     /// Build log viewer.
     Log,
+    /// Cuttlefish mascot display.
+    Mascot,
 }
 
 /// Application state for the TUI.
@@ -66,7 +68,8 @@ impl App {
         self.view = match self.view {
             AppView::Chat => AppView::Diff,
             AppView::Diff => AppView::Log,
-            AppView::Log => AppView::Chat,
+            AppView::Log => AppView::Mascot,
+            AppView::Mascot => AppView::Chat,
         };
     }
 
@@ -119,6 +122,8 @@ mod tests {
         assert_eq!(app.view, AppView::Diff);
         app.next_view();
         assert_eq!(app.view, AppView::Log);
+        app.next_view();
+        assert_eq!(app.view, AppView::Mascot);
         app.next_view();
         assert_eq!(app.view, AppView::Chat);
     }
