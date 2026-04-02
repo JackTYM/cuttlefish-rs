@@ -1,28 +1,28 @@
 <template>
-  <div class="p-6">
+  <div class="p-4 sm:p-6">
     <div class="max-w-6xl mx-auto">
       <!-- New Project Form -->
-      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-4 sm:p-6 mb-6">
         <h2 class="text-lg font-semibold mb-4">New Project</h2>
         <div class="flex flex-col gap-3">
-          <div class="flex gap-3">
+          <div class="flex flex-col sm:flex-row gap-3">
             <input
               v-model="newProjectName"
               placeholder="Project name"
-              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 sm:py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors min-h-[44px]"
             />
             <input
               v-model="newProjectDesc"
               placeholder="Description"
-              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 sm:py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors min-h-[44px]"
             />
           </div>
-          <div class="flex gap-3 items-center">
+          <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <!-- Template Selector -->
             <div class="relative flex-1">
               <select
                 v-model="selectedTemplate"
-                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors appearance-none cursor-pointer text-gray-200"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 sm:py-2 text-sm focus:outline-none focus:border-cyan-500 transition-colors appearance-none cursor-pointer text-gray-200 min-h-[44px]"
               >
                 <option value="">No template (blank project)</option>
                 <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
@@ -36,7 +36,7 @@
             <button
               @click="createProject"
               :disabled="!newProjectName"
-              class="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+              class="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:text-gray-500 text-white px-6 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0"
             >
               Create
             </button>
