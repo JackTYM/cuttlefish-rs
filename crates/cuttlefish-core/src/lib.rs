@@ -8,6 +8,7 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod hashline;
+pub mod routing;
 pub mod template_engine;
 pub mod template_fetcher;
 pub mod template_manifest;
@@ -25,6 +26,7 @@ pub use error::CuttlefishError;
 pub use hashline::{
     EditError, HashedLine, LineEdit, apply_edits, format_with_hashes, hash_file_lines, line_hash,
 };
+pub use routing::{ModelRouter, RouteConfig, RoutingConfig};
 pub use template_engine::TemplateEngine;
 pub use template_fetcher::TemplateFetcher;
 pub use template_manifest::{TemplateError, TemplateManifest, TemplateVariable, parse_manifest};

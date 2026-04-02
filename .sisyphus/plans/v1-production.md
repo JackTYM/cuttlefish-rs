@@ -150,7 +150,7 @@ Wave FINAL (Verification — 4 parallel reviews):
 
 ### Wave 1: Model Providers
 
-- [ ] 1. OpenAI API Provider
+- [x] 1. OpenAI API Provider
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/openai.rs`
@@ -173,7 +173,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 1, parallel with T2-T6
 
-- [ ] 2. Anthropic Direct API Provider
+- [x] 2. Anthropic Direct API Provider
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/anthropic.rs`
@@ -194,7 +194,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 1, parallel with T1, T3-T6
 
-- [ ] 3. Google Vertex AI Provider
+- [x] 3. Google Vertex AI Provider
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/google.rs`
@@ -214,7 +214,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 1, parallel with T1-T2, T4-T6
 
-- [ ] 4. Moonshot (Kimi) Provider
+- [x] 4. Moonshot (Kimi) Provider
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/moonshot.rs`
@@ -233,7 +233,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `unspecified-high`
   **Parallelization**: Wave 1, parallel with T1-T3, T5-T6
 
-- [ ] 5. ChatGPT OAuth Provider
+- [x] 5. ChatGPT OAuth Provider
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/chatgpt_oauth.rs`
@@ -254,7 +254,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 1, parallel with T1-T4, T6
 
-- [ ] 6. Additional Providers (Zhipu, MiniMax, xAI, Ollama)
+- [x] 6. Additional Providers (Zhipu, MiniMax, xAI, Ollama)
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/zhipu.rs` — GLM 5
@@ -280,7 +280,7 @@ Wave FINAL (Verification — 4 parallel reviews):
 
 ### Wave 2: Remaining Agents
 
-- [ ] 7. Planner Agent
+- [x] 7. Planner Agent
 
   **What to do**:
   - Create `crates/cuttlefish-agents/src/planner.rs`
@@ -304,7 +304,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 2, parallel with T8-T10
 
-- [ ] 8. Explorer Agent
+- [x] 8. Explorer Agent
 
   **What to do**:
   - Create `crates/cuttlefish-agents/src/explorer.rs`
@@ -324,7 +324,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `quick`
   **Parallelization**: Wave 2, parallel with T7, T9-T10
 
-- [ ] 9. Librarian Agent
+- [x] 9. Librarian Agent
 
   **What to do**:
   - Create `crates/cuttlefish-agents/src/librarian.rs`
@@ -344,7 +344,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `quick`
   **Parallelization**: Wave 2, parallel with T7-T8, T10
 
-- [ ] 10. DevOps Agent
+- [x] 10. DevOps Agent
 
   **What to do**:
   - Create `crates/cuttlefish-agents/src/devops.rs`
@@ -364,7 +364,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `unspecified-high`
   **Parallelization**: Wave 2, parallel with T7-T9
 
-- [ ] 11. Update Workflow for All Agents
+- [x] 11. Update Workflow for All Agents
 
   **What to do**:
   - Update `crates/cuttlefish-agents/src/workflow.rs`
@@ -392,7 +392,7 @@ Wave FINAL (Verification — 4 parallel reviews):
 
 ### Wave 3: Integration
 
-- [ ] 12. Provider Registry and Config Schema
+- [x] 12. Provider Registry and Config Schema
 
   **What to do**:
   - Create `crates/cuttlefish-providers/src/registry.rs`
@@ -412,7 +412,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `quick`
   **Parallelization**: Wave 3, parallel with T13-T14
 
-- [ ] 13. Category-Based Model Routing
+- [x] 13. Category-Based Model Routing
 
   **What to do**:
   - Create routing logic that maps categories to providers/models
@@ -437,7 +437,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `deep`
   **Parallelization**: Wave 3, parallel with T12, T14
 
-- [ ] 14. Agent Dispatch System
+- [x] 14. Agent Dispatch System
 
   **What to do**:
   - Connect agents to routing system
@@ -466,7 +466,7 @@ Wave FINAL (Verification — 4 parallel reviews):
 
 ### Wave 4: Polish & Documentation
 
-- [ ] 15. Update README Completely
+- [x] 15. Update README Completely
 
   **What to do**:
   - Remove "v1 ships with 3 agents" (now 7)
@@ -501,7 +501,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `writing`
   **Parallelization**: Wave 4, parallel with T16-T18
 
-- [ ] 16. Improve install.sh
+- [x] 16. Improve install.sh
 
   **What to do**:
   - Add provider selection menu
@@ -520,7 +520,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `unspecified-high`
   **Parallelization**: Wave 4, parallel with T15, T17-T18
 
-- [ ] 17. Update cuttlefish.example.toml
+- [x] 17. Update cuttlefish.example.toml
 
   **What to do**:
   - Add all 11 providers with example config
@@ -538,7 +538,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   **Recommended Agent Profile**: `quick`
   **Parallelization**: Wave 4, parallel with T15-T16, T18
 
-- [ ] 18. Provider Setup Documentation
+- [x] 18. Provider Setup Documentation
 
   **What to do**:
   - Create `docs/providers/` directory
@@ -570,7 +570,7 @@ Wave FINAL (Verification — 4 parallel reviews):
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   
   Verify all deliverables from this plan are implemented:
   - All 7 agents have Rust files with tests
@@ -580,7 +580,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   
   Output: `Agents [7/7] | Providers [11/11] | README [ACCURATE/OUTDATED] | VERDICT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   
   Run full quality checks:
   - `cargo clippy --workspace -- -D warnings`
@@ -590,7 +590,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   
   Output: `Clippy [PASS/FAIL] | Tests [N pass] | Fmt [PASS/FAIL] | VERDICT`
 
-- [ ] F3. **E2E Testing** — `deep`
+- [x] F3. **E2E Testing** — `deep`
   
   Test complete workflows:
   - Provider initialization for each
@@ -600,7 +600,7 @@ Wave FINAL (Verification — 4 parallel reviews):
   
   Output: `Providers [N/11 working] | Agents [N/7 working] | Install [PASS/FAIL] | VERDICT`
 
-- [ ] F4. **README Accuracy Check** — `deep`
+- [x] F4. **README Accuracy Check** — `deep`
   
   Line-by-line README verification:
   - Every claimed feature exists

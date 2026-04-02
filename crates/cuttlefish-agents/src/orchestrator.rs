@@ -26,11 +26,27 @@ pub struct PlannedTask {
     pub id: String,
     /// Task description for the agent.
     pub description: String,
-    /// Which agent should handle this task (coder or critic).
+    /// Which agent should handle this task.
     pub agent: String,
     /// Current status of this task.
     #[serde(default)]
     pub status: TaskStatus,
+}
+
+impl PlannedTask {
+    /// Parse the agent string into an AgentRole.
+    pub fn agent_role(&self) -> Option<AgentRole> {
+        match self.agent.to_lowercase().as_str() {
+            "orchestrator" => Some(AgentRole::Orchestrator),
+            "planner" => Some(AgentRole::Planner),
+            "coder" => Some(AgentRole::Coder),
+            "critic" => Some(AgentRole::Critic),
+            "explorer" => Some(AgentRole::Explorer),
+            "librarian" => Some(AgentRole::Librarian),
+            "devops" => Some(AgentRole::DevOps),
+            _ => None,
+        }
+    }
 }
 
 /// Status of a planned task.

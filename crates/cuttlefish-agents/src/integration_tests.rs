@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod workflow_integration {
-    use crate::{bus::TokioMessageBus, workflow::WorkflowEngine};
+    use crate::{bus::TokioMessageBus, workflow::{WorkflowConfig, WorkflowEngine}};
     use cuttlefish_core::traits::bus::MessageBus;
     use cuttlefish_providers::mock::MockModelProvider;
     use std::fs;
@@ -14,7 +14,7 @@ mod workflow_integration {
     use uuid::Uuid;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic"] {
+        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
             let content = format!(
                 r#"---
 name: {name}
@@ -52,6 +52,7 @@ You are the {name} agent."#
         assert!(result.success, "Workflow should succeed with approved code");
         assert_eq!(result.iterations, 1, "Should complete in one iteration");
         assert_eq!(result.final_verdict.as_deref(), Some("approve"));
+        assert!(!result.planning_executed, "Planning should not run by default");
     }
 
     #[tokio::test]
@@ -171,6 +172,52 @@ You are the {name} agent."#
             .expect("workflow should execute");
 
         assert!(result.success, "Should succeed with multiple tasks");
+    }
+
+    #[tokio::test]
+    async fn test_workflow_with_planner_enabled() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
+        let mock = MockModelProvider::new("planner-test");
+        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Build feature", "agent": "coder"}]}"#);
+        mock.add_response("Step 1: Create module\nStep 2: Add tests\nStep 3: Document");
+        mock.add_response("Feature implemented with tests");
+        mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Well planned"}"#);
+
+        let config = WorkflowConfig {
+            enable_planner: true,
+            ..Default::default()
+        };
+        let engine = WorkflowEngine::with_config(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), config);
+        let result = engine
+            .execute(Uuid::new_v4(), "Build a new feature")
+            .await
+            .expect("workflow should execute");
+
+        assert!(result.success, "Should succeed with planner");
+        assert!(result.planning_executed, "Planning phase should have run");
+    }
+
+    #[tokio::test]
+    async fn test_workflow_with_all_agents_enabled() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
+        let mock = MockModelProvider::new("all-agents-test");
+        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Build app", "agent": "coder"}]}"#);
+        mock.add_response("Detailed implementation plan");
+        mock.add_response("App built successfully");
+        mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Complete"}"#);
+
+        let engine = WorkflowEngine::with_all_agents(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
+        let result = engine
+            .execute(Uuid::new_v4(), "Build an application")
+            .await
+            .expect("workflow should execute");
+
+        assert!(result.success, "Should succeed with all agents");
+        assert!(result.planning_executed, "Planning should run when all agents enabled");
     }
 }
 
@@ -309,7 +356,7 @@ mod cross_crate_wiring {
     use uuid::Uuid;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic"] {
+        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
             let content = format!(
                 r#"---
 name: {name}
@@ -395,5 +442,85 @@ You are the {name} agent."#
 
         assert!(result.success, "Workflow should complete successfully");
         assert!(!result.content.is_empty(), "Should have content");
+    }
+}
+
+#[cfg(test)]
+mod all_agents_instantiation {
+    use crate::{
+        CoderAgent, CriticAgent, DevOpsAgent, ExplorerAgent, LibrarianAgent,
+        OrchestratorAgent, PlannerAgent, TokioMessageBus,
+    };
+    use cuttlefish_core::traits::agent::{Agent, AgentRole};
+    use cuttlefish_core::traits::provider::ModelProvider;
+    use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    fn create_test_prompts(dir: &std::path::Path) {
+        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
+            let content = format!(
+                r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+You are the {name} agent."#
+            );
+            fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+        }
+    }
+
+    #[test]
+    fn test_all_seven_agents_can_be_instantiated() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+        let mock: Arc<dyn ModelProvider> = Arc::new(MockModelProvider::new("instantiation-test"));
+        let bus = TokioMessageBus::new();
+
+        let orchestrator = OrchestratorAgent::new(Arc::clone(&mock), bus, temp_dir.path());
+        assert_eq!(orchestrator.name(), "orchestrator");
+        assert_eq!(orchestrator.role(), AgentRole::Orchestrator);
+
+        let planner = PlannerAgent::new(Arc::clone(&mock), temp_dir.path());
+        assert_eq!(planner.name(), "planner");
+        assert_eq!(planner.role(), AgentRole::Planner);
+
+        let coder = CoderAgent::new(Arc::clone(&mock), temp_dir.path());
+        assert_eq!(coder.name(), "coder");
+        assert_eq!(coder.role(), AgentRole::Coder);
+
+        let critic = CriticAgent::new(Arc::clone(&mock), temp_dir.path());
+        assert_eq!(critic.name(), "critic");
+        assert_eq!(critic.role(), AgentRole::Critic);
+
+        let explorer = ExplorerAgent::new(Arc::clone(&mock), temp_dir.path());
+        assert_eq!(explorer.name(), "explorer");
+        assert_eq!(explorer.role(), AgentRole::Explorer);
+
+        let librarian = LibrarianAgent::new(Arc::clone(&mock), temp_dir.path());
+        assert_eq!(librarian.name(), "librarian");
+        assert_eq!(librarian.role(), AgentRole::Librarian);
+
+        let devops = DevOpsAgent::new(mock, temp_dir.path());
+        assert_eq!(devops.name(), "devops");
+        assert_eq!(devops.role(), AgentRole::DevOps);
+    }
+
+    #[test]
+    fn test_agent_role_enum_has_seven_variants() {
+        let roles = [
+            AgentRole::Orchestrator,
+            AgentRole::Planner,
+            AgentRole::Coder,
+            AgentRole::Critic,
+            AgentRole::Explorer,
+            AgentRole::Librarian,
+            AgentRole::DevOps,
+        ];
+        assert_eq!(roles.len(), 7, "Should have exactly 7 agent roles");
     }
 }

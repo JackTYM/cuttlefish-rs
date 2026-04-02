@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// Can be configured with canned responses that are returned in order.
 /// When all canned responses are consumed, returns a default response.
+#[derive(Clone)]
 pub struct MockModelProvider {
     /// Pre-configured responses to return (in order).
     responses: Arc<Mutex<Vec<String>>>,

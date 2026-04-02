@@ -1,6 +1,7 @@
 //! Configuration types for the Cuttlefish platform.
 
 use crate::error::ConfigError;
+use crate::routing::RoutingConfig;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -23,6 +24,9 @@ pub struct CuttlefishConfig {
     /// Sandbox configuration.
     #[serde(default)]
     pub sandbox: SandboxConfig,
+    /// Model routing configuration.
+    #[serde(default)]
+    pub routing: RoutingConfig,
 }
 
 /// Server configuration.

@@ -72,17 +72,15 @@ The cuttlefish is nature's ultimate adapter. With millions of chromatophores in 
 
 Cuttlefish implements a **Planner → Coder → Critic** workflow loop inspired by the Sisyphus/Ultraworker pattern:
 
-| Agent | Role | Optimal Model Category |
-|-------|------|------------------------|
-| **Orchestrator** | Receives requests, creates task plans, coordinates agents | `deep` |
-| **Coder** | Writes code, executes commands, modifies files | `deep` |
-| **Critic** | Reviews code, runs tests, approves or rejects changes | `unspecified-high` |
+| Agent | Role | Category |
+|-------|------|----------|
+| **Orchestrator** | Coordinates agents, manages lifecycle | `deep` |
 | **Planner** | Creates strategic implementation plans | `ultrabrain` |
+| **Coder** | Writes code, runs builds, executes tests | `deep` |
+| **Critic** | Reviews code, runs tests, approves/rejects | `unspecified-high` |
 | **Explorer** | Searches codebases, finds patterns | `quick` |
 | **Librarian** | Finds documentation, retrieves external resources | `quick` |
-| **DevOps** | Handles builds, deployments, infrastructure | `unspecified-high` |
-
-*Note: v1 ships with Orchestrator, Coder, and Critic. Additional agents coming in future releases.*
+| **DevOps** | Handles builds, deployments, CI/CD | `unspecified-high` |
 
 ### 🎯 Category-Based Model Routing
 
@@ -90,12 +88,12 @@ Configure which models serve which task categories:
 
 | Category | Use Case | Recommended Model |
 |----------|----------|-------------------|
-| `deep` | Complex reasoning, autonomous execution | Claude 3.5 Sonnet, Claude 3 Opus |
-| `quick` | Simple tasks, fast responses | Claude 3 Haiku |
-| `ultrabrain` | Hard logic, architecture decisions | Claude 3 Opus |
-| `visual` | Frontend, UI/UX, design work | Claude 3.5 Sonnet |
-| `unspecified-high` | General tasks, higher effort | Claude 3.5 Sonnet |
-| `unspecified-low` | General tasks, lower effort | Claude 3 Haiku |
+| `ultrabrain` | Hard logic, architecture | claude-opus-4-6 |
+| `deep` | Complex autonomous work | gpt-5.4 or claude-sonnet-4-6 |
+| `quick` | Simple fast tasks | claude-haiku-4-5 |
+| `visual` | Frontend, UI/UX | gemini-2.0-flash |
+| `unspecified-high` | General higher effort | claude-sonnet-4-6 |
+| `unspecified-low` | General lower effort | claude-haiku-4-5 |
 
 ### 🐳 Docker Sandboxes
 
@@ -116,12 +114,23 @@ Access your agents from anywhere:
 
 ### 📦 Model Providers
 
-Supported AI backends:
+Cuttlefish supports 11 model providers out of the box:
 
-| Provider | Auth Method | Models |
-|----------|-------------|--------|
-| **AWS Bedrock** | IAM / Access Keys | Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku |
-| **Claude OAuth** | PKCE Flow | Claude 3.5 Sonnet (via claude.ai account) |
+| Provider | Auth Method | Models | Best For |
+|----------|-------------|--------|----------|
+| **Anthropic** | `ANTHROPIC_API_KEY` | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 | General, planning |
+| **OpenAI** | `OPENAI_API_KEY` | gpt-5.4, gpt-5-nano, gpt-4o | Coding, reasoning |
+| **Google Gemini** | `GOOGLE_API_KEY` | gemini-2.0-flash, gemini-1.5-pro | Visual, frontend |
+| **Moonshot (Kimi)** | `MOONSHOT_API_KEY` | kimi-k2.5, moonshot-v1-128k | Claude-like tasks |
+| **Zhipu (GLM)** | `ZHIPU_API_KEY` | glm-4-flash, glm-4 | Broad tasks |
+| **MiniMax** | `MINIMAX_API_KEY` + `MINIMAX_GROUP_ID` | abab6.5s-chat, abab6.5t-chat | Fast utility |
+| **xAI (Grok)** | `XAI_API_KEY` | grok-2, grok-beta | Code search |
+| **AWS Bedrock** | IAM / Access Keys | Claude family via Bedrock | Enterprise |
+| **Ollama** | None (local) | Any GGUF model | Privacy, offline |
+| **Claude OAuth** | PKCE Flow | Claude (via claude.ai) | Personal accounts |
+| **ChatGPT OAuth** | Bearer Token | GPT-4o, GPT-4 | Personal accounts |
+
+See [docs/providers/](docs/providers/) for setup guides.
 
 ### 🔧 Additional Features
 
@@ -504,19 +513,29 @@ cargo fmt --all
 - [x] Core agent system (Orchestrator, Coder, Critic)
 - [x] AWS Bedrock provider
 - [x] Claude OAuth provider
+- [x] ChatGPT OAuth provider
+- [x] OpenAI API provider
+- [x] Google Gemini provider
+- [x] Moonshot/Kimi provider
+- [x] Zhipu/GLM provider
+- [x] MiniMax provider
+- [x] xAI/Grok provider
+- [x] Ollama provider
 - [x] Docker sandboxes
 - [x] Discord bot
 - [x] Web UI (Nuxt)
 - [x] TUI client
 - [x] GitHub integration
 - [x] Hashline editing
+- [x] Planner agent
+- [x] Explorer agent
+- [x] Librarian agent
+- [x] DevOps agent
 
 ### v1.1 (Planned)
-- [ ] Additional agents (Planner, Explorer, Librarian, DevOps)
 - [ ] WASM sandbox option
 - [ ] Hook system for customization
 - [ ] Skill-embedded MCPs
-- [ ] ChatGPT OAuth provider
 
 ### v2.0 (Future)
 - [ ] Code editor in WebUI

@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
             agents: HashMap::new(),
             discord: None,
             sandbox: cuttlefish_core::config::SandboxConfig::default(),
+            routing: cuttlefish_core::RoutingConfig::default(),
         }
     });
 

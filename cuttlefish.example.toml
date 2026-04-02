@@ -45,3 +45,61 @@ category = "deep"
 
 [agents.critic]
 category = "unspecified-high"
+
+# Model routing configuration
+# Maps task categories and agent roles to specific providers/models
+[routing.categories]
+deep = { provider = "anthropic", model = "claude-sonnet-4-6" }
+quick = { provider = "anthropic", model = "claude-haiku-4-5" }
+ultrabrain = { provider = "anthropic", model = "claude-opus-4-6" }
+visual = { provider = "google", model = "gemini-2.0-flash" }
+unspecified-high = { provider = "anthropic", model = "claude-sonnet-4-6" }
+unspecified-low = { provider = "anthropic", model = "claude-haiku-4-5" }
+
+# Agent-specific overrides (optional, takes precedence over category)
+# [routing.agents]
+# coder = { provider = "anthropic", model = "claude-opus-4-6" }
+
+# =============================================================================
+# Additional Model Providers
+# =============================================================================
+
+[providers.anthropic]
+provider_type = "anthropic"
+model = "claude-sonnet-4-6"
+# Requires: ANTHROPIC_API_KEY env var
+
+[providers.openai]
+provider_type = "openai"
+model = "gpt-5.4"
+# Requires: OPENAI_API_KEY env var
+
+[providers.google]
+provider_type = "google"
+model = "gemini-2.0-flash"
+# Requires: GOOGLE_API_KEY env var
+
+[providers.moonshot]
+provider_type = "moonshot"
+model = "kimi-k2.5"
+# Requires: MOONSHOT_API_KEY env var
+
+[providers.zhipu]
+provider_type = "zhipu"
+model = "glm-4-flash"
+# Requires: ZHIPU_API_KEY env var
+
+[providers.minimax]
+provider_type = "minimax"
+model = "abab6.5s-chat"
+# Requires: MINIMAX_API_KEY and MINIMAX_GROUP_ID env vars
+
+[providers.xai]
+provider_type = "xai"
+model = "grok-2"
+# Requires: XAI_API_KEY env var
+
+[providers.ollama]
+provider_type = "ollama"
+model = "llama3.1"
+# No auth required - uses local Ollama at http://localhost:11434
