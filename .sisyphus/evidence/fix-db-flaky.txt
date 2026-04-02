@@ -1,0 +1,52 @@
+# Fix for Intermittent Test Failures in cuttlefish-db
+
+## Problem
+The `test_db()` helper function created a `NamedTempFile` and returned only the `Database`, causing the temp file to be deleted when `test_db()` returned. This created a race condition when multiple async tests ran concurrently — SQLite WAL files (`.wal`, `.shm`) from one test interfered with another.
+
+## Evidence of Flakiness (Before Fix)
+- `cargo test -p cuttlefish-db` failed 3 tests intermittently
+- `cargo test -p cuttlefish-db -- --test-threads=1` passed all 9 tests
+
+## Solution
+Changed `test_db()` to return `(Database, tempfile::TempDir)` so the temp directory stays alive until the test finishes.
+
+### Changes Made
+1. Updated `test_db()` helper:
+   - Changed from: `async fn test_db() -> Database`
+   - Changed to: `async fn test_db() -> (Database, TempDir)`
+   - Replaced `NamedTempFile` with `TempDir`
+   - Updated import from `tempfile::NamedTempFile` to `tempfile::TempDir`
+
+2. Updated all 9 test functions to bind the second return value:
+   - `test_create_and_get_project`
+   - `test_update_project_status`
+   - `test_insert_and_get_messages`
+   - `test_token_count`
+   - `test_get_recent_messages_chrono_order`
+   - `test_get_message_count`
+   - `test_archive_and_summarize`
+   - `test_discord_channel_lookup`
+   - `test_template_crud`
+
+## Verification Results
+All 5 test runs passed with 9 tests each:
+
+=== Run 1 ===
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+=== Run 2 ===
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+=== Run 3 ===
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+=== Run 4 ===
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+=== Run 5 ===
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+## Conclusion
+✅ All tests pass consistently across 5 runs
+✅ No intermittent failures detected
+✅ Race condition resolved by keeping TempDir alive for the duration of each test

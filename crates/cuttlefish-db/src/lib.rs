@@ -485,16 +485,18 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
-    async fn test_db() -> Database {
-        let tmp = NamedTempFile::new().expect("temp file");
-        Database::open(tmp.path()).await.expect("db open")
+    async fn test_db() -> (Database, TempDir) {
+        let dir = TempDir::new().expect("temp dir");
+        let db_path = dir.path().join("test.db");
+        let db = Database::open(&db_path).await.expect("db open");
+        (db, dir)
     }
 
     #[tokio::test]
     async fn test_create_and_get_project() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let id = uuid::Uuid::new_v4().to_string();
         db.create_project(&id, "test-project", "A test project", None)
             .await
@@ -510,7 +512,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_project_status() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let id = uuid::Uuid::new_v4().to_string();
         db.create_project(&id, "test2", "Desc", None)
             .await
@@ -528,7 +530,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_messages() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "test3", "Desc", None)
             .await
@@ -550,7 +552,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_token_count() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "test4", "Desc", None)
             .await
@@ -572,7 +574,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_recent_messages_chrono_order() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "order-test", "Desc", None)
             .await
@@ -594,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_message_count() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "count-test", "Desc", None)
             .await
@@ -614,7 +616,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_archive_and_summarize() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "archive-test", "Desc", None)
             .await
@@ -642,7 +644,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_discord_channel_lookup() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let project_id = uuid::Uuid::new_v4().to_string();
         db.create_project(&project_id, "discord-test", "Desc", None)
             .await
@@ -668,7 +670,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_template_crud() {
-        let db = test_db().await;
+        let (db, _dir) = test_db().await;
         let id = uuid::Uuid::new_v4().to_string();
 
         db.create_template(&id, "nuxt-cloudflare", "Nuxt 3 + Cloudflare", "# Template content", "typescript")

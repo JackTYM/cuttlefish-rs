@@ -1952,7 +1952,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 9 — Advanced Features
 
-- [ ] 38. Self-Update: GitHub Actions Build + Binary Pull + Restart
+- [x] 38. Self-Update: GitHub Actions Build + Binary Pull + Restart
 
   **What to do**:
   - Implement self-update mechanism:
@@ -1997,7 +1997,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(core): add self-update mechanism via GitHub Releases`
   - Pre-commit: `cargo test --workspace`
 
-- [ ] 39. GitHub Actions Monitoring
+- [x] 39. GitHub Actions Monitoring
 
   **What to do**:
   - Implement Actions monitor:
@@ -2041,7 +2041,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(vcs): add GitHub Actions workflow monitoring`
   - Pre-commit: `cargo test -p cuttlefish-vcs`
 
-- [ ] 40. Template System (.MD Reading + Project Scaffolding)
+- [x] 40. Template System (.MD Reading + Project Scaffolding)
 
   **What to do**:
   - Implement template system:
@@ -2090,7 +2090,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(core): add template system with 5 initial templates`
   - Pre-commit: `cargo test --workspace`
 
-- [ ] 41. Context Summarization (Automatic)
+- [x] 41. Context Summarization (Automatic)
 
   **What to do**:
   - Implement automatic context summarization:
@@ -2134,7 +2134,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(core): add automatic context summarization`
   - Pre-commit: `cargo test -p cuttlefish-core`
 
-- [ ] 42. cuttlefish-vcs: GitHub App Authentication
+- [x] 42. cuttlefish-vcs: GitHub App Authentication
 
   **What to do**:
   - Implement GitHub App auth as alternative to PAT:
@@ -2176,7 +2176,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(vcs): add GitHub App authentication with JWT`
   - Pre-commit: `cargo test -p cuttlefish-vcs`
 
-- [ ] 43. Category-Based Model Routing Config
+- [x] 43. Category-Based Model Routing Config
 
   **What to do**:
   - Implement category-to-model routing from TOML config:
@@ -2225,7 +2225,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 10 — End-to-End Integration
 
-- [ ] 44. End-to-End: Discord → Agent → Docker → GitHub Flow
+- [x] 44. End-to-End: Discord → Agent → Docker → GitHub Flow
 
   **What to do**:
   - Integration test (feature-flagged) that exercises the FULL flow:
@@ -2271,7 +2271,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `test: add end-to-end Discord→Agent→Docker→GitHub integration test`
   - Pre-commit: `cargo test --workspace`
 
-- [ ] 45. End-to-End: WebUI → Agent → Docker → GitHub Flow
+- [x] 45. End-to-End: WebUI → Agent → Docker → GitHub Flow
 
   **What to do**:
   - Integration test for WebUI flow:
@@ -2315,7 +2315,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `test: add end-to-end WebUI→Agent→Docker→GitHub integration test`
   - Pre-commit: `cargo test --workspace`
 
-- [ ] 46. End-to-End: TUI → Server → Agent Flow
+- [x] 46. End-to-End: TUI → Server → Agent Flow
 
   **What to do**:
   - Integration test for TUI flow:

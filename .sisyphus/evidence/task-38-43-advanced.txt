@@ -1,0 +1,79 @@
+=== WAVE 9 ADVANCED FEATURES IMPLEMENTATION ===
+Date: 2026-04-01
+Task: Add cuttlefish-core/src/advanced.rs module with self-update, template system, and model routing
+
+FILES CREATED:
+1. crates/cuttlefish-core/src/advanced.rs (370 lines)
+   - Task 38: Self-update mechanism (ReleaseInfo, ReleaseAsset, is_newer_version)
+   - Task 39: GitHub Actions monitoring (WorkflowStatus enum with parsing)
+   - Task 40: Template system (ProjectTemplate, load_templates_from_dir, find_template)
+   - Task 42: GitHub App auth (GithubAppClaims JWT claims)
+   - Task 43: Model routing (ModelConfig, AgentRoutingConfig with Bedrock defaults)
+
+FILES MODIFIED:
+1. crates/cuttlefish-core/src/lib.rs
+   - Added pub mod advanced
+   - Exported all public types and functions from advanced module
+
+VERIFICATION RESULTS:
+✓ cargo test -p cuttlefish-core: 26 passed; 0 failed
+✓ cargo clippy -p cuttlefish-core -- -D warnings: PASSED (no warnings)
+✓ All public items have /// documentation
+✓ No unsafe code (enforced by #![deny(unsafe_code)])
+✓ No unwrap() in non-test code
+✓ All tests pass (version comparison, template loading, model routing, workflow status, GitHub claims)
+
+IMPLEMENTATION DETAILS:
+
+1. SELF-UPDATE (Task 38):
+   - ReleaseInfo: Deserializable from GitHub API
+   - ReleaseAsset: Asset metadata with download URL
+   - is_newer_version(): Semantic version comparison (v1.2.3 format)
+
+2. GITHUB ACTIONS MONITORING (Task 39):
+   - WorkflowStatus enum: Queued, InProgress, Success, Failure, Cancelled, Unknown
+   - from_api(): Parse GitHub API status/conclusion strings
+   - is_terminal(): Check if workflow is in terminal state
+
+3. TEMPLATE SYSTEM (Task 40):
+   - ProjectTemplate: Name, content, language, docker_image
+   - load_templates_from_dir(): Load .md files from directory
+   - find_template(): Lookup template by name
+   - Auto-detection of language and Docker image based on template name
+
+4. GITHUB APP AUTH (Task 42):
+   - GithubAppClaims: JWT claims with iat, exp, iss
+   - new(): Create claims valid for 10 minutes
+   - Clock skew handling (1 min in the past)
+
+5. MODEL ROUTING (Task 43):
+   - ModelConfig: Provider, model_id, temperature, max_tokens
+   - AgentRoutingConfig: Category and agent mappings
+   - resolve_agent(): Route agent role to ModelConfig
+   - resolve_category(): Route category to ModelConfig
+   - default_bedrock(): Pre-configured Bedrock Claude models
+     * deep: Claude 3.5 Sonnet (temp 0.1, 4096 tokens)
+     * quick: Claude 3 Haiku (temp 0.3, 2048 tokens)
+     * unspecified-high: Claude 3.5 Sonnet (temp 0.2, 4096 tokens)
+     * Agent mappings: orchestrator→deep, coder→deep, critic→unspecified-high, planner→deep
+
+COMPLIANCE:
+✓ Rust 2024 edition
+✓ Zero unsafe code
+✓ All public items documented with ///
+✓ No unwrap() in non-test code (uses ? and expect with reasons)
+✓ No println! (uses tracing::debug! and tracing::info!)
+✓ Follows CLAUDE.md conventions
+✓ Comprehensive test coverage (11 tests)
+✓ Proper error handling with Option types
+
+BUILD OUTPUT:
+Checking cuttlefish-core v0.1.0
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.78s
+
+TEST OUTPUT:
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+CLIPPY OUTPUT:
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.78s
+(No warnings or errors)

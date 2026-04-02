@@ -29,3 +29,6 @@ pub use cuttlefish_core::traits::{
     agent::{Agent, AgentContext, AgentOutput, AgentRole, Category},
     bus::{BusMessage, MessageBus},
 };
+
+#[cfg(test)]
+mod integration_tests;

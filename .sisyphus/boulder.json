@@ -29,7 +29,10 @@
     "ses_2b493d655ffe29UkJr43Mva512",
     "ses_2b491d946ffe6QbhLI2MY4eUIN",
     "ses_2b48e089fffesB02ocBCWweSLF",
-    "ses_2b48b0fdaffeSeXs472LXrd2Bg"
+    "ses_2b48b0fdaffeSeXs472LXrd2Bg",
+    "ses_2b44e7378ffeDFDbDHnCDoqaH8",
+    "ses_2b4404960ffev3TKyCgJc0Vfwj",
+    "ses_2b4225c37ffeOqMUeFwE09gujS"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -240,6 +243,33 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-04-01T23:51:44.600Z"
+    },
+    "todo:38": {
+      "task_key": "todo:38",
+      "task_label": "38",
+      "task_title": "Self-Update: GitHub Actions Build + Binary Pull + Restart",
+      "session_id": "ses_2b44e7378ffeDFDbDHnCDoqaH8",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-02T00:59:10.258Z"
+    },
+    "todo:44": {
+      "task_key": "todo:44",
+      "task_label": "44",
+      "task_title": "End-to-End: Discord → Agent → Docker → GitHub Flow",
+      "session_id": "ses_2b4404960ffev3TKyCgJc0Vfwj",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-02T01:17:00.014Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_2b4225c37ffeOqMUeFwE09gujS",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-02T01:49:09.902Z"
     }
   }
 }

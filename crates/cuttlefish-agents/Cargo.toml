@@ -11,6 +11,7 @@ workspace = true
 cuttlefish-core = { path = "../cuttlefish-core" }
 cuttlefish-sandbox = { path = "../cuttlefish-sandbox" }
 cuttlefish-providers = { path = "../cuttlefish-providers" }
+cuttlefish-api = { path = "../cuttlefish-api" }
 tokio = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
