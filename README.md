@@ -204,51 +204,49 @@ Coder    Critic
 
 ## Installation
 
-### Prerequisites
-
-- **Rust 1.94.0+**: `rustup install 1.94.0`
-- **Docker**: Running daemon with socket access
-- **AWS Account**: With Bedrock access (or Claude OAuth credentials)
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/JackTYM/cuttlefish-rs.git
-cd cuttlefish-rs
-
-# Build release binary
-cargo build --release
-
-# Copy example config
-cp cuttlefish.example.toml cuttlefish.toml
-
-# Set required environment variables
-export CUTTLEFISH_API_KEY="your-secure-api-key"
-export AWS_ACCESS_KEY_ID="your-aws-key"
-export AWS_SECRET_ACCESS_KEY="your-aws-secret"
-export AWS_DEFAULT_REGION="us-east-1"
-
-# Run the server
-./target/release/cuttlefish-rs
-```
-
-### Guided Installation (Recommended for Production)
-
-For production deployments on a clean Linux server:
+### Quick Start (Recommended)
 
 ```bash
 # Download and run the guided installer
-curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | bash
 ```
 
 The installer will:
 1. Check and install dependencies (Rust, Docker, Git)
-2. Guide you through server, database, and sandbox configuration
-3. Set up AWS Bedrock credentials
-4. Optionally configure Discord bot integration
-5. Create a systemd service for 24/7 operation
-6. Generate secure API keys
+2. Clone and build Cuttlefish from source
+3. Guide you through provider selection (choose which AI providers to configure)
+4. Set up API keys for your selected providers
+5. Configure server, database, and sandbox settings
+6. Optionally set up Discord bot integration
+7. Optionally create a systemd service for 24/7 operation
+
+### Manual Installation
+
+If you prefer manual setup:
+
+```bash
+# Prerequisites: Rust 1.94.0+, Docker, Git
+rustup install 1.94.0
+
+# Clone and build
+git clone https://github.com/JackTYM/cuttlefish-rs.git
+cd cuttlefish-rs
+cargo build --release
+
+# Configure
+cp cuttlefish.example.toml cuttlefish.toml
+# Edit cuttlefish.toml with your settings
+
+# Set API keys for your providers (examples)
+export CUTTLEFISH_API_KEY="your-secure-api-key"
+export ANTHROPIC_API_KEY="sk-ant-..."      # For Anthropic
+export OPENAI_API_KEY="sk-..."              # For OpenAI
+export GOOGLE_API_KEY="..."                 # For Google Gemini
+# See docs/providers/ for all provider options
+
+# Run
+./target/release/cuttlefish-rs
+```
 
 ### Docker Deployment
 
