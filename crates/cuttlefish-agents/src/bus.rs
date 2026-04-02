@@ -1,10 +1,13 @@
 //! Message bus implementation using tokio broadcast channels.
 
 use async_trait::async_trait;
-use cuttlefish_core::{error::AgentError, traits::bus::{BusMessage, MessageBus}};
+use cuttlefish_core::{
+    error::AgentError,
+    traits::bus::{BusMessage, MessageBus},
+};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 use tracing::debug;
 
 const CHANNEL_CAPACITY: usize = 256;
@@ -18,7 +21,9 @@ pub struct TokioMessageBus {
 impl TokioMessageBus {
     /// Create a new message bus.
     pub fn new() -> Self {
-        Self { channels: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            channels: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     async fn get_or_create(&self, topic: &str) -> broadcast::Sender<BusMessage> {
@@ -34,7 +39,9 @@ impl TokioMessageBus {
 }
 
 impl Default for TokioMessageBus {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -71,7 +78,9 @@ mod tests {
         let bus = TokioMessageBus::new();
         let mut rx1 = bus.subscribe("c").await.expect("s1");
         let mut rx2 = bus.subscribe("c").await.expect("s2");
-        bus.publish(BusMessage::new("c", serde_json::json!({}))).await.expect("pub");
+        bus.publish(BusMessage::new("c", serde_json::json!({})))
+            .await
+            .expect("pub");
         assert!(rx1.recv().await.is_ok());
         assert!(rx2.recv().await.is_ok());
     }
@@ -81,7 +90,9 @@ mod tests {
         let bus = TokioMessageBus::new();
         let mut rx_a = bus.subscribe("a").await.expect("sub");
         let _rx_b = bus.subscribe("b").await.expect("sub");
-        bus.publish(BusMessage::new("b", serde_json::json!({}))).await.expect("pub");
+        bus.publish(BusMessage::new("b", serde_json::json!({})))
+            .await
+            .expect("pub");
         assert!(rx_a.try_recv().is_err());
     }
 }

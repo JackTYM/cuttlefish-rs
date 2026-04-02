@@ -1,11 +1,11 @@
 //! API key authentication middleware for the HTTP server.
 
 use axum::{
+    Json,
     extract::Request,
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{StatusCode, header::AUTHORIZATION},
     middleware::Next,
     response::Response,
-    Json,
 };
 
 /// Extract and validate the API key from the Authorization header.

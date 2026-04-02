@@ -7,27 +7,27 @@
 //! - `GET /ws` — WebSocket upgrade endpoint
 //! - Authentication middleware
 
-/// WebSocket handler and message protocol.
-pub mod ws;
-/// HTTP route handlers.
-pub mod routes;
-/// API key authentication middleware.
-pub mod auth;
 /// REST API route handlers.
 pub mod api_routes;
+/// API key authentication middleware.
+pub mod auth;
 /// Reverse proxy route registry.
 pub mod proxy;
+/// HTTP route handlers.
+pub mod routes;
+/// WebSocket handler and message protocol.
+pub mod ws;
 
 use axum::{
-    routing::{any, get},
     Router,
+    routing::{any, get},
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
-pub use routes::AppState;
-pub use ws::{ClientMessage, ServerMessage};
 pub use auth::{auth_middleware, generate_api_key};
 pub use proxy::{ProxyRegistry, ProxyRoute};
+pub use routes::AppState;
+pub use ws::{ClientMessage, ServerMessage};
 
 /// Build the axum application router with all routes.
 pub fn build_app(state: AppState) -> Router {

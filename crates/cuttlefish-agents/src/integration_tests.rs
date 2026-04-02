@@ -5,10 +5,7 @@
 
 #[cfg(test)]
 mod workflow_integration {
-    use crate::{
-        bus::TokioMessageBus,
-        workflow::WorkflowEngine,
-    };
+    use crate::{bus::TokioMessageBus, workflow::WorkflowEngine};
     use cuttlefish_core::traits::bus::MessageBus;
     use cuttlefish_providers::mock::MockModelProvider;
     use std::sync::Arc;
@@ -19,11 +16,15 @@ mod workflow_integration {
     async fn test_full_workflow_approve_on_first_try() {
         let mock = MockModelProvider::new("integration-test");
         // Orchestrator plans one task
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#,
+        );
         // Coder creates the file
         mock.add_response("Created hello.js: console.log('Hello, World!');");
         // Critic approves
-        mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Clean, working code"}"#);
+        mock.add_response(
+            r#"{"verdict": "approve", "issues": [], "summary": "Clean, working code"}"#,
+        );
 
         let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new());
         let result = engine
@@ -78,7 +79,9 @@ mod workflow_integration {
 
         let mock = MockModelProvider::new("bus-test");
         // Orchestrator dispatches to coder
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Write tests", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Write tests", "agent": "coder"}]}"#,
+        );
         // Coder and critic responses
         mock.add_response("Tests written");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Good tests"}"#);
@@ -228,14 +231,8 @@ mod message_bus_integration {
     #[tokio::test]
     async fn test_multiple_subscribers_receive_message() {
         let bus = TokioMessageBus::new();
-        let mut rx1 = bus
-            .subscribe("test.topic")
-            .await
-            .expect("should subscribe");
-        let mut rx2 = bus
-            .subscribe("test.topic")
-            .await
-            .expect("should subscribe");
+        let mut rx1 = bus.subscribe("test.topic").await.expect("should subscribe");
+        let mut rx2 = bus.subscribe("test.topic").await.expect("should subscribe");
 
         let msg = BusMessage::new("test.topic", serde_json::json!({"data": "test"}));
         bus.publish(msg).await.expect("should publish");
@@ -265,10 +262,7 @@ mod message_bus_integration {
     #[tokio::test]
     async fn test_late_subscriber_misses_old_message() {
         let bus = TokioMessageBus::new();
-        let mut rx1 = bus
-            .subscribe("late.topic")
-            .await
-            .expect("should subscribe");
+        let mut rx1 = bus.subscribe("late.topic").await.expect("should subscribe");
 
         let msg = BusMessage::new("late.topic", serde_json::json!({}));
         bus.publish(msg).await.expect("should publish");
@@ -277,10 +271,7 @@ mod message_bus_integration {
         assert!(rx1.recv().await.is_ok());
 
         // Subscribe after message was published
-        let mut rx2 = bus
-            .subscribe("late.topic")
-            .await
-            .expect("should subscribe");
+        let mut rx2 = bus.subscribe("late.topic").await.expect("should subscribe");
 
         // Late subscriber should not have the old message
         assert!(
@@ -302,7 +293,9 @@ mod cross_crate_wiring {
     async fn test_workflow_engine_wires_all_agents() {
         let mock = MockModelProvider::new("wiring-test");
         // Orchestrator response
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Test task", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Test task", "agent": "coder"}]}"#,
+        );
         // Coder response
         mock.add_response("Code output");
         // Critic response
@@ -332,18 +325,17 @@ mod cross_crate_wiring {
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "No"}"#);
         }
 
-        let engine = WorkflowEngine::with_max_iterations(
-            Arc::new(mock),
-            TokioMessageBus::new(),
-            2,
-        );
+        let engine = WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), 2);
         let result = engine
             .execute(Uuid::new_v4(), "Task")
             .await
             .expect("workflow should execute");
 
         assert_eq!(result.iterations, 2, "Should stop at max iterations");
-        assert!(!result.success, "Should not succeed when max iterations reached");
+        assert!(
+            !result.success,
+            "Should not succeed when max iterations reached"
+        );
     }
 
     /// Test that workflow engine integrates with message bus.

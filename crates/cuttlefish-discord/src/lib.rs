@@ -32,6 +32,6 @@ pub const ARCHIVED_CATEGORY_NAME: &str = "📦 Archived Projects";
 
 pub use channel_manager::ChannelManager;
 pub use formatter::{
-    format_code_block, format_diff, format_status, split_message, DISCORD_MESSAGE_LIMIT,
+    DISCORD_MESSAGE_LIMIT, format_code_block, format_diff, format_status, split_message,
 };
 pub use guild_config::{GuildConfig, GuildConfigStore};

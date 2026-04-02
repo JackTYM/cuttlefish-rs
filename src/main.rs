@@ -16,7 +16,9 @@ async fn main() -> anyhow::Result<()> {
     // Load configuration (falls back gracefully if no config file)
     let config = CuttlefishConfig::load().unwrap_or_else(|_| {
         // Default config if no file found — useful for first-time run
-        tracing::warn!("No cuttlefish.toml found, using defaults. Copy cuttlefish.example.toml to get started.");
+        tracing::warn!(
+            "No cuttlefish.toml found, using defaults. Copy cuttlefish.example.toml to get started."
+        );
         CuttlefishConfig {
             server: cuttlefish_core::config::ServerConfig {
                 host: "127.0.0.1".to_string(),

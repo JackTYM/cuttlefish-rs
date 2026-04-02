@@ -227,11 +227,7 @@ impl GitHubClient {
     /// GitHub responds with a 3xx redirect to a signed URL for the log archive.
     /// This method captures the redirect `Location` header instead of following it,
     /// returning the signed URL that can be used to download logs.
-    pub async fn get_workflow_run_logs_url(
-        &self,
-        repo: &str,
-        run_id: u64,
-    ) -> GitHubResult<String> {
+    pub async fn get_workflow_run_logs_url(&self, repo: &str, run_id: u64) -> GitHubResult<String> {
         let url = format!(
             "{GITHUB_API_BASE}/repos/{}/{repo}/actions/runs/{run_id}/logs",
             self.owner
@@ -256,9 +252,7 @@ impl GitHubClient {
                 .get("location")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string())
-                .ok_or_else(|| {
-                    VcsError("No Location header in redirect response".to_string())
-                })
+                .ok_or_else(|| VcsError("No Location header in redirect response".to_string()))
         } else {
             Err(VcsError(format!(
                 "Expected redirect, got {}",

@@ -349,12 +349,10 @@ impl Database {
         &self,
         channel_id: &str,
     ) -> Result<Option<models::Project>, sqlx::Error> {
-        sqlx::query_as::<_, models::Project>(
-            "SELECT * FROM projects WHERE discord_channel_id = ?",
-        )
-        .bind(channel_id)
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as::<_, models::Project>("SELECT * FROM projects WHERE discord_channel_id = ?")
+            .bind(channel_id)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Get all projects for a specific Discord guild.
@@ -443,10 +441,7 @@ impl Database {
     }
 
     /// Get a template by name.
-    pub async fn get_template(
-        &self,
-        name: &str,
-    ) -> Result<Option<models::Template>, sqlx::Error> {
+    pub async fn get_template(&self, name: &str) -> Result<Option<models::Template>, sqlx::Error> {
         sqlx::query_as::<_, models::Template>("SELECT * FROM templates WHERE name = ?")
             .bind(name)
             .fetch_optional(&self.pool)
@@ -501,11 +496,7 @@ mod tests {
         db.create_project(&id, "test-project", "A test project", None)
             .await
             .expect("create");
-        let project = db
-            .get_project(&id)
-            .await
-            .expect("get")
-            .expect("exists");
+        let project = db.get_project(&id).await.expect("get").expect("exists");
         assert_eq!(project.name, "test-project");
         assert_eq!(project.status, "active");
     }
@@ -520,11 +511,7 @@ mod tests {
         db.update_project_status(&id, "completed")
             .await
             .expect("update");
-        let project = db
-            .get_project(&id)
-            .await
-            .expect("get")
-            .expect("exists");
+        let project = db.get_project(&id).await.expect("get").expect("exists");
         assert_eq!(project.status, "completed");
     }
 
@@ -538,15 +525,19 @@ mod tests {
 
         for i in 0..5 {
             let msg_id = uuid::Uuid::new_v4().to_string();
-            db.insert_message(&msg_id, &project_id, "user", &format!("message {}", i), None, 10)
-                .await
-                .expect("insert");
+            db.insert_message(
+                &msg_id,
+                &project_id,
+                "user",
+                &format!("message {}", i),
+                None,
+                10,
+            )
+            .await
+            .expect("insert");
         }
 
-        let messages = db
-            .get_recent_messages(&project_id, 3)
-            .await
-            .expect("get");
+        let messages = db.get_recent_messages(&project_id, 3).await.expect("get");
         assert_eq!(messages.len(), 3);
     }
 
@@ -565,10 +556,7 @@ mod tests {
                 .expect("insert");
         }
 
-        let total = db
-            .get_total_token_count(&project_id)
-            .await
-            .expect("count");
+        let total = db.get_total_token_count(&project_id).await.expect("count");
         assert_eq!(total, 300);
     }
 
@@ -634,7 +622,12 @@ mod tests {
         let future_ts = "9999-12-31 23:59:59";
         let summary_id = uuid::Uuid::new_v4().to_string();
         let archived = db
-            .archive_and_summarize(&project_id, future_ts, &summary_id, "Summary of conversation")
+            .archive_and_summarize(
+                &project_id,
+                future_ts,
+                &summary_id,
+                "Summary of conversation",
+            )
             .await
             .expect("archive");
 
@@ -673,9 +666,15 @@ mod tests {
         let (db, _dir) = test_db().await;
         let id = uuid::Uuid::new_v4().to_string();
 
-        db.create_template(&id, "nuxt-cloudflare", "Nuxt 3 + Cloudflare", "# Template content", "typescript")
-            .await
-            .expect("create");
+        db.create_template(
+            &id,
+            "nuxt-cloudflare",
+            "Nuxt 3 + Cloudflare",
+            "# Template content",
+            "typescript",
+        )
+        .await
+        .expect("create");
 
         let tmpl = db
             .get_template("nuxt-cloudflare")
@@ -694,10 +693,7 @@ mod tests {
             .expect("list by lang");
         assert!(!ts_templates.is_empty());
 
-        let deleted = db
-            .delete_template("nuxt-cloudflare")
-            .await
-            .expect("delete");
+        let deleted = db.delete_template("nuxt-cloudflare").await.expect("delete");
         assert!(deleted);
 
         let result = db

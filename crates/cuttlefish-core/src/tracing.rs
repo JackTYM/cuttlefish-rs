@@ -1,6 +1,6 @@
 //! Tracing and logging setup for the Cuttlefish platform.
 
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Initialize tracing and logging for the application.
 ///

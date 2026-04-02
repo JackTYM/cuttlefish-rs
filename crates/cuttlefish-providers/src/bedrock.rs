@@ -2,18 +2,14 @@
 
 use async_trait::async_trait;
 use aws_sdk_bedrockruntime::{
-    types::{
-        ContentBlock, ConversationRole, Message as BedrockMessage,
-        SystemContentBlock,
-    },
     Client,
+    types::{ContentBlock, ConversationRole, Message as BedrockMessage, SystemContentBlock},
 };
 use aws_smithy_types::Document;
 use cuttlefish_core::{
     error::ProviderError,
     traits::provider::{
-        CompletionRequest, CompletionResponse, MessageRole, ModelProvider,
-        StreamChunk, ToolCall,
+        CompletionRequest, CompletionResponse, MessageRole, ModelProvider, StreamChunk, ToolCall,
     },
 };
 use futures::stream::{self, BoxStream, StreamExt};
@@ -117,8 +113,10 @@ impl ModelProvider for BedrockProvider {
         &self,
         request: CompletionRequest,
     ) -> Result<CompletionResponse, ProviderError> {
-        let (system_msgs, conv_msgs): (Vec<_>, Vec<_>) =
-            request.messages.iter().partition(|m| m.role == MessageRole::System);
+        let (system_msgs, conv_msgs): (Vec<_>, Vec<_>) = request
+            .messages
+            .iter()
+            .partition(|m| m.role == MessageRole::System);
 
         let mut system_blocks = Vec::new();
         if let Some(sys) = &request.system {
@@ -193,14 +191,8 @@ impl ModelProvider for BedrockProvider {
 
         Ok(CompletionResponse {
             content,
-            input_tokens: usage
-                .as_ref()
-                .map(|u| u.input_tokens as u32)
-                .unwrap_or(0),
-            output_tokens: usage
-                .as_ref()
-                .map(|u| u.output_tokens as u32)
-                .unwrap_or(0),
+            input_tokens: usage.as_ref().map(|u| u.input_tokens as u32).unwrap_or(0),
+            output_tokens: usage.as_ref().map(|u| u.output_tokens as u32).unwrap_or(0),
             model: self.model_id.clone(),
             tool_calls,
         })

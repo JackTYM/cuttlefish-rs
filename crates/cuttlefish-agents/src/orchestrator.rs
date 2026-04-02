@@ -68,7 +68,10 @@ impl OrchestratorAgent {
     /// Build a planning prompt for the given user input.
     fn build_planning_prompt(input: &str) -> CompletionRequest {
         CompletionRequest {
-            messages: vec![Message { role: MessageRole::User, content: input.to_string() }],
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: input.to_string(),
+            }],
             max_tokens: Some(2048),
             temperature: Some(0.2),
             system: Some(ORCHESTRATOR_SYSTEM_PROMPT.to_string()),
@@ -78,11 +81,14 @@ impl OrchestratorAgent {
     /// Publish a task to the appropriate agent topic.
     async fn dispatch_task(&self, task: &PlannedTask, project_id: &Uuid) -> Result<(), AgentError> {
         let topic = format!("agent.{}.input", task.agent);
-        let msg = BusMessage::new(topic, json!({
-            "task_id": task.id,
-            "project_id": project_id.to_string(),
-            "description": task.description,
-        }));
+        let msg = BusMessage::new(
+            topic,
+            json!({
+                "task_id": task.id,
+                "project_id": project_id.to_string(),
+                "description": task.description,
+            }),
+        );
         debug!("Dispatching task {} to {}", task.id, task.agent);
         self.bus.publish(msg).await
     }
@@ -90,23 +96,42 @@ impl OrchestratorAgent {
 
 #[async_trait]
 impl Agent for OrchestratorAgent {
-    fn name(&self) -> &str { "orchestrator" }
+    fn name(&self) -> &str {
+        "orchestrator"
+    }
 
-    fn role(&self) -> AgentRole { AgentRole::Orchestrator }
+    fn role(&self) -> AgentRole {
+        AgentRole::Orchestrator
+    }
 
-    async fn execute(&self, ctx: &mut AgentContext, input: &str) -> Result<AgentOutput, AgentError> {
-        info!("Orchestrator executing for project {}: {}", ctx.project_id, &input[..input.len().min(80)]);
+    async fn execute(
+        &self,
+        ctx: &mut AgentContext,
+        input: &str,
+    ) -> Result<AgentOutput, AgentError> {
+        info!(
+            "Orchestrator executing for project {}: {}",
+            ctx.project_id,
+            &input[..input.len().min(80)]
+        );
 
         // Build task plan using model
         let request = Self::build_planning_prompt(input);
-        let response = self.provider.complete(request).await
+        let response = self
+            .provider
+            .complete(request)
+            .await
             .map_err(|e| AgentError(format!("Planning failed: {e}")))?;
 
         // Try to parse task plan from response
         let tasks: Vec<PlannedTask> = serde_json::from_str::<serde_json::Value>(&response.content)
             .ok()
             .and_then(|v| v["tasks"].as_array().cloned())
-            .map(|arr| arr.iter().filter_map(|t| serde_json::from_value(t.clone()).ok()).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|t| serde_json::from_value(t.clone()).ok())
+                    .collect()
+            })
             .unwrap_or_else(|| {
                 // Fallback: create single coder task
                 vec![PlannedTask {
@@ -159,12 +184,17 @@ mod tests {
     #[tokio::test]
     async fn test_orchestrator_dispatches_on_execute() {
         let mock = MockModelProvider::new("test");
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#,
+        );
         let bus = TokioMessageBus::new();
         let _rx = bus.subscribe("agent.coder.input").await.expect("subscribe");
         let agent = OrchestratorAgent::new(Arc::new(mock), bus);
         let mut ctx = test_ctx();
-        let out = agent.execute(&mut ctx, "Create a hello world app").await.expect("exec");
+        let out = agent
+            .execute(&mut ctx, "Create a hello world app")
+            .await
+            .expect("exec");
         assert!(out.success);
         assert_eq!(out.metadata["tasks_dispatched"], 1);
     }
@@ -177,7 +207,10 @@ mod tests {
         let _rx = bus.subscribe("agent.coder.input").await.expect("sub");
         let agent = OrchestratorAgent::new(Arc::new(mock), bus);
         let mut ctx = test_ctx();
-        let out = agent.execute(&mut ctx, "Build something").await.expect("exec");
+        let out = agent
+            .execute(&mut ctx, "Build something")
+            .await
+            .expect("exec");
         assert!(out.success); // Falls back to single coder task
     }
 

@@ -143,11 +143,9 @@ impl VersionControl for GitRepository {
                     .map_err(|e| VcsError(format!("Failed to stage all: {e}")))?;
             } else {
                 for file in &files {
-                    index
-                        .add_path(file)
-                        .map_err(|e| {
-                            VcsError(format!("Failed to stage {}: {e}", file.display()))
-                        })?;
+                    index.add_path(file).map_err(|e| {
+                        VcsError(format!("Failed to stage {}: {e}", file.display()))
+                    })?;
                 }
             }
             index
@@ -169,9 +167,9 @@ impl VersionControl for GitRepository {
             // Get parent commit (if HEAD exists)
             let parents = match repo.head() {
                 Ok(head_ref) => {
-                    let head_commit = head_ref.peel_to_commit().map_err(|e| {
-                        VcsError(format!("Failed to get parent commit: {e}"))
-                    })?;
+                    let head_commit = head_ref
+                        .peel_to_commit()
+                        .map_err(|e| VcsError(format!("Failed to get parent commit: {e}")))?;
                     vec![head_commit]
                 }
                 Err(_) => vec![], // Initial commit
@@ -353,9 +351,7 @@ mod tests {
         fs::write(&path, content).expect("write file");
 
         let mut index = repo.index().expect("index");
-        index
-            .add_path(std::path::Path::new(filename))
-            .expect("add");
+        index.add_path(std::path::Path::new(filename)).expect("add");
         index.write().expect("write index");
 
         let tree_oid = index.write_tree().expect("write tree");

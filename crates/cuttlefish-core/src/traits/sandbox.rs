@@ -90,12 +90,7 @@ pub trait Sandbox: Send + Sync {
     async fn exec(&self, id: &SandboxId, command: &str) -> SandboxResult<ExecOutput>;
 
     /// Write a file into the sandbox.
-    async fn write_file(
-        &self,
-        id: &SandboxId,
-        path: &Path,
-        content: &[u8],
-    ) -> SandboxResult<()>;
+    async fn write_file(&self, id: &SandboxId, path: &Path, content: &[u8]) -> SandboxResult<()>;
 
     /// Read a file from the sandbox.
     async fn read_file(&self, id: &SandboxId, path: &Path) -> SandboxResult<Vec<u8>>;

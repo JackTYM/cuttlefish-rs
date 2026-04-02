@@ -1,12 +1,12 @@
 //! Docker-based sandbox implementation using bollard.
 
 use async_trait::async_trait;
+use bollard::Docker;
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, RemoveContainerOptions,
     StartContainerOptions, StopContainerOptions,
 };
 use bollard::exec::{CreateExecOptions, StartExecResults};
-use bollard::Docker;
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{ExecOutput, Sandbox, SandboxConfig, SandboxId};
 use futures::StreamExt;
@@ -41,14 +41,12 @@ impl DockerSandbox {
     ///
     /// Returns [`SandboxError`] if the socket is unreachable.
     pub fn with_socket(socket_path: &str) -> Result<Self, SandboxError> {
-        let docker =
-            Docker::connect_with_socket(socket_path, 30, bollard::API_DEFAULT_VERSION).map_err(
-                |e| {
-                    SandboxError(format!(
-                        "Failed to connect to Docker socket {socket_path}: {e}"
-                    ))
-                },
-            )?;
+        let docker = Docker::connect_with_socket(socket_path, 30, bollard::API_DEFAULT_VERSION)
+            .map_err(|e| {
+                SandboxError(format!(
+                    "Failed to connect to Docker socket {socket_path}: {e}"
+                ))
+            })?;
         Ok(Self { docker })
     }
 }
@@ -104,12 +102,7 @@ impl Sandbox for DockerSandbox {
         self.docker
             .start_container(&response.id, None::<StartContainerOptions<String>>)
             .await
-            .map_err(|e| {
-                SandboxError(format!(
-                    "Failed to start container {}: {e}",
-                    response.id
-                ))
-            })?;
+            .map_err(|e| SandboxError(format!("Failed to start container {}: {e}", response.id)))?;
 
         let workspace_id = SandboxId(response.id.clone());
         let _ = self.exec(&workspace_id, "mkdir -p /workspace").await;
@@ -133,9 +126,7 @@ impl Sandbox for DockerSandbox {
             .docker
             .create_exec(container_id, exec_options)
             .await
-            .map_err(|e| {
-                SandboxError(format!("Failed to create exec in {container_id}: {e}"))
-            })?;
+            .map_err(|e| SandboxError(format!("Failed to create exec in {container_id}: {e}")))?;
 
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
@@ -153,8 +144,7 @@ impl Sandbox for DockerSandbox {
                         stdout_buf.push_str(&String::from_utf8_lossy(&message));
                         if stdout_buf.len() > MAX_OUTPUT_BYTES {
                             stdout_buf.truncate(MAX_OUTPUT_BYTES);
-                            stdout_buf
-                                .push_str("\n[OUTPUT TRUNCATED - EXCEEDED 1MB LIMIT]");
+                            stdout_buf.push_str("\n[OUTPUT TRUNCATED - EXCEEDED 1MB LIMIT]");
                             truncated = true;
                         }
                     }
@@ -162,8 +152,7 @@ impl Sandbox for DockerSandbox {
                         stderr_buf.push_str(&String::from_utf8_lossy(&message));
                         if stderr_buf.len() > MAX_OUTPUT_BYTES {
                             stderr_buf.truncate(MAX_OUTPUT_BYTES);
-                            stderr_buf
-                                .push_str("\n[OUTPUT TRUNCATED - EXCEEDED 1MB LIMIT]");
+                            stderr_buf.push_str("\n[OUTPUT TRUNCATED - EXCEEDED 1MB LIMIT]");
                             truncated = true;
                         }
                     }
@@ -171,10 +160,7 @@ impl Sandbox for DockerSandbox {
                     Err(e) => warn!("Error reading exec output: {e}"),
                 }
                 if truncated {
-                    warn!(
-                        "Output truncated for exec in container {}",
-                        container_id
-                    );
+                    warn!("Output truncated for exec in container {}", container_id);
                     break;
                 }
             }
@@ -207,9 +193,7 @@ impl Sandbox for DockerSandbox {
         if let Some(parent) = path.parent() {
             let parent_str = parent.to_string_lossy();
             if !parent_str.is_empty() {
-                let _ = self
-                    .exec(id, &format!("mkdir -p '{parent_str}'"))
-                    .await;
+                let _ = self.exec(id, &format!("mkdir -p '{parent_str}'")).await;
             }
         }
 
@@ -290,9 +274,7 @@ impl Sandbox for DockerSandbox {
         self.docker
             .remove_container(container_id, Some(remove_opts))
             .await
-            .map_err(|e| {
-                SandboxError(format!("Failed to remove container {container_id}: {e}"))
-            })?;
+            .map_err(|e| SandboxError(format!("Failed to remove container {container_id}: {e}")))?;
 
         Ok(())
     }
@@ -308,14 +290,17 @@ impl DockerSandbox {
         command: &str,
         timeout_secs: u64,
     ) -> Result<ExecOutput, SandboxError> {
-        use tokio::time::{timeout, Duration};
+        use tokio::time::{Duration, timeout};
 
         let exec_future = self.exec(id, command);
 
         match timeout(Duration::from_secs(timeout_secs), exec_future).await {
             Ok(result) => result,
             Err(_) => {
-                warn!("Exec timed out after {}s in container {}", timeout_secs, id.0);
+                warn!(
+                    "Exec timed out after {}s in container {}",
+                    timeout_secs, id.0
+                );
                 Ok(ExecOutput {
                     stdout: String::new(),
                     stderr: format!("Command timed out after {timeout_secs}s"),

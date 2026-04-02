@@ -4,25 +4,28 @@
 
 /// Message bus implementation using tokio broadcast channels.
 pub mod bus;
-/// Agent execution runner with tool calling and timeout enforcement.
-pub mod runner;
-/// Tool registry and built-in tool definitions.
-pub mod tools;
-/// Orchestrator agent that plans and delegates work.
-pub mod orchestrator;
 /// Coder agent that writes code, runs builds, and executes tests.
 pub mod coder;
 /// Critic agent that reviews code changes and provides structured feedback.
 pub mod critic;
+/// Orchestrator agent that plans and delegates work.
+pub mod orchestrator;
+/// Agent execution runner with tool calling and timeout enforcement.
+pub mod runner;
+/// Tool registry and built-in tool definitions.
+pub mod tools;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
 pub mod workflow;
 
 pub use bus::TokioMessageBus;
-pub use runner::{AgentRunner, RunnerConfig, ToolExecutionResult, ToolExecutor, MAX_ITERATIONS, DEFAULT_TIMEOUT_SECS};
-pub use tools::{ToolDefinition, ToolRegistry};
-pub use orchestrator::OrchestratorAgent;
 pub use coder::CoderAgent;
 pub use critic::{CriticAgent, ReviewResult, ReviewVerdict};
+pub use orchestrator::OrchestratorAgent;
+pub use runner::{
+    AgentRunner, DEFAULT_TIMEOUT_SECS, MAX_ITERATIONS, RunnerConfig, ToolExecutionResult,
+    ToolExecutor,
+};
+pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowEngine, WorkflowResult};
 
 pub use cuttlefish_core::traits::{

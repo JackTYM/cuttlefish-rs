@@ -9,13 +9,13 @@ use cuttlefish_core::{
         CompletionRequest, CompletionResponse, MessageRole, ModelProvider, StreamChunk,
     },
 };
-use futures::stream::{self, BoxStream};
 use futures::StreamExt;
+use futures::stream::{self, BoxStream};
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::debug;
 
-use crate::oauth_flow::{compute_cch, OAuthTokens, ANTHROPIC_BETA, USER_AGENT};
+use crate::oauth_flow::{ANTHROPIC_BETA, OAuthTokens, USER_AGENT, compute_cch};
 
 const API_BASE: &str = "https://api.anthropic.com";
 const API_VERSION: &str = "2023-06-01";

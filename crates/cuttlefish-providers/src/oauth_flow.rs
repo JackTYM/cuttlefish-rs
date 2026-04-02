@@ -3,7 +3,7 @@
 //! Implements the OAuth 2.0 Authorization Code flow with PKCE as used by
 //! the Claude Code CLI client.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use cuttlefish_core::error::ProviderError;
 use sha2::{Digest, Sha256};
 
@@ -147,10 +147,12 @@ mod tests {
         let verifier = PkceVerifier("test_verifier_value".to_string());
         let challenge = derive_pkce_challenge(&verifier);
         assert!(!challenge.0.is_empty());
-        assert!(challenge
-            .0
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            challenge
+                .0
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 
     #[test]

@@ -3,12 +3,10 @@
 use async_trait::async_trait;
 use cuttlefish_core::{
     error::ProviderError,
-    traits::provider::{
-        CompletionRequest, CompletionResponse, ModelProvider, StreamChunk,
-    },
+    traits::provider::{CompletionRequest, CompletionResponse, ModelProvider, StreamChunk},
 };
-use futures::stream::{self, BoxStream};
 use futures::StreamExt;
+use futures::stream::{self, BoxStream};
 use std::sync::{Arc, Mutex};
 
 /// A mock model provider for use in tests.

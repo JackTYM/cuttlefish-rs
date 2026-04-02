@@ -8,14 +8,16 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod hashline;
-pub mod traits;
 pub mod tracing;
+pub mod traits;
 
 pub use advanced::{
-    find_template, is_newer_version, load_templates_from_dir, AgentRoutingConfig, GithubAppClaims,
-    ModelConfig, ProjectTemplate, ReleaseAsset, ReleaseInfo, WorkflowStatus,
+    AgentRoutingConfig, GithubAppClaims, ModelConfig, ProjectTemplate, ReleaseAsset, ReleaseInfo,
+    WorkflowStatus, find_template, is_newer_version, load_templates_from_dir,
 };
 pub use config::CuttlefishConfig;
 pub use context::{ContextConfig, ContextManager};
 pub use error::CuttlefishError;
-pub use hashline::{apply_edits, format_with_hashes, hash_file_lines, line_hash, EditError, HashedLine, LineEdit};
+pub use hashline::{
+    EditError, HashedLine, LineEdit, apply_edits, format_with_hashes, hash_file_lines, line_hash,
+};

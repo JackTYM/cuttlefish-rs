@@ -140,10 +140,7 @@ impl ContextManager {
     ///
     /// Summarizes messages beyond the recent window, archiving them and
     /// inserting a summary message in their place.
-    pub async fn trigger_summarization(
-        &self,
-        project_id: &str,
-    ) -> Result<(), CuttlefishError> {
+    pub async fn trigger_summarization(&self, project_id: &str) -> Result<(), CuttlefishError> {
         // Keep the most recent half of threshold messages, summarize the rest
         let keep_count = self.config.summarize_threshold / 2;
 
@@ -195,12 +192,7 @@ impl ContextManager {
 
         let summary_id = Uuid::new_v4().to_string();
         self.db
-            .archive_and_summarize(
-                project_id,
-                &cutoff,
-                &summary_id,
-                &summary_response.content,
-            )
+            .archive_and_summarize(project_id, &cutoff, &summary_id, &summary_response.content)
             .await
             .map_err(|e| DatabaseError(e.to_string()))?;
 
@@ -217,8 +209,8 @@ mod tests {
     use super::*;
     use crate::error::ProviderError;
     use crate::traits::provider::{CompletionResponse, StreamChunk};
-    use futures::stream::{self, BoxStream};
     use futures::StreamExt;
+    use futures::stream::{self, BoxStream};
     use std::sync::Arc;
 
     /// Inline mock: cannot use cuttlefish-providers (would be circular dep).
@@ -262,9 +254,7 @@ mod tests {
         tempfile::NamedTempFile,
     ) {
         let tmp = tempfile::NamedTempFile::new().expect("temp file");
-        let db = cuttlefish_db::Database::open(tmp.path())
-            .await
-            .expect("db");
+        let db = cuttlefish_db::Database::open(tmp.path()).await.expect("db");
         let project_id = Uuid::new_v4().to_string();
         db.create_project(
             &project_id,
@@ -384,10 +374,7 @@ mod tests {
             .await
             .expect("build context");
 
-        let count_after = db
-            .get_message_count(&project_id)
-            .await
-            .expect("count");
+        let count_after = db.get_message_count(&project_id).await.expect("count");
         assert!(
             count_after < 55,
             "Expected fewer than 55 messages after summarization, got {count_after}"

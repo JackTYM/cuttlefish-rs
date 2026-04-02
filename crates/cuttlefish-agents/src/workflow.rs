@@ -12,10 +12,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    bus::TokioMessageBus,
-    coder::CoderAgent,
-    critic::CriticAgent,
-    orchestrator::OrchestratorAgent,
+    bus::TokioMessageBus, coder::CoderAgent, critic::CriticAgent, orchestrator::OrchestratorAgent,
 };
 
 /// Maximum Coder↔Critic iterations per task (Metis guardrail).
@@ -175,10 +172,12 @@ impl WorkflowEngine {
             final_content = critic_output.content;
 
             // Add critic feedback to coder context
-            coder_ctx.messages.push(cuttlefish_core::traits::provider::Message {
-                role: cuttlefish_core::traits::provider::MessageRole::User,
-                content: format!("Critic feedback: {}", final_content),
-            });
+            coder_ctx
+                .messages
+                .push(cuttlefish_core::traits::provider::Message {
+                    role: cuttlefish_core::traits::provider::MessageRole::User,
+                    content: format!("Critic feedback: {}", final_content),
+                });
         }
 
         // Max iterations reached — return last result
@@ -263,10 +262,7 @@ mod tests {
             TokioMessageBus::new(),
             2, // test with 2 max iterations
         );
-        let result = engine
-            .execute(Uuid::new_v4(), "Task")
-            .await
-            .expect("exec");
+        let result = engine.execute(Uuid::new_v4(), "Task").await.expect("exec");
         assert!(!result.success);
         assert_eq!(result.iterations, 2);
     }

@@ -64,12 +64,18 @@ pub struct CriticAgent {
 impl CriticAgent {
     /// Create a new critic agent.
     pub fn new(provider: Arc<dyn ModelProvider>) -> Self {
-        Self { provider, max_iterations: 5 }
+        Self {
+            provider,
+            max_iterations: 5,
+        }
     }
 
     /// Create with a custom max iterations limit.
     pub fn with_max_iterations(provider: Arc<dyn ModelProvider>, max_iterations: usize) -> Self {
-        Self { provider, max_iterations }
+        Self {
+            provider,
+            max_iterations,
+        }
     }
 
     /// Parse the review result from model output.

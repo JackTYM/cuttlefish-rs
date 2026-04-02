@@ -61,9 +61,8 @@ pub enum ServerMessage {
 impl ServerMessage {
     /// Serialize to JSON string.
     pub fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap_or_else(|_| {
-            r#"{"type":"error","message":"serialization failed"}"#.to_string()
-        })
+        serde_json::to_string(self)
+            .unwrap_or_else(|_| r#"{"type":"error","message":"serialization failed"}"#.to_string())
     }
 }
 

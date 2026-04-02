@@ -53,9 +53,7 @@ pub async fn create_project(
 /// List all projects.
 ///
 /// GET /api/projects
-pub async fn list_projects(
-    State(_state): State<AppState>,
-) -> Json<Vec<ProjectResponse>> {
+pub async fn list_projects(State(_state): State<AppState>) -> Json<Vec<ProjectResponse>> {
     // In a real implementation this would query DB
     Json(vec![])
 }
@@ -82,7 +80,10 @@ pub async fn cancel_project(
     Path(id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let _ = id;
-    (StatusCode::OK, Json(serde_json::json!({ "status": "cancelled" })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "status": "cancelled" })),
+    )
 }
 
 #[cfg(test)]

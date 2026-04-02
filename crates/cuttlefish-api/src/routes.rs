@@ -1,9 +1,6 @@
 //! HTTP route handlers for the API server.
 
-use axum::{
-    http::StatusCode,
-    response::Json,
-};
+use axum::{http::StatusCode, response::Json};
 use serde::Serialize;
 
 /// Application state shared across handlers.
