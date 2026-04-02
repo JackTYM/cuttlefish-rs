@@ -10,6 +10,7 @@ members = [
     "crates/cuttlefish-discord",
     "crates/cuttlefish-api",
     "crates/cuttlefish-tui",
+    "crates/cuttlefish-tunnel",
 ]
 resolver = "2"
 
@@ -37,7 +38,11 @@ description = "Multi-agent, multi-model agentic coding platform"
 [dependencies]
 cuttlefish-core = { path = "crates/cuttlefish-core" }
 cuttlefish-api = { path = "crates/cuttlefish-api" }
+cuttlefish-tunnel = { path = "crates/cuttlefish-tunnel" }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 axum = { version = "0.8", features = ["ws"] }
+dirs = "5"
+base64 = "0.22"
+serde_json = "1"
