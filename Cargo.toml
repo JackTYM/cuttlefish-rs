@@ -35,6 +35,9 @@ rust-version = "1.94.0"
 description = "Multi-agent, multi-model agentic coding platform"
 
 [dependencies]
+cuttlefish-core = { path = "crates/cuttlefish-core" }
+cuttlefish-api = { path = "crates/cuttlefish-api" }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
+axum = { version = "0.8", features = ["ws"] }

@@ -111,6 +111,39 @@ impl ToolExecutor {
                 let pattern = call.input["pattern"].as_str().unwrap_or("*");
                 ToolExecutionResult { id: call.id.clone(), content: format!("[SIMULATION] Would search for: {}", pattern), success: true }
             }
+            crate::tools::built_in::EDIT_FILE => {
+                let path = call.input["path"].as_str().unwrap_or("");
+                let edits_json = call.input["edits"].as_array();
+                
+                if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+                    let content = match sb.read_file(id, std::path::Path::new(path)).await {
+                        Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+                        Err(e) => return ToolExecutionResult { id: call.id.clone(), content: format!("Error reading file: {e}"), success: false },
+                    };
+                    
+                    let edits: Vec<cuttlefish_core::hashline::LineEdit> = match edits_json {
+                        Some(arr) => arr.iter().map(|e| cuttlefish_core::hashline::LineEdit {
+                            hash: e["hash"].as_str().unwrap_or("").to_string(),
+                            expected_content: e["expected_content"].as_str().map(|s| s.to_string()),
+                            new_content: e["new_content"].as_str().map(|s| s.to_string()),
+                        }).collect(),
+                        None => return ToolExecutionResult { id: call.id.clone(), content: "Error: 'edits' array required".to_string(), success: false },
+                    };
+                    
+                    match cuttlefish_core::hashline::apply_edits(&content, &edits) {
+                        Ok(new_content) => {
+                            match sb.write_file(id, std::path::Path::new(path), new_content.as_bytes()).await {
+                                Ok(()) => ToolExecutionResult { id: call.id.clone(), content: format!("Applied {} edit(s) to {}", edits.len(), path), success: true },
+                                Err(e) => ToolExecutionResult { id: call.id.clone(), content: format!("Error writing file: {e}"), success: false },
+                            }
+                        }
+                        Err(e) => ToolExecutionResult { id: call.id.clone(), content: format!("Edit error: {e}"), success: false },
+                    }
+                } else {
+                    let edit_count = edits_json.map(|a| a.len()).unwrap_or(0);
+                    ToolExecutionResult { id: call.id.clone(), content: format!("[SIMULATION] Would apply {} edit(s) to {}", edit_count, path), success: true }
+                }
+            }
             unknown => {
                 warn!("Unknown tool: {}", unknown);
                 ToolExecutionResult { id: call.id.clone(), content: format!("Error: Unknown tool '{}'", unknown), success: false }

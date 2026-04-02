@@ -7,6 +7,7 @@ pub mod advanced;
 pub mod config;
 pub mod context;
 pub mod error;
+pub mod hashline;
 pub mod traits;
 pub mod tracing;
 
@@ -17,3 +18,4 @@ pub use advanced::{
 pub use config::CuttlefishConfig;
 pub use context::{ContextConfig, ContextManager};
 pub use error::CuttlefishError;
+pub use hashline::{apply_edits, format_with_hashes, hash_file_lines, line_hash, EditError, HashedLine, LineEdit};

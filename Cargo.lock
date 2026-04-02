@@ -1158,6 +1158,9 @@ name = "cuttlefish-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.8.8",
+ "cuttlefish-api",
+ "cuttlefish-core",
  "tokio",
  "tracing",
 ]

@@ -19,6 +19,8 @@ pub mod built_in {
     pub const READ_FILE: &str = "read_file";
     /// Write file contents.
     pub const WRITE_FILE: &str = "write_file";
+    /// Edit file using line hashes (Hashline).
+    pub const EDIT_FILE: &str = "edit_file";
     /// Execute shell command.
     pub const EXECUTE_COMMAND: &str = "execute_command";
     /// Search files by pattern.
@@ -40,7 +42,7 @@ impl ToolRegistry {
         }
     }
 
-    /// Create a registry with all 5 default agent tools.
+    /// Create a registry with all 6 default agent tools.
     pub fn with_defaults() -> Self {
         let mut r = Self::new();
         r.register(ToolDefinition {
@@ -52,6 +54,29 @@ impl ToolRegistry {
             name: built_in::WRITE_FILE.to_string(),
             description: "Write content to a file in the workspace".to_string(),
             input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}),
+        });
+        r.register(ToolDefinition {
+            name: built_in::EDIT_FILE.to_string(),
+            description: "Edit specific lines in a file using line hashes. Use read_file first to get hashes.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the file to edit"},
+                    "edits": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "hash": {"type": "string", "description": "5-char hash of the line to edit"},
+                                "new_content": {"type": "string", "description": "New content for the line (omit to delete)"}
+                            },
+                            "required": ["hash"]
+                        },
+                        "description": "List of edits to apply"
+                    }
+                },
+                "required": ["path", "edits"]
+            }),
         });
         r.register(ToolDefinition {
             name: built_in::EXECUTE_COMMAND.to_string(),
@@ -103,11 +128,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_defaults_has_5_tools() {
+    fn test_defaults_has_6_tools() {
         let r = ToolRegistry::with_defaults();
-        assert_eq!(r.all_definitions().len(), 5);
+        assert_eq!(r.all_definitions().len(), 6);
         assert!(r.get(built_in::READ_FILE).is_some());
         assert!(r.get(built_in::WRITE_FILE).is_some());
+        assert!(r.get(built_in::EDIT_FILE).is_some());
         assert!(r.get(built_in::EXECUTE_COMMAND).is_some());
     }
 
@@ -125,6 +151,6 @@ mod tests {
     #[test]
     fn test_all_definitions_count() {
         let r = ToolRegistry::with_defaults();
-        assert_eq!(r.all_definitions().len(), 5);
+        assert_eq!(r.all_definitions().len(), 6);
     }
 }
