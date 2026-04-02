@@ -152,6 +152,46 @@ impl Database {
         .execute(pool)
         .await?;
 
+        sqlx::query(
+            r#"CREATE TABLE IF NOT EXISTS tunnel_link_codes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    subdomain TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+)"#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"CREATE TABLE IF NOT EXISTS active_tunnels (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subdomain TEXT NOT NULL UNIQUE,
+    connected_at TEXT NOT NULL,
+    last_heartbeat TEXT NOT NULL,
+    client_version TEXT,
+    client_ip TEXT
+)"#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_tunnel_link_codes_hash ON tunnel_link_codes(code_hash)",
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_active_tunnels_subdomain ON active_tunnels(subdomain)",
+        )
+        .execute(pool)
+        .await?;
+
         Ok(())
     }
 
@@ -475,6 +515,156 @@ impl Database {
             .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    /// Create a new link code.
+    pub async fn create_link_code(
+        &self,
+        user_id: &str,
+        code_hash: &str,
+        subdomain: &str,
+        expires_at: &str,
+    ) -> Result<models::TunnelLinkCode, sqlx::Error> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let created_at = chrono::Utc::now().to_rfc3339();
+
+        sqlx::query_as::<_, models::TunnelLinkCode>(
+            r#"
+            INSERT INTO tunnel_link_codes (id, user_id, code_hash, subdomain, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            RETURNING *
+            "#,
+        )
+        .bind(&id)
+        .bind(user_id)
+        .bind(code_hash)
+        .bind(subdomain)
+        .bind(&created_at)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    /// Find a link code by its hash.
+    pub async fn find_link_code_by_hash(
+        &self,
+        code_hash: &str,
+    ) -> Result<Option<models::TunnelLinkCode>, sqlx::Error> {
+        sqlx::query_as::<_, models::TunnelLinkCode>(
+            "SELECT * FROM tunnel_link_codes WHERE code_hash = ? AND used_at IS NULL",
+        )
+        .bind(code_hash)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Mark a link code as used.
+    pub async fn mark_link_code_used(&self, id: &str) -> Result<(), sqlx::Error> {
+        let used_at = chrono::Utc::now().to_rfc3339();
+        sqlx::query("UPDATE tunnel_link_codes SET used_at = ? WHERE id = ?")
+            .bind(&used_at)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Delete expired link codes.
+    pub async fn cleanup_expired_link_codes(&self) -> Result<u64, sqlx::Error> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let result = sqlx::query("DELETE FROM tunnel_link_codes WHERE expires_at < ?")
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Register a new active tunnel.
+    pub async fn register_tunnel(
+        &self,
+        user_id: &str,
+        subdomain: &str,
+        client_version: Option<&str>,
+        client_ip: Option<&str>,
+    ) -> Result<models::ActiveTunnel, sqlx::Error> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        sqlx::query_as::<_, models::ActiveTunnel>(
+            r#"
+            INSERT INTO active_tunnels (id, user_id, subdomain, connected_at, last_heartbeat, client_version, client_ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(subdomain) DO UPDATE SET
+                user_id = excluded.user_id,
+                connected_at = excluded.connected_at,
+                last_heartbeat = excluded.last_heartbeat,
+                client_version = excluded.client_version,
+                client_ip = excluded.client_ip
+            RETURNING *
+            "#,
+        )
+        .bind(&id)
+        .bind(user_id)
+        .bind(subdomain)
+        .bind(&now)
+        .bind(&now)
+        .bind(client_version)
+        .bind(client_ip)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    /// Update heartbeat for a tunnel.
+    pub async fn update_tunnel_heartbeat(&self, subdomain: &str) -> Result<(), sqlx::Error> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("UPDATE active_tunnels SET last_heartbeat = ? WHERE subdomain = ?")
+            .bind(&now)
+            .bind(subdomain)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Get tunnel by subdomain.
+    pub async fn get_tunnel_by_subdomain(
+        &self,
+        subdomain: &str,
+    ) -> Result<Option<models::ActiveTunnel>, sqlx::Error> {
+        sqlx::query_as::<_, models::ActiveTunnel>(
+            "SELECT * FROM active_tunnels WHERE subdomain = ?",
+        )
+        .bind(subdomain)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Remove a tunnel.
+    pub async fn remove_tunnel(&self, subdomain: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM active_tunnels WHERE subdomain = ?")
+            .bind(subdomain)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// List all active tunnels.
+    pub async fn list_active_tunnels(&self) -> Result<Vec<models::ActiveTunnel>, sqlx::Error> {
+        sqlx::query_as::<_, models::ActiveTunnel>(
+            "SELECT * FROM active_tunnels ORDER BY connected_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Remove stale tunnels (no heartbeat for specified duration).
+    pub async fn cleanup_stale_tunnels(&self, timeout_seconds: i64) -> Result<u64, sqlx::Error> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::seconds(timeout_seconds);
+        let cutoff_str = cutoff.to_rfc3339();
+        let result = sqlx::query("DELETE FROM active_tunnels WHERE last_heartbeat < ?")
+            .bind(&cutoff_str)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
 }
 
 #[cfg(test)]
@@ -701,5 +891,137 @@ mod tests {
             .await
             .expect("get after delete");
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_link_code_lifecycle() {
+        let (db, _dir) = test_db().await;
+
+        let code = db
+            .create_link_code("user1", "hash123", "testuser", "2099-01-01T00:00:00Z")
+            .await
+            .expect("create");
+        assert_eq!(code.user_id, "user1");
+        assert_eq!(code.subdomain, "testuser");
+
+        let found = db
+            .find_link_code_by_hash("hash123")
+            .await
+            .expect("find")
+            .expect("exists");
+        assert_eq!(found.id, code.id);
+
+        db.mark_link_code_used(&code.id)
+            .await
+            .expect("mark used");
+
+        let found = db
+            .find_link_code_by_hash("hash123")
+            .await
+            .expect("find after use");
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_expired_link_codes() {
+        let (db, _dir) = test_db().await;
+
+        db.create_link_code("user1", "hash1", "sub1", "2020-01-01T00:00:00Z")
+            .await
+            .expect("create expired");
+
+        db.create_link_code("user1", "hash2", "sub2", "2099-01-01T00:00:00Z")
+            .await
+            .expect("create valid");
+
+        let cleaned = db
+            .cleanup_expired_link_codes()
+            .await
+            .expect("cleanup");
+        assert_eq!(cleaned, 1);
+
+        let found = db
+            .find_link_code_by_hash("hash1")
+            .await
+            .expect("find");
+        assert!(found.is_none());
+
+        let found = db
+            .find_link_code_by_hash("hash2")
+            .await
+            .expect("find");
+        assert!(found.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_active_tunnel_lifecycle() {
+        let (db, _dir) = test_db().await;
+
+        let tunnel = db
+            .register_tunnel("user1", "alice", Some("1.0.0"), Some("192.168.1.1"))
+            .await
+            .expect("register");
+        assert_eq!(tunnel.subdomain, "alice");
+        assert_eq!(tunnel.client_version, Some("1.0.0".to_string()));
+
+        let found = db
+            .get_tunnel_by_subdomain("alice")
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(found.id, tunnel.id);
+
+        db.update_tunnel_heartbeat("alice")
+            .await
+            .expect("heartbeat");
+
+        let tunnels = db
+            .list_active_tunnels()
+            .await
+            .expect("list");
+        assert_eq!(tunnels.len(), 1);
+
+        let removed = db
+            .remove_tunnel("alice")
+            .await
+            .expect("remove");
+        assert!(removed);
+
+        let found = db
+            .get_tunnel_by_subdomain("alice")
+            .await
+            .expect("get after remove");
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_stale_tunnels() {
+        let (db, _dir) = test_db().await;
+
+        db.register_tunnel("user1", "alice", None, None)
+            .await
+            .expect("register");
+
+        db.register_tunnel("user2", "bob", None, None)
+            .await
+            .expect("register");
+
+        let tunnels = db
+            .list_active_tunnels()
+            .await
+            .expect("list before cleanup");
+        assert_eq!(tunnels.len(), 2);
+
+        let cleaned = db
+            .cleanup_stale_tunnels(0)
+            .await
+            .expect("cleanup");
+        assert_eq!(cleaned, 2);
+
+        let tunnels = db
+            .list_active_tunnels()
+            .await
+            .expect("list after cleanup");
+        assert_eq!(tunnels.len(), 0);
     }
 }

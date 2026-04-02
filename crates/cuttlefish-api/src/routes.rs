@@ -1,6 +1,9 @@
 //! HTTP route handlers for the API server.
 
+use std::sync::Arc;
+
 use axum::{http::StatusCode, response::Json};
+use cuttlefish_core::TemplateRegistry;
 use serde::Serialize;
 
 /// Application state shared across handlers.
@@ -8,6 +11,8 @@ use serde::Serialize;
 pub struct AppState {
     /// API key for authentication.
     pub api_key: String,
+    /// Template registry for project scaffolding.
+    pub template_registry: Arc<TemplateRegistry>,
 }
 
 /// Health check response.

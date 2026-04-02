@@ -115,3 +115,41 @@ pub struct ConfigOverride {
     /// Configuration value.
     pub value: String,
 }
+
+/// A tunnel link code for initial authentication.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TunnelLinkCode {
+    /// Unique identifier.
+    pub id: String,
+    /// User who created this link code.
+    pub user_id: String,
+    /// SHA-256 hash of the link code (never store plaintext).
+    pub code_hash: String,
+    /// Subdomain to assign on successful auth.
+    pub subdomain: String,
+    /// When the link code was created.
+    pub created_at: String,
+    /// When the link code expires.
+    pub expires_at: String,
+    /// When the link code was used (None if unused).
+    pub used_at: Option<String>,
+}
+
+/// An active tunnel connection.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ActiveTunnel {
+    /// Unique identifier.
+    pub id: String,
+    /// User who owns this tunnel.
+    pub user_id: String,
+    /// Subdomain for this tunnel.
+    pub subdomain: String,
+    /// When the tunnel connected.
+    pub connected_at: String,
+    /// Last heartbeat timestamp.
+    pub last_heartbeat: String,
+    /// Client version string.
+    pub client_version: Option<String>,
+    /// Client IP address.
+    pub client_ip: Option<String>,
+}
