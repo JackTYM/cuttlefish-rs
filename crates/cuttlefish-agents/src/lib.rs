@@ -16,6 +16,8 @@ pub mod runner;
 pub mod tools;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
 pub mod workflow;
+/// Runtime prompt loading from YAML frontmatter markdown files.
+pub mod prompt_registry;
 
 pub use bus::TokioMessageBus;
 pub use coder::CoderAgent;
@@ -27,6 +29,7 @@ pub use runner::{
 };
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowEngine, WorkflowResult};
+pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
 
 pub use cuttlefish_core::traits::{
     agent::{Agent, AgentContext, AgentOutput, AgentRole, Category},

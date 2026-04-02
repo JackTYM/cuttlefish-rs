@@ -9,17 +9,11 @@ use cuttlefish_core::{
     },
 };
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::info;
 
-const CRITIC_SYSTEM_PROMPT: &str = "\
-You are the Critic agent for Cuttlefish. You review code changes for quality, \
-correctness, and adherence to project standards. \
-Review the provided code and output a JSON verdict: \
-{\"verdict\": \"approve\" or \"reject\", \"issues\": [{\"file\": \"...\", \"line\": N, \"message\": \"...\"}], \
-\"summary\": \"brief review summary\"}. \
-Only reject if there are genuine bugs, security issues, or major quality problems. \
-Approve working code even if imperfect.";
+use crate::prompt_registry::PromptRegistry;
 
 /// The result of a critic review.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -57,23 +51,42 @@ pub struct ReviewIssue {
 /// The critic agent that reviews code.
 pub struct CriticAgent {
     provider: Arc<dyn ModelProvider>,
+    prompt_registry: Arc<PromptRegistry>,
     /// Maximum iterations for Coder→Critic before forcing approval.
     pub max_iterations: usize,
 }
 
 impl CriticAgent {
-    /// Create a new critic agent.
-    pub fn new(provider: Arc<dyn ModelProvider>) -> Self {
+    /// Create a new critic agent with the given provider and prompts directory.
+    pub fn new(provider: Arc<dyn ModelProvider>, prompts_dir: impl Into<PathBuf>) -> Self {
         Self {
             provider,
+            prompt_registry: Arc::new(PromptRegistry::new(prompts_dir)),
+            max_iterations: 5,
+        }
+    }
+
+    /// Create a new critic agent with a shared prompt registry.
+    pub fn with_registry(
+        provider: Arc<dyn ModelProvider>,
+        prompt_registry: Arc<PromptRegistry>,
+    ) -> Self {
+        Self {
+            provider,
+            prompt_registry,
             max_iterations: 5,
         }
     }
 
     /// Create with a custom max iterations limit.
-    pub fn with_max_iterations(provider: Arc<dyn ModelProvider>, max_iterations: usize) -> Self {
+    pub fn with_max_iterations(
+        provider: Arc<dyn ModelProvider>,
+        prompts_dir: impl Into<PathBuf>,
+        max_iterations: usize,
+    ) -> Self {
         Self {
             provider,
+            prompt_registry: Arc::new(PromptRegistry::new(prompts_dir)),
             max_iterations,
         }
     }
@@ -116,11 +129,16 @@ impl Agent for CriticAgent {
     ) -> Result<AgentOutput, AgentError> {
         info!("Critic reviewing: {}", &input[..input.len().min(80)]);
 
+        let prompt = self
+            .prompt_registry
+            .load("critic")
+            .map_err(|e| AgentError(format!("Failed to load critic prompt: {e}")))?;
+
         let request = CompletionRequest {
             messages: ctx.messages.clone(),
             max_tokens: Some(1024),
             temperature: Some(0.1),
-            system: Some(CRITIC_SYSTEM_PROMPT.to_string()),
+            system: Some(prompt.body),
         };
 
         let response = self
@@ -155,7 +173,23 @@ impl Agent for CriticAgent {
 mod tests {
     use super::*;
     use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
+    use tempfile::TempDir;
     use uuid::Uuid;
+
+    fn create_test_prompt(dir: &std::path::Path, name: &str, body: &str) {
+        let content = format!(
+            r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+{body}"#
+        );
+        fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+    }
 
     fn test_ctx() -> AgentContext {
         AgentContext {
@@ -172,9 +206,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_critic_approves_good_code() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompt(temp_dir.path(), "critic", "You are the critic agent.");
+
         let mock = MockModelProvider::new("test");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Code looks good"}"#);
-        let agent = CriticAgent::new(Arc::new(mock));
+        let agent = CriticAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
         let out = agent.execute(&mut ctx, "Review code").await.expect("exec");
         assert!(out.success);
@@ -183,15 +220,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_critic_rejects_bad_code() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompt(temp_dir.path(), "critic", "You are the critic agent.");
+
         let mock = MockModelProvider::new("test");
         mock.add_response(
             r#"{"verdict": "reject", "issues": [{"file": "main.rs", "line": 5, "message": "SQL injection vulnerability"}], "summary": "Security issue found"}"#,
         );
-        let agent = CriticAgent::new(Arc::new(mock));
+        let agent = CriticAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
         let out = agent.execute(&mut ctx, "Review code").await.expect("exec");
         assert!(!out.success);
         assert_eq!(out.metadata["issues_count"], 1);
+    }
+
+    #[tokio::test]
+    async fn test_critic_fails_on_missing_prompt() {
+        let temp_dir = TempDir::new().expect("temp dir");
+
+        let mock = MockModelProvider::new("test");
+        let agent = CriticAgent::new(Arc::new(mock), temp_dir.path());
+        let mut ctx = test_ctx();
+        let result = agent.execute(&mut ctx, "Review code").await;
+        assert!(result.is_err());
+        let err = result.expect_err("should fail");
+        assert!(err.to_string().contains("Failed to load critic prompt"));
     }
 
     #[test]
@@ -208,8 +261,11 @@ mod tests {
 
     #[test]
     fn test_critic_role() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompt(temp_dir.path(), "critic", "You are the critic agent.");
+
         let mock = Arc::new(MockModelProvider::default());
-        let agent = CriticAgent::new(mock);
+        let agent = CriticAgent::new(mock, temp_dir.path());
         assert_eq!(agent.name(), "critic");
         assert_eq!(agent.role(), AgentRole::Critic);
     }

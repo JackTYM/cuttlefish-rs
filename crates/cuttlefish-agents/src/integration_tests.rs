@@ -8,25 +8,42 @@ mod workflow_integration {
     use crate::{bus::TokioMessageBus, workflow::WorkflowEngine};
     use cuttlefish_core::traits::bus::MessageBus;
     use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
     use std::sync::Arc;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
-    /// Test that a complete workflow succeeds when critic approves on first try.
+    fn create_test_prompts(dir: &std::path::Path) {
+        for name in ["orchestrator", "coder", "critic"] {
+            let content = format!(
+                r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+You are the {name} agent."#
+            );
+            fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+        }
+    }
+
     #[tokio::test]
     async fn test_full_workflow_approve_on_first_try() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("integration-test");
-        // Orchestrator plans one task
         mock.add_response(
             r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#,
         );
-        // Coder creates the file
         mock.add_response("Created hello.js: console.log('Hello, World!');");
-        // Critic approves
         mock.add_response(
             r#"{"verdict": "approve", "issues": [], "summary": "Clean, working code"}"#,
         );
 
-        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new());
+        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
         let result = engine
             .execute(Uuid::new_v4(), "Create a hello world Node.js script")
             .await
@@ -37,26 +54,23 @@ mod workflow_integration {
         assert_eq!(result.final_verdict.as_deref(), Some("approve"));
     }
 
-    /// Test that a workflow retries when critic rejects, then succeeds.
     #[tokio::test]
     async fn test_full_workflow_retry_and_succeed() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("integration-retry");
-        // Orchestrator
-        mock.add_response("{}"); // Fallback single task
-        // First coder attempt — buggy
+        mock.add_response("{}");
         mock.add_response("Created file with bug on line 5");
-        // First critic — reject
         mock.add_response(
             r#"{"verdict": "reject", "issues": [{"file": "hello.js", "line": 5, "message": "Unhandled error"}], "summary": "Bug found"}"#,
         );
-        // Second coder attempt — fixed
         mock.add_response("Fixed: added try-catch around line 5");
-        // Second critic — approve
         mock.add_response(
             r#"{"verdict": "approve", "issues": [], "summary": "Bug fixed, code is clean"}"#,
         );
 
-        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new());
+        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
         let result = engine
             .execute(Uuid::new_v4(), "Create a robust Node.js script")
             .await
@@ -66,48 +80,47 @@ mod workflow_integration {
         assert_eq!(result.iterations, 2, "Should take 2 iterations");
     }
 
-    /// Test that message bus pub/sub works within workflow execution.
     #[tokio::test]
     async fn test_message_bus_pubsub_in_workflow() {
-        let bus = TokioMessageBus::new();
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
 
-        // Subscribe before publish
+        let bus = TokioMessageBus::new();
         let mut rx = bus
             .subscribe("agent.coder.input")
             .await
             .expect("should subscribe");
 
         let mock = MockModelProvider::new("bus-test");
-        // Orchestrator dispatches to coder
         mock.add_response(
             r#"{"tasks": [{"id": "1", "description": "Write tests", "agent": "coder"}]}"#,
         );
-        // Coder and critic responses
         mock.add_response("Tests written");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Good tests"}"#);
 
-        let engine = WorkflowEngine::with_max_iterations(Arc::new(mock), bus, 1);
+        let engine = WorkflowEngine::with_max_iterations(Arc::new(mock), bus, temp_dir.path(), 1);
         let _ = engine
             .execute(Uuid::new_v4(), "Write unit tests")
             .await
             .expect("workflow should execute");
 
-        // The orchestrator should have published to the coder topic
         assert!(
             rx.try_recv().is_ok(),
             "Coder should have received a task via bus"
         );
     }
 
-    /// Test that workflow result contains content from execution.
     #[tokio::test]
     async fn test_workflow_result_contains_content() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("content-test");
         mock.add_response("{}");
         mock.add_response("Created index.ts with TypeScript hello world");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Approved"}"#);
 
-        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new());
+        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
         let result = engine
             .execute(Uuid::new_v4(), "Create TypeScript hello world")
             .await
@@ -116,19 +129,20 @@ mod workflow_integration {
         assert!(!result.content.is_empty(), "Result should have content");
     }
 
-    /// Test that workflow stops at max iterations without approval.
     #[tokio::test]
     async fn test_workflow_stops_at_max_iterations() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("max-iter-test");
-        // Orchestrator
         mock.add_response("{}");
-        // Add reject cycle for each iteration (max 3)
         for _ in 0..3 {
             mock.add_response("Code attempt");
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "Still broken"}"#);
         }
 
-        let engine = WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), 3);
+        let engine =
+            WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), 3);
         let result = engine
             .execute(Uuid::new_v4(), "Task")
             .await
@@ -138,19 +152,19 @@ mod workflow_integration {
         assert_eq!(result.iterations, 3, "Should reach max iterations");
     }
 
-    /// Test that workflow handles multiple tasks from orchestrator.
     #[tokio::test]
     async fn test_workflow_with_multiple_tasks() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("multi-task");
-        // Orchestrator plans multiple tasks
         mock.add_response(
             r#"{"tasks": [{"id": "1", "description": "Task 1", "agent": "coder"}, {"id": "2", "description": "Task 2", "agent": "coder"}]}"#,
         );
-        // First task: coder + critic
         mock.add_response("Completed task 1");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Task 1 done"}"#);
 
-        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new());
+        let engine = WorkflowEngine::new(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
         let result = engine
             .execute(Uuid::new_v4(), "Execute multiple tasks")
             .await
@@ -205,8 +219,10 @@ mod api_integration {
     /// Test that app state can be created.
     #[test]
     fn test_app_state_creation() {
+        let registry = std::sync::Arc::new(cuttlefish_core::TemplateRegistry::new());
         let state = AppState {
             api_key: "test-key".to_string(),
+            template_registry: registry,
         };
         assert_eq!(state.api_key, "test-key");
     }
@@ -214,8 +230,10 @@ mod api_integration {
     /// Test that build_app returns a router.
     #[test]
     fn test_build_app_returns_router() {
+        let registry = std::sync::Arc::new(cuttlefish_core::TemplateRegistry::new());
         let state = AppState {
             api_key: "test-key".to_string(),
+            template_registry: registry,
         };
         let _app = build_app(state);
         // If this compiles and runs, the router was built successfully
@@ -285,24 +303,41 @@ mod message_bus_integration {
 mod cross_crate_wiring {
     use crate::{bus::TokioMessageBus, workflow::WorkflowEngine};
     use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
     use std::sync::Arc;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
-    /// Test that WorkflowEngine properly wires all agents together.
+    fn create_test_prompts(dir: &std::path::Path) {
+        for name in ["orchestrator", "coder", "critic"] {
+            let content = format!(
+                r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+You are the {name} agent."#
+            );
+            fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+        }
+    }
+
     #[tokio::test]
     async fn test_workflow_engine_wires_all_agents() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("wiring-test");
-        // Orchestrator response
         mock.add_response(
             r#"{"tasks": [{"id": "1", "description": "Test task", "agent": "coder"}]}"#,
         );
-        // Coder response
         mock.add_response("Code output");
-        // Critic response
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "OK"}"#);
 
         let bus = TokioMessageBus::new();
-        let engine = WorkflowEngine::new(Arc::new(mock), bus);
+        let engine = WorkflowEngine::new(Arc::new(mock), bus, temp_dir.path());
 
         let result = engine
             .execute(Uuid::new_v4(), "Test input")
@@ -314,18 +349,20 @@ mod cross_crate_wiring {
         assert_eq!(result.final_verdict.as_deref(), Some("approve"));
     }
 
-    /// Test that workflow engine respects max iterations setting.
     #[tokio::test]
     async fn test_workflow_engine_respects_max_iterations() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let mock = MockModelProvider::new("iter-limit");
         mock.add_response("{}");
-        // Add 2 reject cycles
         for _ in 0..2 {
             mock.add_response("Attempt");
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "No"}"#);
         }
 
-        let engine = WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), 2);
+        let engine =
+            WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), 2);
         let result = engine
             .execute(Uuid::new_v4(), "Task")
             .await
@@ -338,9 +375,11 @@ mod cross_crate_wiring {
         );
     }
 
-    /// Test that workflow engine integrates with message bus.
     #[tokio::test]
     async fn test_workflow_engine_uses_message_bus() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
+
         let bus = TokioMessageBus::new();
 
         let mock = MockModelProvider::new("bus-integration");
@@ -348,7 +387,7 @@ mod cross_crate_wiring {
         mock.add_response("Output");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "OK"}"#);
 
-        let engine = WorkflowEngine::new(Arc::new(mock), bus.clone());
+        let engine = WorkflowEngine::new(Arc::new(mock), bus.clone(), temp_dir.path());
         let result = engine
             .execute(Uuid::new_v4(), "Input")
             .await

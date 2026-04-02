@@ -10,19 +10,14 @@ use cuttlefish_core::{
     },
 };
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::bus::TokioMessageBus;
+use crate::prompt_registry::PromptRegistry;
 use cuttlefish_core::traits::bus::MessageBus;
-
-const ORCHESTRATOR_SYSTEM_PROMPT: &str = "\
-You are the Orchestrator agent for Cuttlefish. You receive project descriptions, \
-analyze requirements, create task plans, and coordinate specialized agents to complete work. \
-Be concise, methodical, and focus on delivering working software. \
-When you receive a task, output a JSON plan with structure: \
-{\"tasks\": [{\"id\": \"1\", \"description\": \"...\", \"agent\": \"coder|critic\"}]}";
 
 /// An orchestrator task in the execution plan.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -57,25 +52,60 @@ pub enum TaskStatus {
 pub struct OrchestratorAgent {
     provider: Arc<dyn ModelProvider>,
     bus: TokioMessageBus,
+    prompt_registry: Arc<PromptRegistry>,
 }
 
 impl OrchestratorAgent {
-    /// Create a new orchestrator with the given model provider and message bus.
-    pub fn new(provider: Arc<dyn ModelProvider>, bus: TokioMessageBus) -> Self {
-        Self { provider, bus }
+    /// Create a new orchestrator with the given model provider, message bus, and prompts directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` - The model provider for completions.
+    /// * `bus` - The message bus for dispatching tasks.
+    /// * `prompts_dir` - Path to the directory containing prompt `.md` files.
+    pub fn new(
+        provider: Arc<dyn ModelProvider>,
+        bus: TokioMessageBus,
+        prompts_dir: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            provider,
+            bus,
+            prompt_registry: Arc::new(PromptRegistry::new(prompts_dir)),
+        }
+    }
+
+    /// Create a new orchestrator with a shared prompt registry.
+    ///
+    /// Use this when multiple agents share the same registry.
+    pub fn with_registry(
+        provider: Arc<dyn ModelProvider>,
+        bus: TokioMessageBus,
+        prompt_registry: Arc<PromptRegistry>,
+    ) -> Self {
+        Self {
+            provider,
+            bus,
+            prompt_registry,
+        }
     }
 
     /// Build a planning prompt for the given user input.
-    fn build_planning_prompt(input: &str) -> CompletionRequest {
-        CompletionRequest {
+    fn build_planning_prompt(&self, input: &str) -> Result<CompletionRequest, AgentError> {
+        let prompt = self
+            .prompt_registry
+            .load("orchestrator")
+            .map_err(|e| AgentError(format!("Failed to load orchestrator prompt: {e}")))?;
+
+        Ok(CompletionRequest {
             messages: vec![Message {
                 role: MessageRole::User,
                 content: input.to_string(),
             }],
             max_tokens: Some(2048),
             temperature: Some(0.2),
-            system: Some(ORCHESTRATOR_SYSTEM_PROMPT.to_string()),
-        }
+            system: Some(prompt.body),
+        })
     }
 
     /// Publish a task to the appropriate agent topic.
@@ -116,7 +146,7 @@ impl Agent for OrchestratorAgent {
         );
 
         // Build task plan using model
-        let request = Self::build_planning_prompt(input);
+        let request = self.build_planning_prompt(input)?;
         let response = self
             .provider
             .complete(request)
@@ -169,7 +199,23 @@ impl Agent for OrchestratorAgent {
 mod tests {
     use super::*;
     use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
+    use tempfile::TempDir;
     use uuid::Uuid;
+
+    fn create_test_prompt(dir: &std::path::Path, name: &str, body: &str) {
+        let content = format!(
+            r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+{body}"#
+        );
+        fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+    }
 
     fn test_ctx() -> AgentContext {
         AgentContext {
@@ -183,13 +229,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_orchestrator_dispatches_on_execute() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompt(
+            temp_dir.path(),
+            "orchestrator",
+            "You are the orchestrator. Output JSON task plans.",
+        );
+
         let mock = MockModelProvider::new("test");
         mock.add_response(
             r#"{"tasks": [{"id": "1", "description": "Create hello.js", "agent": "coder"}]}"#,
         );
         let bus = TokioMessageBus::new();
         let _rx = bus.subscribe("agent.coder.input").await.expect("subscribe");
-        let agent = OrchestratorAgent::new(Arc::new(mock), bus);
+        let agent = OrchestratorAgent::new(Arc::new(mock), bus, temp_dir.path());
         let mut ctx = test_ctx();
         let out = agent
             .execute(&mut ctx, "Create a hello world app")
@@ -201,17 +254,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_orchestrator_fallback_on_bad_json() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompt(
+            temp_dir.path(),
+            "orchestrator",
+            "You are the orchestrator. Output JSON task plans.",
+        );
+
         let mock = MockModelProvider::new("test");
         mock.add_response("I will create a Node.js app for you.");
         let bus = TokioMessageBus::new();
         let _rx = bus.subscribe("agent.coder.input").await.expect("sub");
-        let agent = OrchestratorAgent::new(Arc::new(mock), bus);
+        let agent = OrchestratorAgent::new(Arc::new(mock), bus, temp_dir.path());
         let mut ctx = test_ctx();
         let out = agent
             .execute(&mut ctx, "Build something")
             .await
             .expect("exec");
         assert!(out.success); // Falls back to single coder task
+    }
+
+    #[tokio::test]
+    async fn test_orchestrator_fails_on_missing_prompt() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        // No prompt file created
+
+        let mock = MockModelProvider::new("test");
+        let bus = TokioMessageBus::new();
+        let agent = OrchestratorAgent::new(Arc::new(mock), bus, temp_dir.path());
+        let mut ctx = test_ctx();
+        let result = agent.execute(&mut ctx, "Do something").await;
+        assert!(result.is_err());
+        let err = result.expect_err("should fail");
+        assert!(err.to_string().contains("Failed to load orchestrator prompt"));
     }
 
     #[test]

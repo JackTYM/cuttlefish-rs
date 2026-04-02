@@ -7,12 +7,14 @@ use cuttlefish_core::{
         provider::ModelProvider,
     },
 };
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
     bus::TokioMessageBus, coder::CoderAgent, critic::CriticAgent, orchestrator::OrchestratorAgent,
+    prompt_registry::PromptRegistry,
 };
 
 /// Maximum Coder↔Critic iterations per task (Metis guardrail).
@@ -41,11 +43,20 @@ pub struct WorkflowEngine {
 
 impl WorkflowEngine {
     /// Create a workflow engine with all agents backed by the given provider.
-    pub fn new(provider: Arc<dyn ModelProvider>, bus: TokioMessageBus) -> Self {
+    pub fn new(
+        provider: Arc<dyn ModelProvider>,
+        bus: TokioMessageBus,
+        prompts_dir: impl Into<PathBuf>,
+    ) -> Self {
+        let registry = Arc::new(PromptRegistry::new(prompts_dir));
         Self {
-            orchestrator: OrchestratorAgent::new(Arc::clone(&provider), bus),
-            coder: CoderAgent::new(Arc::clone(&provider)),
-            critic: CriticAgent::new(provider),
+            orchestrator: OrchestratorAgent::with_registry(
+                Arc::clone(&provider),
+                bus,
+                Arc::clone(&registry),
+            ),
+            coder: CoderAgent::with_registry(Arc::clone(&provider), Arc::clone(&registry)),
+            critic: CriticAgent::with_registry(provider, registry),
             max_iterations: MAX_CODER_CRITIC_ITERATIONS,
         }
     }
@@ -54,9 +65,10 @@ impl WorkflowEngine {
     pub fn with_max_iterations(
         provider: Arc<dyn ModelProvider>,
         bus: TokioMessageBus,
+        prompts_dir: impl Into<PathBuf>,
         max_iterations: usize,
     ) -> Self {
-        let mut engine = Self::new(provider, bus);
+        let mut engine = Self::new(provider, bus, prompts_dir);
         engine.max_iterations = max_iterations;
         engine
     }
@@ -198,23 +210,41 @@ impl WorkflowEngine {
 mod tests {
     use super::*;
     use cuttlefish_providers::mock::MockModelProvider;
+    use std::fs;
+    use tempfile::TempDir;
 
-    fn make_engine(mock: MockModelProvider) -> WorkflowEngine {
+    fn create_test_prompts(dir: &std::path::Path) {
+        for name in ["orchestrator", "coder", "critic"] {
+            let content = format!(
+                r#"---
+name: {name}
+description: Test agent
+tools: []
+category: deep
+---
+
+You are the {name} agent."#
+            );
+            fs::write(dir.join(format!("{name}.md")), content).expect("write test prompt");
+        }
+    }
+
+    fn make_engine(mock: MockModelProvider) -> (WorkflowEngine, TempDir) {
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
         let bus = TokioMessageBus::new();
-        WorkflowEngine::new(Arc::new(mock), bus)
+        let engine = WorkflowEngine::new(Arc::new(mock), bus, temp_dir.path());
+        (engine, temp_dir)
     }
 
     #[tokio::test]
     async fn test_workflow_succeeds_with_approve() {
         let mock = MockModelProvider::new("test");
-        // Orchestrator response
         mock.add_response(r#"{"tasks": [{"id":"1","description":"Create app","agent":"coder"}]}"#);
-        // Coder response
         mock.add_response("Created index.js with hello world");
-        // Critic approves
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Good code"}"#);
 
-        let engine = make_engine(mock);
+        let (engine, _temp_dir) = make_engine(mock);
         let result = engine
             .execute(Uuid::new_v4(), "Create a hello world app")
             .await
@@ -226,18 +256,13 @@ mod tests {
     #[tokio::test]
     async fn test_workflow_retries_on_reject() {
         let mock = MockModelProvider::new("test");
-        // Orchestrator
         mock.add_response(r#"{"tasks": [{"id":"1","description":"Create app","agent":"coder"}]}"#);
-        // Coder first attempt
         mock.add_response("Created index.js (buggy)");
-        // Critic rejects
         mock.add_response(r#"{"verdict": "reject", "issues": [{"file":"index.js","message":"Bug"}], "summary": "Has bugs"}"#);
-        // Coder second attempt
         mock.add_response("Created index.js (fixed)");
-        // Critic approves
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Fixed"}"#);
 
-        let engine = make_engine(mock);
+        let (engine, _temp_dir) = make_engine(mock);
         let result = engine
             .execute(Uuid::new_v4(), "Create app")
             .await
@@ -249,18 +274,19 @@ mod tests {
     #[tokio::test]
     async fn test_workflow_stops_at_max_iterations() {
         let mock = MockModelProvider::new("test");
-        // Orchestrator
         mock.add_response("{}");
-        // Add reject cycle for each iteration (max 5)
         for _ in 0..5 {
             mock.add_response("Code attempt");
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "Still broken"}"#);
         }
 
+        let temp_dir = TempDir::new().expect("temp dir");
+        create_test_prompts(temp_dir.path());
         let engine = WorkflowEngine::with_max_iterations(
             Arc::new(mock),
             TokioMessageBus::new(),
-            2, // test with 2 max iterations
+            temp_dir.path(),
+            2,
         );
         let result = engine.execute(Uuid::new_v4(), "Task").await.expect("exec");
         assert!(!result.success);
