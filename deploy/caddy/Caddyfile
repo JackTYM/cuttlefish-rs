@@ -1,0 +1,57 @@
+# Cuttlefish Tunnel Proxy Configuration
+#
+# This Caddyfile routes wildcard subdomains (*.cuttlefish.ai) to the tunnel daemon.
+# The tunnel daemon then forwards requests to the appropriate self-hosted instance.
+#
+# Prerequisites:
+# 1. DNS wildcard record: *.cuttlefish.ai -> server IP
+# 2. Caddy installed with DNS challenge support for wildcard certs
+# 3. Tunnel daemon running on localhost:8081
+
+# Main site - serves the cuttlefish.ai marketing/dashboard
+cuttlefish.ai {
+    reverse_proxy localhost:8080
+}
+
+# API subdomain
+api.cuttlefish.ai {
+    reverse_proxy localhost:8080
+}
+
+# Tunnel subdomains - all other *.cuttlefish.ai routes to tunnel daemon
+*.cuttlefish.ai {
+    # Extract subdomain for logging
+    @tunnel host *.cuttlefish.ai
+    
+    # Forward to tunnel daemon HTTP endpoint
+    reverse_proxy @tunnel localhost:8081 {
+        # Pass the original host header so the daemon knows which tunnel to route to
+        header_up Host {http.request.host}
+        
+        # WebSocket support for the tunnel connection itself
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+        
+        # Timeouts for long-running connections
+        transport http {
+            dial_timeout 10s
+            response_header_timeout 60s
+        }
+    }
+    
+    # Request logging
+    log {
+        output file /var/log/caddy/tunnel-access.log
+        format json
+    }
+}
+
+# Tunnel daemon WebSocket endpoint (for client connections)
+# This is separate from the HTTP routing above
+tunnel.cuttlefish.ai {
+    reverse_proxy localhost:8082 {
+        # WebSocket support required
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+    }
+}
