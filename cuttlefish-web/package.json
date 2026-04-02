@@ -1,0 +1,21 @@
+{
+  "name": "cuttlefish-web",
+  "version": "1.0.0",
+  "description": "Cuttlefish WebUI - Nuxt 3 application",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.5",
+    "nuxt": "^4.4.2"
+  }
+}

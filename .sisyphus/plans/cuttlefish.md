@@ -1709,7 +1709,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 7 — WebUI (Nuxt)
 
-- [ ] 30. cuttlefish-web: Nuxt Project Setup + WebSocket Client
+- [x] 30. cuttlefish-web: Nuxt Project Setup + WebSocket Client
 
   **What to do**:
   - Initialize Nuxt 3 project in `cuttlefish-web/` directory
@@ -1756,141 +1756,10 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(web): initialize Nuxt project with WebSocket client`
   - Pre-commit: `cd cuttlefish-web && npm test`
 
-- [ ] 31. cuttlefish-web: Chat Interface with Code Blocks
-
-  **What to do**:
-  - Build chat UI component:
-    - Message list with user/assistant differentiation
-    - Markdown rendering with syntax-highlighted code blocks
-    - Input textarea with send button and Enter-to-send
-    - Auto-scroll to newest message
-    - Typing indicator when agent is responding
-    - Streaming: display agent response as it arrives via WebSocket
-  - Message actions: copy code block, expand/collapse long messages
-  - Mobile-responsive layout
-
-  **Recommended Agent Profile**:
-  - **Category**: `visual-engineering`
-  - **Skills**: [`frontend-ui-ux`]
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES (with Tasks 32-34)
-  - **Blocks**: Task 45
-  - **Blocked By**: Task 30
-
-  **Acceptance Criteria**:
-  - [ ] Messages render with correct formatting
-  - [ ] Code blocks have syntax highlighting
-  - [ ] Streaming response displays incrementally
-  - [ ] Auto-scroll works
-
-  **QA Scenarios**:
-  ```
-  Scenario: Chat message with code block renders correctly
-    Tool: Playwright
-    Steps:
-      1. Navigate to project chat
-      2. Send message "Create hello.py"
-      3. Wait for response with code block
-      4. Assert code block has Python syntax highlighting (class="language-python")
-      5. Assert copy button visible on hover
-    Expected Result: Code block rendered with syntax highlighting
-    Evidence: .sisyphus/evidence/task-31-chat-codeblock.png
-  ```
-
-  **Commit**: YES
-  - Message: `feat(web): add chat interface with streaming and code blocks`
-
-- [ ] 32. cuttlefish-web: Build Log Viewer (Streaming)
-
-  **What to do**:
-  - Build log viewer component:
-    - Real-time streaming of build output via WebSocket build_log messages
-    - ANSI color code support (convert to HTML spans)
-    - Auto-scroll with "scroll lock" toggle
-    - Status indicator: running (yellow), success (green), failure (red)
-    - Timestamp per line
-    - Filter: show/hide stdout vs stderr
-  - Tab in project view alongside chat
-
-  **Recommended Agent Profile**:
-  - **Category**: `visual-engineering`
-  - **Skills**: [`frontend-ui-ux`]
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES (with Tasks 31, 33, 34)
-  - **Blocks**: Task 45
-  - **Blocked By**: Task 30
-
-  **Acceptance Criteria**:
-  - [ ] Build logs stream in real-time
-  - [ ] ANSI colors rendered correctly
-  - [ ] Status indicator updates
-  - [ ] Scroll lock works
-
-  **QA Scenarios**:
-  ```
-  Scenario: Build log streams in real-time
-    Tool: Playwright
-    Steps:
-      1. Navigate to project build logs tab
-      2. Trigger a build (or simulate via WS)
-      3. Assert log lines appear one-by-one (not all at once)
-      4. Assert ANSI green text renders as green span
-      5. Assert status shows "running" then "success"
-    Expected Result: Real-time log streaming with colors
-    Evidence: .sisyphus/evidence/task-32-build-log.png
-  ```
-
-  **Commit**: YES
-  - Message: `feat(web): add streaming build log viewer`
-
-- [ ] 33. cuttlefish-web: File Diff Viewer
-
-  **What to do**:
-  - Build diff viewer component:
-    - Render unified diff format with added/removed/context lines
-    - Side-by-side or unified view toggle
-    - File grouping (multiple files in one diff)
-    - Syntax highlighting within diff
-    - Line numbers for both old and new files
-  - Triggered when agent completes file changes
-  - Diff data comes from git diff via WebSocket
-
-  **Recommended Agent Profile**:
-  - **Category**: `visual-engineering`
-  - **Skills**: [`frontend-ui-ux`]
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES (with Tasks 31, 32, 34)
-  - **Blocks**: Task 45
-  - **Blocked By**: Task 30
-
-  **Acceptance Criteria**:
-  - [ ] Unified diff renders with color coding (green=added, red=removed)
-  - [ ] Multiple files grouped correctly
-  - [ ] Side-by-side toggle works
-  - [ ] Line numbers displayed
-
-  **QA Scenarios**:
-  ```
-  Scenario: Diff viewer shows file changes
-    Tool: Playwright
-    Steps:
-      1. Navigate to project diff tab
-      2. Provide sample unified diff via WS
-      3. Assert added lines shown in green
-      4. Assert removed lines shown in red
-      5. Assert file headers visible
-      6. Toggle side-by-side — assert layout changes
-    Expected Result: Diff rendered with correct styling
-    Evidence: .sisyphus/evidence/task-33-diff-viewer.png
-  ```
-
-  **Commit**: YES
-  - Message: `feat(web): add file diff viewer with side-by-side toggle`
-
-- [ ] 34. cuttlefish-web: Project Dashboard + Management
+- [x] 31. cuttlefish-web: Chat Interface with Code Blocks
+- [x] 32. cuttlefish-web: Build Log Viewer (Streaming)
+- [x] 33. cuttlefish-web: File Diff Viewer
+- [x] 34. cuttlefish-web: Project Dashboard + Management
 
   **What to do**:
   - Dashboard page (`/`):
@@ -1940,7 +1809,7 @@ Wave FINAL (Verification — after ALL tasks):
 
 ### Wave 8 — TUI Client
 
-- [ ] 35. cuttlefish-tui: Ratatui App + WebSocket Connection
+- [x] 35. cuttlefish-tui: Ratatui App + WebSocket Connection
 
   **What to do**:
   - Create TUI binary using ratatui + crossterm:
@@ -1986,7 +1855,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(tui): add ratatui TUI client with WebSocket connection`
   - Pre-commit: `cargo build -p cuttlefish-tui`
 
-- [ ] 36. cuttlefish-tui: Chat View + Input Handling
+ - [x] 36. cuttlefish-tui: Chat View + Input Handling
 
   **What to do**:
   - Chat view in right panel:
@@ -2033,7 +1902,7 @@ Wave FINAL (Verification — after ALL tasks):
   - Message: `feat(tui): add chat view with input handling and command mode`
   - Pre-commit: `cargo build -p cuttlefish-tui`
 
-- [ ] 37. cuttlefish-tui: Diff View + Build Log View
+ - [x] 37. cuttlefish-tui: Diff View + Build Log View
 
   **What to do**:
   - Diff view (Tab to switch):

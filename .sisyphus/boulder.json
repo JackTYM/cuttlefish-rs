@@ -27,7 +27,9 @@
     "ses_2b498efb7ffeL8DRjU16ttPorE",
     "ses_2b4960363ffetrTfaqChabxFTq",
     "ses_2b493d655ffe29UkJr43Mva512",
-    "ses_2b491d946ffe6QbhLI2MY4eUIN"
+    "ses_2b491d946ffe6QbhLI2MY4eUIN",
+    "ses_2b48e089fffesB02ocBCWweSLF",
+    "ses_2b48b0fdaffeSeXs472LXrd2Bg"
   ],
   "plan_name": "cuttlefish",
   "agent": "atlas",
@@ -229,6 +231,15 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-04-01T23:44:27.861Z"
+    },
+    "todo:30": {
+      "task_key": "todo:30",
+      "task_label": "30",
+      "task_title": "cuttlefish-web: Nuxt Project Setup + WebSocket Client",
+      "session_id": "ses_2b48b0fdaffeSeXs472LXrd2Bg",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-01T23:51:44.600Z"
     }
   }
 }

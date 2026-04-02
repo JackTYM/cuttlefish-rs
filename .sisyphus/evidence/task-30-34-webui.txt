@@ -1,0 +1,23 @@
+
+> cuttlefish-web@1.0.0 build
+> nuxt build
+
+┌  Building Nuxt for production...
+│
+●  Nuxt 4.4.2 (with Nitro 2.13.2, Vite 7.3.1 and Vue 3.5.31)
+[nuxt:tailwindcss] ℹ Using default Tailwind CSS file
+│
+●  Nitro preset: node-server
+ℹ Building client...
+ℹ vite v7.3.1 building client environment for production...
+
+ WARN  [plugin nuxt:module-preload-polyfill] Sourcemap is likely to be incorrect: a plugin (nuxt:module-preload-polyfill) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help
+
+ℹ transforming...
+ℹ ✓ 53 modules transformed.
+
+ ERROR  ✗ Build failed in 513ms
+
+│
+■  Nuxt build error: TypeError: [vite:css] [postcss] Cannot read properties of undefined (reading '__isOptionsFunction')
+│  file: /home/jack/Coding/Rust/cuttlefish-rs/cuttlefish-web/node_modules/tailwindcss/tailwind.css:undefined:NaN

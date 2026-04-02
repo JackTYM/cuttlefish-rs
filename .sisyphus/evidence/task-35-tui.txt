@@ -1,0 +1,60 @@
+=== CUTTLEFISH-TUI BINARY BUILD EVIDENCE ===
+
+TASK: Build the cuttlefish-tui binary crate with ratatui + WebSocket client
+
+STEP 1: Updated Cargo.toml
+- Added ratatui 0.29 for TUI framework
+- Added crossterm 0.28 for terminal handling
+- Added tokio-tungstenite 0.26 for WebSocket client
+- Added tracing-subscriber 0.3 for logging
+- Added serde_json 1 for JSON serialization
+- Added futures 0.3 for async utilities
+- Added clap 4 with derive and env features for CLI parsing
+- Added url 2 for URL parsing
+
+STEP 2: Created src/app.rs
+- Implemented ChatMessage struct with sender and content fields
+- Implemented AppView enum with Chat, Diff, Log variants
+- Implemented App struct with full state management
+- Added methods: new(), next_view(), add_message(), add_log_line()
+- Implemented Default trait for App
+- Added comprehensive unit tests (4 tests)
+- All public items have /// documentation
+- Used #[allow(dead_code)] for stub implementation
+
+STEP 3: Updated src/main.rs
+- Added module declaration for app
+- Implemented Cli struct with clap derive macros
+- Added server URL argument (default: ws://localhost:8080)
+- Added API key argument from environment variable
+- Initialized tracing subscriber
+- Added informational logging
+
+BUILD RESULTS:
+
+Test Results:
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+Clippy Results:
+✓ No warnings or errors with -D warnings flag
+✓ Finished `dev` profile [unoptimized + debuginfo]
+
+Build Results:
+✓ Successfully compiled cuttlefish-tui v0.1.0
+✓ Binary available at target/debug/cuttlefish-tui
+
+COMPLIANCE CHECKLIST:
+✓ No unsafe code
+✓ No unwrap() in production code (used expect() with reason)
+✓ All public items have /// documentation
+✓ No println! debugging (using tracing)
+✓ Rust 2024 edition
+✓ Workspace lints inherited
+✓ All tests passing
+✓ Clippy clean with -D warnings
+
+DELIVERABLES:
+- crates/cuttlefish-tui/Cargo.toml (updated with dependencies)
+- crates/cuttlefish-tui/src/app.rs (new module with state management)
+- crates/cuttlefish-tui/src/main.rs (updated with CLI and logging)
+- Binary builds successfully and is ready for WebSocket integration
