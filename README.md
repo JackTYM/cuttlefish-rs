@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/.github/assets/logo.png" alt="Cuttlefish Logo" width="200"/>
+  <img src=".github/assets/logo.svg" alt="Cuttlefish Logo" width="200"/>
 </p>
 
 <h1 align="center">🐙 Cuttlefish</h1>
