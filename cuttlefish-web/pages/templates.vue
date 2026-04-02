@@ -1,63 +1,75 @@
 <template>
   <div class="p-6">
     <!-- Header -->
-    <div class="mb-8">
+    <header class="mb-8">
       <h1 class="text-2xl font-bold text-white mb-2">Templates</h1>
       <p class="text-gray-400">Start your project from proven templates</p>
-    </div>
+    </header>
     
     <!-- Filters -->
-    <div class="flex flex-col sm:flex-row gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-4 mb-6" role="search">
       <!-- Search -->
+      <label for="template-search" class="sr-only">Search templates</label>
       <input 
+        id="template-search"
         v-model="searchQuery"
-        type="text" 
+        type="search" 
         placeholder="Search templates..."
-        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
+        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400 transition-colors motion-reduce:transition-none min-h-[44px]"
       />
       
       <!-- Language filter -->
-      <div class="flex gap-2 flex-wrap">
-        <button 
-          v-for="lang in languages" 
-          :key="lang"
-          @click="selectedLanguage = lang === 'All' ? '' : lang"
-          :class="[
-            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-            (selectedLanguage === lang || (!selectedLanguage && lang === 'All'))
-              ? 'bg-cyan-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-          ]"
-        >
-          {{ lang }}
-        </button>
-      </div>
+      <fieldset>
+        <legend class="sr-only">Filter by language</legend>
+        <div class="flex gap-2 flex-wrap" role="group" aria-label="Filter by programming language">
+          <button 
+            v-for="lang in languages" 
+            :key="lang"
+            @click="selectedLanguage = lang === 'All' ? '' : lang"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950 min-h-[44px]',
+              (selectedLanguage === lang || (!selectedLanguage && lang === 'All'))
+                ? 'bg-cyan-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+            ]"
+            :aria-pressed="(selectedLanguage === lang || (!selectedLanguage && lang === 'All'))"
+          >
+            {{ lang }}
+          </button>
+        </div>
+      </fieldset>
     </div>
     
     <!-- Template Grid -->
-    <div v-if="filteredTemplates.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div 
-        v-for="template in filteredTemplates" 
-        :key="template.id"
-        class="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-cyan-800 transition-colors group cursor-pointer"
-      >
-        <div class="flex justify-between items-start mb-3">
-          <h3 class="font-semibold text-white">{{ template.name }}</h3>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">{{ template.language }}</span>
-        </div>
-        <p class="text-sm text-gray-400 line-clamp-2 mb-4">{{ template.description }}</p>
-        <div class="flex justify-between items-center">
-          <span class="text-xs text-gray-500">by {{ template.author }}</span>
-          <button class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-            Use Template
-          </button>
-        </div>
+    <section v-if="filteredTemplates.length" aria-labelledby="templates-heading">
+      <h2 id="templates-heading" class="sr-only">Available Templates</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <article 
+          v-for="template in filteredTemplates" 
+          :key="template.id"
+          class="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-cyan-800 transition-colors motion-reduce:transition-none group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="font-semibold text-white">{{ template.name }}</h3>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">{{ template.language }}</span>
+          </div>
+          <p class="text-sm text-gray-400 line-clamp-2 mb-4">{{ template.description }}</p>
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-gray-500">by {{ template.author }}</span>
+            <button 
+              class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg transition-colors motion-reduce:transition-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+              :aria-label="`Use ${template.name} template`"
+            >
+              Use Template
+            </button>
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
     
     <!-- Empty state -->
-    <div v-else class="text-center py-16 text-gray-500">
-      <div class="text-4xl mb-4">📦</div>
+    <div v-else class="text-center py-16 text-gray-500" role="status">
+      <div class="text-4xl mb-4" role="img" aria-label="Empty box">📦</div>
       <p>No templates found matching your criteria</p>
     </div>
   </div>
