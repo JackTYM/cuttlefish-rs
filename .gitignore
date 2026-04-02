@@ -41,3 +41,10 @@ logs/
 # Temp files
 *.tmp
 *.temp
+
+# Node.js
+node_modules/
+cuttlefish-web/node_modules/
+cuttlefish-web/.nuxt/
+cuttlefish-web/.output/
+cuttlefish-web/dist/
