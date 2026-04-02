@@ -1,0 +1,115 @@
+<template>
+  <div class="min-h-screen bg-slate-950 py-16">
+    <div class="container mx-auto px-4">
+      <!-- Header -->
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-white mb-4">Template Marketplace</h1>
+        <p class="text-slate-400 text-lg">Start your project from proven templates</p>
+      </div>
+      
+      <!-- Filters -->
+      <div class="flex flex-col sm:flex-row gap-4 mb-8 max-w-2xl mx-auto">
+        <input 
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search templates..."
+          class="flex-1 px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+        />
+        <div class="flex gap-2">
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            @click="selectedCategory = cat === 'All' ? '' : cat"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition',
+              (selectedCategory === cat || (!selectedCategory && cat === 'All'))
+                ? 'bg-cyan-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            ]"
+          >
+            {{ cat }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- Grid -->
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div 
+          v-for="t in filteredTemplates" 
+          :key="t.id"
+          class="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition group"
+        >
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="text-lg font-semibold text-white">{{ t.name }}</h3>
+            <span class="text-xs px-2 py-1 bg-slate-800 text-slate-400 rounded">{{ t.language }}</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-4">{{ t.description }}</p>
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2 text-sm text-slate-500">
+              <span>by {{ t.author }}</span>
+              <span>•</span>
+              <span>⭐ {{ t.stars }}</span>
+            </div>
+            <a 
+              :href="'https://app.cuttlefish.dev/new?template=' + t.name"
+              class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg transition opacity-0 group-hover:opacity-100"
+            >
+              Use Template
+            </a>
+          </div>
+          <div class="mt-3">
+            <span :class="[
+              'text-xs px-2 py-1 rounded',
+              t.category === 'Official' ? 'bg-cyan-900/50 text-cyan-400' : 'bg-purple-900/50 text-purple-400'
+            ]">
+              {{ t.category }}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Submit CTA -->
+      <div class="text-center mt-16 p-8 bg-slate-900 border border-slate-800 rounded-xl">
+        <h2 class="text-xl font-semibold text-white mb-2">Have a great template?</h2>
+        <p class="text-slate-400 mb-4">Share it with the community</p>
+        <a 
+          href="https://github.com/JackTYM/cuttlefish-rs/blob/main/docs/templates.md" 
+          target="_blank"
+          class="inline-block px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+        >
+          Submit Your Template →
+        </a>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+definePageMeta({
+  layout: 'default'
+})
+
+const searchQuery = ref('')
+const selectedCategory = ref('')
+
+const templates = ref([
+  { id: '1', name: 'rust-cli', description: 'Rust CLI application starter', category: 'Official', language: 'Rust', author: 'cuttlefish', stars: 142 },
+  { id: '2', name: 'rust-lib', description: 'Rust library with tests and CI', category: 'Official', language: 'Rust', author: 'cuttlefish', stars: 98 },
+  { id: '3', name: 'nuxt-app', description: 'Nuxt 3 web application', category: 'Official', language: 'TypeScript', author: 'cuttlefish', stars: 156 },
+  { id: '4', name: 'fastapi', description: 'Python FastAPI backend', category: 'Official', language: 'Python', author: 'cuttlefish', stars: 87 },
+  { id: '5', name: 'discord-bot', description: 'Discord bot starter', category: 'Community', language: 'TypeScript', author: 'community', stars: 64 },
+  { id: '6', name: 'tauri-app', description: 'Tauri desktop application', category: 'Community', language: 'Rust', author: 'contributor', stars: 45 },
+])
+
+const categories = ['All', 'Official', 'Community']
+
+const filteredTemplates = computed(() => {
+  return templates.value.filter(t => {
+    const matchesSearch = !searchQuery.value || 
+      t.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      t.description.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesCat = !selectedCategory.value || selectedCategory.value === 'All' || t.category === selectedCategory.value
+    return matchesSearch && matchesCat
+  })
+})
+</script>
