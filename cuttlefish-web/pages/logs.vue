@@ -1,6 +1,9 @@
 <script setup lang="ts">
 const selectedProject = ref('')
 const selectedAgent = ref('')
+const refreshInterval = ref<number | null>(null)
+const displayedCount = ref(20)
+const pageSize = 20
 
 const logs = ref([
   { id: '1', timestamp: '10:30 AM', agent: 'orchestrator', project: 'my-app', action: 'Planning implementation' },
@@ -25,6 +28,20 @@ const filteredLogs = computed(() => {
     const matchesAgent = !selectedAgent.value || selectedAgent.value === 'All' || log.agent === selectedAgent.value
     return matchesProject && matchesAgent
   })
+})
+
+const fetchLogs = async () => {
+  // Would fetch from API - implementation pending
+  // const res = await $fetch('/api/logs')
+  // logs.value = res
+}
+
+onMounted(() => {
+  refreshInterval.value = setInterval(fetchLogs, 5000)
+})
+
+onUnmounted(() => {
+  if (refreshInterval.value) clearInterval(refreshInterval.value)
 })
 </script>
 
@@ -62,7 +79,7 @@ const filteredLogs = computed(() => {
       <h2 id="activity-heading" class="sr-only">Activity Log</h2>
       <ul class="space-y-3" role="log" aria-live="polite">
         <li 
-          v-for="log in filteredLogs" 
+          v-for="log in filteredLogs.slice(0, displayedCount)" 
           :key="log.id"
           class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 bg-gray-900 border border-gray-800 rounded-lg"
         >
@@ -85,6 +102,16 @@ const filteredLogs = computed(() => {
           <span class="text-gray-600 text-xs sm:text-sm">{{ log.project }}</span>
         </li>
       </ul>
+      <!-- Load More Button -->
+      <div v-if="displayedCount < filteredLogs.length" class="mt-4 text-center">
+        <button
+          @click="displayedCount += 20"
+          class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+          :aria-label="`Load more logs, currently showing ${displayedCount} of ${filteredLogs.length}`"
+        >
+          Load More
+        </button>
+      </div>
     </section>
     
     <div v-if="filteredLogs.length === 0" class="text-center py-12 text-gray-400" role="status">

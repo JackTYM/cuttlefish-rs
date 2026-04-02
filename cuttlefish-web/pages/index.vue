@@ -67,24 +67,49 @@
 
       <!-- Projects Grid -->
       <section v-if="projects.length" aria-labelledby="projects-heading">
+        <div class="mb-4 flex items-center gap-3">
+          <button
+            @click="showArchived = !showArchived"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            :class="showArchived 
+              ? 'bg-yellow-900/50 text-yellow-400 hover:bg-yellow-900/70 border border-yellow-700/50' 
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'"
+            :aria-pressed="showArchived"
+            aria-label="Toggle archived projects visibility"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            {{ showArchived ? 'Showing Archived' : 'Show Archived' }}
+          </button>
+        </div>
         <h2 id="projects-heading" class="sr-only">Your Projects</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <NuxtLink
-            v-for="project in projects"
+            v-for="project in filteredProjects"
             :key="project.id"
             :to="`/project/${project.id}`"
             class="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-cyan-800 transition-colors motion-reduce:transition-none cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
+            :class="{ 'opacity-60': project.isArchived }"
           >
             <article>
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-white group-hover:text-cyan-400 transition-colors motion-reduce:transition-none">{{ project.name }}</h3>
+                  <h3 class="font-semibold text-white group-hover:text-cyan-400 transition-colors motion-reduce:transition-none" :class="{ 'line-through': project.isArchived }">{{ project.name }}</h3>
                   <!-- Template Badge -->
                   <span
                     v-if="project.template"
                     class="text-xs px-2 py-0.5 rounded-full bg-purple-900/50 text-purple-300 border border-purple-700/50"
                   >
                     {{ project.template }}
+                  </span>
+                  <!-- Archived Badge -->
+                  <span
+                    v-if="project.isArchived"
+                    class="text-xs px-2 py-0.5 rounded-full bg-yellow-900/50 text-yellow-300 border border-yellow-700/50"
+                    role="status"
+                  >
+                    Archived
                   </span>
                 </div>
                 <span
@@ -117,6 +142,7 @@ interface Project {
   description: string
   status: string
   template?: string
+  isArchived?: boolean
 }
 
 interface Template {
@@ -140,10 +166,18 @@ const projects = ref<Project[]>([])
 const newProjectName = ref('')
 const newProjectDesc = ref('')
 const selectedTemplate = ref('')
+const showArchived = ref(false)
 
 const selectedTemplateInfo = computed(() =>
   templates.find(t => t.id === selectedTemplate.value)
 )
+
+const filteredProjects = computed(() => {
+  return projects.value.filter(p => {
+    if (showArchived.value) return p.isArchived
+    return !p.isArchived
+  })
+})
 
 const createProject = async () => {
   if (!newProjectName.value) return

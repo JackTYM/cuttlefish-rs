@@ -758,8 +758,7 @@ const sendMessage = () => {
 }
 
 const saveSettings = () => {
-  // Would save to API
-  console.log('Saving settings:', settings.value, agentSettings.value)
+  // Would save to API - implementation pending
 }
 
 const resetSettings = () => {
