@@ -874,9 +874,9 @@ check_dependencies() {
         docker_missing=true
     fi
     
-    if command -v rustc &> /dev/null; then
+    if command -v rustc &> /dev/null || [[ -x "$HOME/.cargo/bin/rustc" ]]; then
         local rust_ver
-        rust_ver=$(rustc --version | awk '{print $2}')
+        rust_ver=$("${HOME}/.cargo/bin/rustc" --version 2>/dev/null || rustc --version | awk '{print $2}')
         success "Rust $rust_ver is installed"
     else
         warn "Rust is not installed (will install)"
@@ -1202,19 +1202,23 @@ install_dependencies_wsl() {
 }
 
 install_rust() {
-    if ! command -v rustc &> /dev/null; then
+    # Source cargo env if it exists (in case rust is installed but not in PATH)
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+    
+    if ! command -v rustc &> /dev/null && [[ ! -x "$HOME/.cargo/bin/rustc" ]]; then
         info "Installing Rust ${RUST_VERSION}..."
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
         source "$HOME/.cargo/env"
         success "Rust installed"
     else
         local current_ver
-        current_ver=$(rustc --version | awk '{print $2}')
+        current_ver=$("$HOME/.cargo/bin/rustc" --version 2>/dev/null || rustc --version | awk '{print $2}')
         if [[ "$current_ver" != "$RUST_VERSION"* ]]; then
             info "Updating Rust to ${RUST_VERSION}..."
-            rustup install "$RUST_VERSION"
-            rustup default "$RUST_VERSION"
+            "$HOME/.cargo/bin/rustup" install "$RUST_VERSION" 2>/dev/null || rustup install "$RUST_VERSION"
+            "$HOME/.cargo/bin/rustup" default "$RUST_VERSION" 2>/dev/null || rustup default "$RUST_VERSION"
         fi
+        success "Rust $current_ver is ready"
     fi
 }
 
