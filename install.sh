@@ -834,12 +834,8 @@ check_dependencies() {
         echo ""
         error "Missing dependencies: ${missing[*]}"
         echo ""
-        if prompt_yn "Would you like to install missing dependencies?"; then
-            install_dependencies "${missing[@]}"
-        else
-            error "Cannot continue without dependencies"
-            exit 1
-        fi
+        info "Installing missing dependencies..."
+        install_dependencies "${missing[@]}"
     fi
     
     if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
@@ -848,56 +844,32 @@ check_dependencies() {
             macos)
                 if [[ "$docker_missing" == true ]]; then
                     warn "Docker is not installed on macOS"
-                    if prompt_yn "Would you like to install Docker now?"; then
-                        install_dependencies_macos "docker"
-                    else
-                        error "Cannot continue without Docker"
-                        exit 1
-                    fi
+                    info "Installing Docker..."
+                    install_dependencies_macos "docker"
                 else
                     warn "Docker is installed but not running"
-                    if prompt_yn "Would you like to start Docker?"; then
-                        install_dependencies_macos "docker-running"
-                    else
-                        error "Cannot continue without Docker running"
-                        exit 1
-                    fi
+                    info "Starting Docker..."
+                    install_dependencies_macos "docker-running"
                 fi
                 ;;
             wsl)
                 if [[ "$docker_missing" == true ]]; then
                     warn "Docker is not available in WSL"
-                    if prompt_yn "Would you like to set up Docker?"; then
-                        install_dependencies_wsl "docker"
-                    else
-                        error "Cannot continue without Docker"
-                        exit 1
-                    fi
+                    info "Setting up Docker..."
+                    install_dependencies_wsl "docker"
                 else
                     warn "Docker is installed but not running"
-                    if prompt_yn "Would you like to start Docker?"; then
-                        install_dependencies_wsl "docker-running"
-                    else
-                        error "Cannot continue without Docker running"
-                        exit 1
-                    fi
+                    info "Starting Docker..."
+                    install_dependencies_wsl "docker-running"
                 fi
                 ;;
             linux)
                 if [[ "$docker_missing" == true ]]; then
-                    if prompt_yn "Would you like to install Docker?"; then
-                        install_dependencies_linux "docker"
-                    else
-                        error "Cannot continue without Docker"
-                        exit 1
-                    fi
+                    info "Installing Docker..."
+                    install_dependencies_linux "docker"
                 else
-                    if prompt_yn "Would you like to start Docker?"; then
-                        install_dependencies_linux "docker-running"
-                    else
-                        error "Cannot continue without Docker running"
-                        exit 1
-                    fi
+                    info "Starting Docker..."
+                    install_dependencies_linux "docker-running"
                 fi
                 ;;
         esac
