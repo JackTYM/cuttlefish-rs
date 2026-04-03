@@ -11,7 +11,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY src ./src
 
-RUN cargo build --release --bin tunnel-daemon
+RUN cargo build --release -p cuttlefish-tunnel --bin tunnel-daemon
 
 FROM debian:bookworm-slim
 
