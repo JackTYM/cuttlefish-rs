@@ -140,7 +140,7 @@ pub fn find_template<'a>(
 pub struct ModelConfig {
     /// Provider name (e.g., "bedrock", "claude-oauth").
     pub provider: String,
-    /// Model ID (e.g., "anthropic.claude-3-5-sonnet-20241022-v2:0").
+    /// Model ID (e.g., "anthropic.claude-sonnet-4-6-20260101-v1:0").
     pub model_id: String,
     /// Temperature for sampling (0.0-1.0).
     #[serde(default)]
@@ -182,7 +182,7 @@ impl AgentRoutingConfig {
             "deep".to_string(),
             ModelConfig {
                 provider: "bedrock".to_string(),
-                model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0".to_string(),
+                model_id: "anthropic.claude-sonnet-4-6-20260101-v1:0".to_string(),
                 temperature: 0.1,
                 max_tokens: 4096,
             },
@@ -191,7 +191,7 @@ impl AgentRoutingConfig {
             "quick".to_string(),
             ModelConfig {
                 provider: "bedrock".to_string(),
-                model_id: "anthropic.claude-3-haiku-20240307-v1:0".to_string(),
+                model_id: "anthropic.claude-haiku-4-5-20260101-v1:0".to_string(),
                 temperature: 0.3,
                 max_tokens: 2048,
             },
@@ -200,7 +200,7 @@ impl AgentRoutingConfig {
             "unspecified-high".to_string(),
             ModelConfig {
                 provider: "bedrock".to_string(),
-                model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0".to_string(),
+                model_id: "anthropic.claude-sonnet-4-6-20260101-v1:0".to_string(),
                 temperature: 0.2,
                 max_tokens: 4096,
             },

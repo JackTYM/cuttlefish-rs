@@ -27,6 +27,16 @@ ENABLE_DISCORD=false
 ENABLE_WEBUI=true
 AWS_CONFIGURED=false
 
+# Bedrock model selections
+BEDROCK_PRIMARY_MODEL="anthropic.claude-sonnet-4-6"
+BEDROCK_FAST_MODEL="anthropic.claude-haiku-4-5-20251001-v1:0"
+
+# Platform detection state
+PLATFORM=""
+DISTRO=""
+HAS_SYSTEMD=false
+DEPLOYMENT_MODE="systemd"
+
 # Provider selections (space-separated list of selected provider indices)
 SELECTED_PROVIDERS=""
 
@@ -57,6 +67,23 @@ XAI_API_KEY=""
 OLLAMA_MODEL=""
 AZURE_ENDPOINT=""
 AZURE_API_KEY=""
+
+# Custom model/endpoint overrides (set during advanced configuration)
+ANTHROPIC_CUSTOM_MODEL=""
+ANTHROPIC_BASE_URL=""
+OPENAI_CUSTOM_MODEL=""
+OPENAI_BASE_URL=""
+GOOGLE_CUSTOM_MODEL=""
+MOONSHOT_CUSTOM_MODEL=""
+MOONSHOT_BASE_URL=""
+ZHIPU_CUSTOM_MODEL=""
+ZHIPU_BASE_URL=""
+MINIMAX_CUSTOM_MODEL=""
+MINIMAX_BASE_URL=""
+XAI_CUSTOM_MODEL=""
+XAI_BASE_URL=""
+OLLAMA_CUSTOM_MODEL=""
+OLLAMA_BASE_URL="http://localhost:11434"
 
 #######################################
 # Utility Functions
@@ -158,6 +185,109 @@ get_provider_field() {
 is_provider_selected() {
     local idx="$1"
     echo " $SELECTED_PROVIDERS " | grep -q " $idx "
+}
+
+detect_platform() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        PLATFORM="macos"
+        DISTRO=""
+        HAS_SYSTEMD=false
+    elif grep -qi microsoft /proc/version 2>/dev/null; then
+        PLATFORM="wsl"
+        DISTRO=""
+        if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null 2>&1; then
+            HAS_SYSTEMD=true
+        else
+            HAS_SYSTEMD=false
+        fi
+    elif [[ -f /etc/os-release ]]; then
+        PLATFORM="linux"
+        # shellcheck source=/dev/null
+        source /etc/os-release
+        DISTRO="${ID:-unknown}"
+        if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null 2>&1; then
+            HAS_SYSTEMD=true
+        else
+            HAS_SYSTEMD=false
+        fi
+    else
+        error "Unsupported platform. Supported: Linux, macOS, WSL"
+        exit 1
+    fi
+    
+    info "Detected platform: $PLATFORM${DISTRO:+ ($DISTRO)}, systemd: $HAS_SYSTEMD"
+}
+
+show_docker_mode_warning() {
+    echo ""
+    echo -e "${RED}${BOLD}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}${BOLD}║  ⚠️  SECURITY WARNING: Docker Container Mode Selected         ║${NC}"
+    echo -e "${RED}${BOLD}╠═══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${RED}${BOLD}║${NC}  In Docker mode, ALL projects run in the SAME container.      ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  There is NO isolation between projects.                      ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}                                                               ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  A malicious or buggy project could:                          ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Access files from other projects                           ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Interfere with other running builds                        ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Consume all container resources                            ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}                                                               ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  Only use Docker mode for:                                    ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Single-user development                                    ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Testing purposes                                           ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}║${NC}  • Environments where systemd is unavailable (macOS, WSL)     ${RED}${BOLD}║${NC}"
+    echo -e "${RED}${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    if ! prompt_yn "I understand and accept these limitations" "n"; then
+        info "Returning to deployment mode selection..."
+        select_deployment_mode
+        return
+    fi
+    
+    warn "Docker Container mode confirmed. Proceeding with no sandbox isolation."
+    echo ""
+}
+
+select_deployment_mode() {
+    echo ""
+    echo -e "${BOLD}=== Deployment Mode ===${NC}"
+    echo ""
+    
+    if [[ "$HAS_SYSTEMD" == false ]]; then
+        warn "systemd is not available on this system (platform: $PLATFORM)"
+        info "Automatically selecting Docker Container mode"
+        DEPLOYMENT_MODE="docker"
+        show_docker_mode_warning
+        return
+    fi
+    
+    echo "How should Cuttlefish be deployed?"
+    echo ""
+    echo -e "  ${GREEN}1) Systemd Service${NC} ${BOLD}(Recommended)${NC}"
+    echo "     - Cuttlefish runs as a persistent system service"
+    echo "     - Each project gets an ISOLATED Docker sandbox"
+    echo "     - Automatic restart on failure"
+    echo "     - Requires: Linux with systemd + Docker"
+    echo ""
+    echo -e "  ${YELLOW}2) Docker Container Mode${NC}"
+    echo "     - Cuttlefish itself runs inside a Docker container"
+    echo "     - Simpler setup, no systemd required"
+    echo -e "     - ${RED}⚠️  WARNING: NO project sandbox isolation${NC}"
+    echo ""
+    
+    local mode_choice
+    prompt mode_choice "Select deployment mode [1-2]" "1"
+    
+    case "$mode_choice" in
+        2)
+            DEPLOYMENT_MODE="docker"
+            show_docker_mode_warning
+            ;;
+        *)
+            DEPLOYMENT_MODE="systemd"
+            success "Systemd service mode selected"
+            ;;
+    esac
 }
 
 toggle_provider() {
@@ -323,6 +453,7 @@ collect_provider_credentials() {
                     xai)        XAI_API_KEY="$API_KEY_TMP" ;;
                 esac
                 success "$pname API key saved"
+                configure_provider_advanced "$pid" "$pname"
                 echo ""
                 ;;
             
@@ -334,6 +465,7 @@ collect_provider_credentials() {
             
             local)
                 configure_ollama
+                configure_provider_advanced "$pid" "$pname"
                 ;;
             
             cloud)
@@ -348,6 +480,82 @@ collect_provider_credentials() {
                 ;;
         esac
     done
+}
+
+configure_provider_advanced() {
+    local provider_id="$1"
+    local provider_name="$2"
+    
+    echo ""
+    if ! prompt_yn "Configure advanced options for $provider_name? (custom model/endpoint)" "n"; then
+        return
+    fi
+    
+    echo ""
+    echo -e "${BOLD}Advanced Configuration for $provider_name${NC}"
+    echo ""
+    
+    case "$provider_id" in
+        anthropic|openai|google|moonshot|zhipu|minimax|xai|ollama)
+            local default_model
+            case "$provider_id" in
+                anthropic)  default_model="claude-sonnet-4-6" ;;
+                openai)     default_model="gpt-5.4" ;;
+                google)     default_model="gemini-2.0-flash" ;;
+                moonshot)   default_model="kimi-k2.5" ;;
+                zhipu)      default_model="glm-4-flash" ;;
+                minimax)    default_model="abab6.5s-chat" ;;
+                xai)        default_model="grok-2" ;;
+                ollama)     default_model="${OLLAMA_MODEL:-llama3.1}" ;;
+            esac
+            
+            if prompt_yn "Use a custom model ID? (default: $default_model)" "n"; then
+                local custom_model
+                prompt custom_model "Enter model ID" "$default_model"
+                case "$provider_id" in
+                    anthropic)  ANTHROPIC_CUSTOM_MODEL="$custom_model" ;;
+                    openai)     OPENAI_CUSTOM_MODEL="$custom_model" ;;
+                    google)     GOOGLE_CUSTOM_MODEL="$custom_model" ;;
+                    moonshot)   MOONSHOT_CUSTOM_MODEL="$custom_model" ;;
+                    zhipu)      ZHIPU_CUSTOM_MODEL="$custom_model" ;;
+                    minimax)    MINIMAX_CUSTOM_MODEL="$custom_model" ;;
+                    xai)        XAI_CUSTOM_MODEL="$custom_model" ;;
+                    ollama)     OLLAMA_CUSTOM_MODEL="$custom_model" ;;
+                esac
+            fi
+            ;;
+    esac
+    
+    case "$provider_id" in
+        anthropic|openai|moonshot|zhipu|minimax|xai|ollama)
+            local default_endpoint
+            case "$provider_id" in
+                anthropic)  default_endpoint="https://api.anthropic.com" ;;
+                openai)     default_endpoint="https://api.openai.com/v1" ;;
+                moonshot)   default_endpoint="https://api.moonshot.cn/v1" ;;
+                zhipu)      default_endpoint="https://open.bigmodel.cn/api/paas/v4" ;;
+                minimax)    default_endpoint="https://api.minimax.chat/v1" ;;
+                xai)        default_endpoint="https://api.x.ai/v1" ;;
+                ollama)     default_endpoint="http://localhost:11434" ;;
+            esac
+            
+            if prompt_yn "Use a custom API endpoint? (default: $default_endpoint)" "n"; then
+                local custom_url
+                prompt custom_url "Enter API base URL" "$default_endpoint"
+                case "$provider_id" in
+                    anthropic)  ANTHROPIC_BASE_URL="$custom_url" ;;
+                    openai)     OPENAI_BASE_URL="$custom_url" ;;
+                    moonshot)   MOONSHOT_BASE_URL="$custom_url" ;;
+                    zhipu)      ZHIPU_BASE_URL="$custom_url" ;;
+                    minimax)    MINIMAX_BASE_URL="$custom_url" ;;
+                    xai)        XAI_BASE_URL="$custom_url" ;;
+                    ollama)     OLLAMA_BASE_URL="$custom_url" ;;
+                esac
+            fi
+            ;;
+    esac
+    
+    echo ""
 }
 
 configure_ollama() {
@@ -437,6 +645,8 @@ configure_aws_provider() {
         else
             warn "AWS CLI not installed, skipping verification"
         fi
+        
+        configure_bedrock_models
     else
         warn "Skipping AWS configuration - set credentials manually"
         AWS_REGION="us-east-1"
@@ -459,6 +669,108 @@ configure_azure_provider() {
     echo ""
 }
 
+configure_bedrock_models() {
+    echo ""
+    echo -e "${BOLD}=== AWS Bedrock Model Selection ===${NC}"
+    echo ""
+    echo "Select your primary Claude model for Bedrock:"
+    echo ""
+    echo -e "${YELLOW}Claude Sonnet 4.6 (Recommended for coding):${NC}"
+    echo "   1) anthropic.claude-sonnet-4-6              (Default - single region)"
+    echo "   2) us.anthropic.claude-sonnet-4-6           (US cross-region inference)"
+    echo "   3) eu.anthropic.claude-sonnet-4-6           (EU cross-region inference)"
+    echo "   4) global.anthropic.claude-sonnet-4-6       (Global cross-region inference)"
+    echo ""
+    echo -e "${YELLOW}Claude Opus 4.6 (Most capable):${NC}"
+    echo "   5) anthropic.claude-opus-4-6-v1             (Default)"
+    echo "   6) us.anthropic.claude-opus-4-6-v1          (US cross-region)"
+    echo "   7) eu.anthropic.claude-opus-4-6-v1          (EU cross-region)"
+    echo "   8) global.anthropic.claude-opus-4-6-v1      (Global cross-region)"
+    echo ""
+    echo -e "${YELLOW}Claude Haiku 4.5 (Fast and economical):${NC}"
+    echo "   9) anthropic.claude-haiku-4-5-20251001-v1:0 (Default)"
+    echo "  10) us.anthropic.claude-haiku-4-5-20251001-v1:0 (US cross-region)"
+    echo "  11) global.anthropic.claude-haiku-4-5-20251001-v1:0 (Global)"
+    echo ""
+    echo -e "${YELLOW}Claude Opus 4.5:${NC}"
+    echo "  12) anthropic.claude-opus-4-5-20251101-v1:0  (Default)"
+    echo "  13) us.anthropic.claude-opus-4-5-20251101-v1:0 (US cross-region)"
+    echo "  14) global.anthropic.claude-opus-4-5-20251101-v1:0 (Global)"
+    echo ""
+    echo -e "${YELLOW}Claude Sonnet 4.5:${NC}"
+    echo "  15) anthropic.claude-sonnet-4-5-20250929-v1:0 (Default)"
+    echo "  16) global.anthropic.claude-sonnet-4-5-20250929-v1:0 (Global)"
+    echo ""
+    echo -e "${CYAN}Custom:${NC}"
+    echo "  17) Enter a custom model ID"
+    echo ""
+    
+    local model_choice
+    prompt model_choice "Select primary model [1-17]" "1"
+    
+    case "$model_choice" in
+        1)  BEDROCK_PRIMARY_MODEL="anthropic.claude-sonnet-4-6" ;;
+        2)  BEDROCK_PRIMARY_MODEL="us.anthropic.claude-sonnet-4-6" ;;
+        3)  BEDROCK_PRIMARY_MODEL="eu.anthropic.claude-sonnet-4-6" ;;
+        4)  BEDROCK_PRIMARY_MODEL="global.anthropic.claude-sonnet-4-6" ;;
+        5)  BEDROCK_PRIMARY_MODEL="anthropic.claude-opus-4-6-v1" ;;
+        6)  BEDROCK_PRIMARY_MODEL="us.anthropic.claude-opus-4-6-v1" ;;
+        7)  BEDROCK_PRIMARY_MODEL="eu.anthropic.claude-opus-4-6-v1" ;;
+        8)  BEDROCK_PRIMARY_MODEL="global.anthropic.claude-opus-4-6-v1" ;;
+        9)  BEDROCK_PRIMARY_MODEL="anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        10) BEDROCK_PRIMARY_MODEL="us.anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        11) BEDROCK_PRIMARY_MODEL="global.anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        12) BEDROCK_PRIMARY_MODEL="anthropic.claude-opus-4-5-20251101-v1:0" ;;
+        13) BEDROCK_PRIMARY_MODEL="us.anthropic.claude-opus-4-5-20251101-v1:0" ;;
+        14) BEDROCK_PRIMARY_MODEL="global.anthropic.claude-opus-4-5-20251101-v1:0" ;;
+        15) BEDROCK_PRIMARY_MODEL="anthropic.claude-sonnet-4-5-20250929-v1:0" ;;
+        16) BEDROCK_PRIMARY_MODEL="global.anthropic.claude-sonnet-4-5-20250929-v1:0" ;;
+        17) prompt BEDROCK_PRIMARY_MODEL "Enter custom primary model ID" "anthropic.claude-sonnet-4-6" ;;
+        *)  BEDROCK_PRIMARY_MODEL="anthropic.claude-sonnet-4-6" ;;
+    esac
+    
+    success "Primary model: $BEDROCK_PRIMARY_MODEL"
+    
+    local suggested_fast
+    if [[ "$BEDROCK_PRIMARY_MODEL" == us.* ]]; then
+        suggested_fast="us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    elif [[ "$BEDROCK_PRIMARY_MODEL" == eu.* ]]; then
+        suggested_fast="anthropic.claude-haiku-4-5-20251001-v1:0"
+    elif [[ "$BEDROCK_PRIMARY_MODEL" == global.* ]]; then
+        suggested_fast="global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    else
+        suggested_fast="anthropic.claude-haiku-4-5-20251001-v1:0"
+    fi
+    
+    echo ""
+    echo "Select fast/economical model (for quick tasks):"
+    echo "  Suggested: $suggested_fast"
+    echo ""
+    echo "  1) Use suggested: $suggested_fast"
+    echo "  2) anthropic.claude-haiku-4-5-20251001-v1:0 (Default Haiku)"
+    echo "  3) us.anthropic.claude-haiku-4-5-20251001-v1:0 (US Haiku)"
+    echo "  4) global.anthropic.claude-haiku-4-5-20251001-v1:0 (Global Haiku)"
+    echo "  5) Same as primary model"
+    echo "  6) Enter custom fast model ID"
+    echo ""
+    
+    local fast_choice
+    prompt fast_choice "Select fast model [1-6]" "1"
+    
+    case "$fast_choice" in
+        1)  BEDROCK_FAST_MODEL="$suggested_fast" ;;
+        2)  BEDROCK_FAST_MODEL="anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        3)  BEDROCK_FAST_MODEL="us.anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        4)  BEDROCK_FAST_MODEL="global.anthropic.claude-haiku-4-5-20251001-v1:0" ;;
+        5)  BEDROCK_FAST_MODEL="$BEDROCK_PRIMARY_MODEL" ;;
+        6)  prompt BEDROCK_FAST_MODEL "Enter custom fast model ID" "$suggested_fast" ;;
+        *)  BEDROCK_FAST_MODEL="$suggested_fast" ;;
+    esac
+    
+    success "Fast model: $BEDROCK_FAST_MODEL"
+    echo ""
+}
+
 #######################################
 # Dependency Checks
 #######################################
@@ -469,9 +781,10 @@ check_dependencies() {
     echo ""
     
     local missing=()
+    local docker_missing=false
+    local docker_not_running=false
     
-    # Check for required commands
-    for cmd in curl git docker; do
+    for cmd in curl git; do
         if command -v "$cmd" &> /dev/null; then
             success "$cmd is installed"
         else
@@ -480,17 +793,19 @@ check_dependencies() {
         fi
     done
     
-    # Check Docker is running
     if command -v docker &> /dev/null; then
+        success "docker is installed"
         if docker info &> /dev/null; then
             success "Docker daemon is running"
         else
             error "Docker is installed but not running"
-            missing+=("docker-running")
+            docker_not_running=true
         fi
+    else
+        error "docker is not installed"
+        docker_missing=true
     fi
     
-    # Check for Rust
     if command -v rustc &> /dev/null; then
         local rust_ver
         rust_ver=$(rustc --version | awk '{print $2}')
@@ -510,54 +825,340 @@ check_dependencies() {
             exit 1
         fi
     fi
+    
+    if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
+        echo ""
+        case "$PLATFORM" in
+            macos)
+                if [[ "$docker_missing" == true ]]; then
+                    warn "Docker is not installed on macOS"
+                    if prompt_yn "Would you like to install Docker now?"; then
+                        install_dependencies_macos "docker"
+                    else
+                        error "Cannot continue without Docker"
+                        exit 1
+                    fi
+                else
+                    warn "Docker is installed but not running"
+                    if prompt_yn "Would you like to start Docker?"; then
+                        install_dependencies_macos "docker-running"
+                    else
+                        error "Cannot continue without Docker running"
+                        exit 1
+                    fi
+                fi
+                ;;
+            wsl)
+                if [[ "$docker_missing" == true ]]; then
+                    warn "Docker is not available in WSL"
+                    if prompt_yn "Would you like to set up Docker?"; then
+                        install_dependencies_wsl "docker"
+                    else
+                        error "Cannot continue without Docker"
+                        exit 1
+                    fi
+                else
+                    warn "Docker is installed but not running"
+                    if prompt_yn "Would you like to start Docker?"; then
+                        install_dependencies_wsl "docker-running"
+                    else
+                        error "Cannot continue without Docker running"
+                        exit 1
+                    fi
+                fi
+                ;;
+            linux)
+                if [[ "$docker_missing" == true ]]; then
+                    if prompt_yn "Would you like to install Docker?"; then
+                        install_dependencies_linux "docker"
+                    else
+                        error "Cannot continue without Docker"
+                        exit 1
+                    fi
+                else
+                    if prompt_yn "Would you like to start Docker?"; then
+                        install_dependencies_linux "docker-running"
+                    else
+                        error "Cannot continue without Docker running"
+                        exit 1
+                    fi
+                fi
+                ;;
+        esac
+        
+        if ! docker info &>/dev/null; then
+            error "Docker is still not accessible. Please check your Docker installation."
+            exit 1
+        fi
+        success "Docker is now running"
+    fi
 }
 
 install_dependencies() {
     local deps=("$@")
     
-    # Detect package manager
-    if command -v apt-get &> /dev/null; then
-        PKG_MANAGER="apt-get"
-        PKG_UPDATE="apt-get update"
-        PKG_INSTALL="apt-get install -y"
-    elif command -v dnf &> /dev/null; then
-        PKG_MANAGER="dnf"
-        PKG_UPDATE="dnf check-update || true"
-        PKG_INSTALL="dnf install -y"
-    elif command -v pacman &> /dev/null; then
-        PKG_MANAGER="pacman"
-        PKG_UPDATE="pacman -Sy"
-        PKG_INSTALL="pacman -S --noconfirm"
-    else
-        error "No supported package manager found (apt, dnf, pacman)"
-        exit 1
-    fi
+    case "$PLATFORM" in
+        linux)
+            install_dependencies_linux "${deps[@]}"
+            ;;
+        macos)
+            install_dependencies_macos "${deps[@]}"
+            ;;
+        wsl)
+            install_dependencies_wsl "${deps[@]}"
+            ;;
+        *)
+            error "Unknown platform: $PLATFORM"
+            exit 1
+            ;;
+    esac
+}
+
+install_dependencies_linux() {
+    local deps=("$@")
+    
+    # Detect package manager from DISTRO or available commands
+    local pkg_install pkg_update
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop)
+            pkg_update="apt-get update"
+            pkg_install="apt-get install -y"
+            ;;
+        fedora|rhel|centos|rocky|almalinux)
+            pkg_update="dnf check-update || true"
+            pkg_install="dnf install -y"
+            ;;
+        arch|manjaro|endeavouros)
+            pkg_update="pacman -Sy --noconfirm"
+            pkg_install="pacman -S --noconfirm"
+            ;;
+        *)
+            # Fallback: try to detect from available commands
+            if command -v apt-get &>/dev/null; then
+                pkg_update="apt-get update"
+                pkg_install="apt-get install -y"
+            elif command -v dnf &>/dev/null; then
+                pkg_update="dnf check-update || true"
+                pkg_install="dnf install -y"
+            elif command -v pacman &>/dev/null; then
+                pkg_update="pacman -Sy --noconfirm"
+                pkg_install="pacman -S --noconfirm"
+            else
+                error "No supported package manager found (apt-get, dnf, pacman)"
+                exit 1
+            fi
+            ;;
+    esac
     
     info "Updating package lists..."
-    $PKG_UPDATE
+    eval "$pkg_update"
     
     for dep in "${deps[@]}"; do
         case "$dep" in
             curl|git)
                 info "Installing $dep..."
-                $PKG_INSTALL "$dep"
+                eval "$pkg_install $dep"
+                ;;
+            build-essential)
+                info "Installing build tools..."
+                case "$DISTRO" in
+                    ubuntu|debian|linuxmint|pop)
+                        eval "$pkg_install build-essential pkg-config libssl-dev"
+                        ;;
+                    fedora|rhel|centos|rocky|almalinux)
+                        eval "$pkg_install gcc make openssl-devel pkgconfig"
+                        ;;
+                    arch|manjaro|endeavouros)
+                        eval "$pkg_install base-devel openssl"
+                        ;;
+                    *)
+                        # Fallback based on package manager
+                        if command -v apt-get &>/dev/null; then
+                            eval "$pkg_install build-essential pkg-config libssl-dev"
+                        elif command -v dnf &>/dev/null; then
+                            eval "$pkg_install gcc make openssl-devel pkgconfig"
+                        elif command -v pacman &>/dev/null; then
+                            eval "$pkg_install base-devel openssl"
+                        else
+                            warn "Unknown distro, skipping build tools"
+                        fi
+                        ;;
+                esac
                 ;;
             docker)
                 info "Installing Docker..."
-                if [[ "$PKG_MANAGER" == "apt-get" ]]; then
-                    $PKG_INSTALL docker.io
+                if command -v apt-get &>/dev/null; then
+                    # Use official Docker install script for Debian/Ubuntu
+                    curl -fsSL https://get.docker.com | sh
                 else
-                    $PKG_INSTALL docker
+                    eval "$pkg_install docker"
                 fi
-                systemctl enable docker
-                systemctl start docker
+                if [[ "$HAS_SYSTEMD" == true ]]; then
+                    systemctl enable docker
+                    systemctl start docker
+                else
+                    service docker start 2>/dev/null || true
+                fi
+                usermod -aG docker "$SERVICE_USER" 2>/dev/null || true
                 ;;
             docker-running)
-                info "Starting Docker..."
-                systemctl start docker
+                info "Starting Docker daemon..."
+                if [[ "$HAS_SYSTEMD" == true ]]; then
+                    systemctl start docker
+                else
+                    service docker start 2>/dev/null || true
+                fi
                 ;;
         esac
     done
+}
+
+install_dependencies_macos() {
+    local deps=("$@")
+    
+    # Ensure Homebrew is installed
+    if ! command -v brew &>/dev/null; then
+        info "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # Add brew to PATH for Apple Silicon
+        if [[ -f /opt/homebrew/bin/brew ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        fi
+    fi
+    
+    for dep in "${deps[@]}"; do
+        case "$dep" in
+            curl|git)
+                if ! command -v "$dep" &>/dev/null; then
+                    info "Installing $dep via Homebrew..."
+                    brew install "$dep"
+                fi
+                ;;
+            build-essential)
+                info "Installing Xcode Command Line Tools..."
+                xcode-select --install 2>/dev/null || true
+                brew install openssl pkg-config
+                ;;
+            docker|docker-running)
+                if ! command -v docker &>/dev/null; then
+                    echo ""
+                    echo "Docker is not installed. Choose an option:"
+                    echo "  1) Docker Desktop (GUI, requires license for commercial use)"
+                    echo "  2) Colima (CLI, free and open source - recommended)"
+                    echo ""
+                    local docker_choice
+                    prompt docker_choice "Select Docker option [1-2]" "2"
+                    
+                    case "$docker_choice" in
+                        1)
+                            info "Installing Docker Desktop..."
+                            brew install --cask docker
+                            echo ""
+                            warn "Please launch Docker Desktop from Applications and wait for it to start."
+                            echo -en "${CYAN}Press Enter when Docker Desktop is running...${NC}"
+                            read -r
+                            ;;
+                        *)
+                            info "Installing Colima + Docker CLI..."
+                            brew install colima docker
+                            info "Starting Colima..."
+                            colima start
+                            ;;
+                    esac
+                elif [[ "$dep" == "docker-running" ]]; then
+                    # Docker is installed but not running
+                    if command -v colima &>/dev/null; then
+                        info "Starting Colima..."
+                        colima start
+                    else
+                        echo ""
+                        warn "Docker is installed but not running."
+                        echo "Please start Docker Desktop from Applications."
+                        echo -en "${CYAN}Press Enter when Docker is running...${NC}"
+                        read -r
+                    fi
+                fi
+                ;;
+        esac
+    done
+}
+
+install_dependencies_wsl() {
+    local deps=("$@")
+    
+    # WSL uses Linux package managers but Docker needs special handling
+    # First handle non-Docker deps using Linux installer
+    local non_docker_deps=()
+    local needs_docker=false
+    
+    for dep in "${deps[@]}"; do
+        if [[ "$dep" == "docker" || "$dep" == "docker-running" ]]; then
+            needs_docker=true
+        else
+            non_docker_deps+=("$dep")
+        fi
+    done
+    
+    if [[ ${#non_docker_deps[@]} -gt 0 ]]; then
+        install_dependencies_linux "${non_docker_deps[@]}"
+    fi
+    
+    if [[ "$needs_docker" == true ]] && ! command -v docker &>/dev/null; then
+        echo ""
+        echo "Docker is not found in WSL. Choose an option:"
+        echo "  1) Use Docker Desktop for Windows (recommended)"
+        echo "     - Install Docker Desktop on Windows"
+        echo "     - Enable WSL integration in Docker Desktop settings"
+        echo "     - Docker will be available in WSL automatically"
+        echo "  2) Install Docker directly in WSL"
+        echo "     - Standalone Docker daemon in WSL"
+        echo "     - May have limitations with systemd"
+        echo ""
+        local wsl_docker_choice
+        prompt wsl_docker_choice "Select Docker option [1-2]" "1"
+        
+        case "$wsl_docker_choice" in
+            2)
+                info "Installing Docker in WSL..."
+                curl -fsSL https://get.docker.com | sh
+                if [[ "$HAS_SYSTEMD" == true ]]; then
+                    systemctl enable docker
+                    systemctl start docker
+                else
+                    service docker start 2>/dev/null || true
+                    warn "systemd not available. Start Docker manually: sudo service docker start"
+                fi
+                usermod -aG docker "$SERVICE_USER" 2>/dev/null || true
+                ;;
+            *)
+                echo ""
+                warn "Please install Docker Desktop for Windows and enable WSL integration."
+                echo "  1. Download: https://www.docker.com/products/docker-desktop/"
+                echo "  2. Install and launch Docker Desktop"
+                echo "  3. Go to Settings → Resources → WSL Integration"
+                echo "  4. Enable integration for your WSL distro"
+                echo ""
+                echo -en "${CYAN}Press Enter when Docker Desktop is configured...${NC}"
+                read -r
+                ;;
+        esac
+    elif [[ "$needs_docker" == true ]]; then
+        # Docker command exists but may not be running
+        if ! docker info &>/dev/null; then
+            echo ""
+            warn "Docker is installed but not running."
+            if [[ "$HAS_SYSTEMD" == true ]]; then
+                info "Starting Docker..."
+                systemctl start docker
+            else
+                echo "If using Docker Desktop for Windows, please start it."
+                echo "If using native Docker, run: sudo service docker start"
+                echo ""
+                echo -en "${CYAN}Press Enter when Docker is running...${NC}"
+                read -r
+            fi
+        fi
+    fi
 }
 
 install_rust() {
@@ -747,11 +1348,12 @@ EOF
         
         case "$pid" in
             anthropic)
+                local anthropic_model="${ANTHROPIC_CUSTOM_MODEL:-claude-sonnet-4-6}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.anthropic]
 provider_type = "anthropic"
-model = "claude-sonnet-4-6"
+model = "$anthropic_model"
 api_key_env = "ANTHROPIC_API_KEY"
 
 [providers.anthropic-fast]
@@ -759,16 +1361,21 @@ provider_type = "anthropic"
 model = "claude-haiku-4-5"
 api_key_env = "ANTHROPIC_API_KEY"
 EOF
+                if [[ -n "${ANTHROPIC_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.anthropic\]$/,/^\[/{s/^api_key_env = "ANTHROPIC_API_KEY"$/api_key_env = "ANTHROPIC_API_KEY"\nbase_url = "'"$ANTHROPIC_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                    sed -i '/^\[providers\.anthropic-fast\]$/,/^\[/{s/^api_key_env = "ANTHROPIC_API_KEY"$/api_key_env = "ANTHROPIC_API_KEY"\nbase_url = "'"$ANTHROPIC_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="anthropic"
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="anthropic-fast"
                 ;;
                 
             openai)
+                local openai_model="${OPENAI_CUSTOM_MODEL:-gpt-5.4}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.openai]
 provider_type = "openai"
-model = "gpt-5.4"
+model = "$openai_model"
 api_key_env = "OPENAI_API_KEY"
 
 [providers.openai-fast]
@@ -776,62 +1383,83 @@ provider_type = "openai"
 model = "gpt-5-nano"
 api_key_env = "OPENAI_API_KEY"
 EOF
+                if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.openai\]$/,/^\[/{s/^api_key_env = "OPENAI_API_KEY"$/api_key_env = "OPENAI_API_KEY"\nbase_url = "'"$OPENAI_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                    sed -i '/^\[providers\.openai-fast\]$/,/^\[/{s/^api_key_env = "OPENAI_API_KEY"$/api_key_env = "OPENAI_API_KEY"\nbase_url = "'"$OPENAI_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="openai"
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="openai-fast"
                 ;;
                 
             google)
+                local google_model="${GOOGLE_CUSTOM_MODEL:-gemini-2.0-flash}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.google]
 provider_type = "google"
-model = "gemini-2.0-flash"
+model = "$google_model"
 api_key_env = "GOOGLE_API_KEY"
 EOF
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="google"
                 ;;
                 
             moonshot)
+                local moonshot_model="${MOONSHOT_CUSTOM_MODEL:-kimi-k2.5}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.moonshot]
 provider_type = "moonshot"
-model = "kimi-k2.5"
+model = "$moonshot_model"
 api_key_env = "MOONSHOT_API_KEY"
 EOF
+                if [[ -n "${MOONSHOT_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.moonshot\]$/,/^\[/{s/^api_key_env = "MOONSHOT_API_KEY"$/api_key_env = "MOONSHOT_API_KEY"\nbase_url = "'"$MOONSHOT_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="moonshot"
                 ;;
                 
             zhipu)
+                local zhipu_model="${ZHIPU_CUSTOM_MODEL:-glm-4-flash}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.zhipu]
 provider_type = "zhipu"
-model = "glm-4-flash"
+model = "$zhipu_model"
 api_key_env = "ZHIPU_API_KEY"
 EOF
+                if [[ -n "${ZHIPU_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.zhipu\]$/,/^\[/{s/^api_key_env = "ZHIPU_API_KEY"$/api_key_env = "ZHIPU_API_KEY"\nbase_url = "'"$ZHIPU_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="zhipu"
                 ;;
                 
             minimax)
+                local minimax_model="${MINIMAX_CUSTOM_MODEL:-abab6.5s-chat}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.minimax]
 provider_type = "minimax"
-model = "abab6.5s-chat"
+model = "$minimax_model"
 api_key_env = "MINIMAX_API_KEY"
 EOF
+                if [[ -n "${MINIMAX_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.minimax\]$/,/^\[/{s/^api_key_env = "MINIMAX_API_KEY"$/api_key_env = "MINIMAX_API_KEY"\nbase_url = "'"$MINIMAX_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="minimax"
                 ;;
                 
             xai)
+                local xai_model="${XAI_CUSTOM_MODEL:-grok-2}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.xai]
 provider_type = "xai"
-model = "grok-2"
+model = "$xai_model"
 api_key_env = "XAI_API_KEY"
 EOF
+                if [[ -n "${XAI_BASE_URL:-}" ]]; then
+                    sed -i '/^\[providers\.xai\]$/,/^\[/{s/^api_key_env = "XAI_API_KEY"$/api_key_env = "XAI_API_KEY"\nbase_url = "'"$XAI_BASE_URL"'"/}' "$CONFIG_DIR/cuttlefish.toml"
+                fi
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="xai"
                 ;;
                 
@@ -846,12 +1474,14 @@ EOF
                 ;;
                 
             ollama)
+                local ollama_model="${OLLAMA_CUSTOM_MODEL:-${OLLAMA_MODEL:-llama3.1}}"
+                local ollama_url="${OLLAMA_BASE_URL:-http://localhost:11434}"
                 cat >> "$CONFIG_DIR/cuttlefish.toml" << EOF
 
 [providers.ollama]
 provider_type = "ollama"
-model = "${OLLAMA_MODEL:-llama3.1}"
-base_url = "http://localhost:11434"
+model = "$ollama_model"
+base_url = "$ollama_url"
 EOF
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="ollama"
                 [[ -z "$first_quick_provider" ]] && first_quick_provider="ollama"
@@ -862,12 +1492,12 @@ EOF
 
 [providers.bedrock]
 provider_type = "bedrock"
-model = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+model = "${BEDROCK_PRIMARY_MODEL}"
 region = "${AWS_REGION:-us-east-1}"
 
 [providers.bedrock-fast]
 provider_type = "bedrock"
-model = "anthropic.claude-3-haiku-20240307-v1:0"
+model = "${BEDROCK_FAST_MODEL}"
 region = "${AWS_REGION:-us-east-1}"
 EOF
                 [[ -z "$first_deep_provider" ]] && first_deep_provider="bedrock"
@@ -1043,6 +1673,7 @@ print_summary() {
     echo "  Environment:   $CONFIG_DIR/cuttlefish.env"
     echo "  Database:      $DB_PATH"
     echo "  Logs:          $LOG_DIR/"
+    echo "  Mode:          $DEPLOYMENT_MODE"
     echo ""
     echo -e "${BOLD}Configured Providers:${NC}"
     for idx in $SELECTED_PROVIDERS; do
@@ -1051,12 +1682,32 @@ print_summary() {
         echo "  - $pname"
     done
     echo ""
-    echo -e "${BOLD}Service Commands:${NC}"
-    echo "  Start:         sudo systemctl start cuttlefish"
-    echo "  Stop:          sudo systemctl stop cuttlefish"
-    echo "  Status:        sudo systemctl status cuttlefish"
-    echo "  Logs:          sudo journalctl -u cuttlefish -f"
-    echo "  Enable:        sudo systemctl enable cuttlefish"
+    
+    if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
+        echo -e "${BOLD}Service Commands:${NC}"
+        echo "  Start:         sudo systemctl start cuttlefish"
+        echo "  Stop:          sudo systemctl stop cuttlefish"
+        echo "  Status:        sudo systemctl status cuttlefish"
+        echo "  Logs:          sudo journalctl -u cuttlefish -f"
+        echo "  Enable:        sudo systemctl enable cuttlefish"
+    else
+        echo -e "${BOLD}Docker Commands:${NC}"
+        echo "  Run:"
+        echo "    docker run -d --name cuttlefish \\"
+        echo "      -v /var/run/docker.sock:/var/run/docker.sock \\"
+        echo "      -v $CONFIG_DIR:/etc/cuttlefish:ro \\"
+        echo "      -v $DATA_DIR:/var/lib/cuttlefish \\"
+        echo "      -v $LOG_DIR:/var/log/cuttlefish \\"
+        echo "      --env-file $CONFIG_DIR/cuttlefish.env \\"
+        echo "      -p ${SERVER_PORT}:${SERVER_PORT} \\"
+        echo "      cuttlefish:latest"
+        echo ""
+        echo "  Stop:          docker stop cuttlefish"
+        echo "  Logs:          docker logs -f cuttlefish"
+        echo "  Restart:       docker restart cuttlefish"
+        echo ""
+        echo -e "${YELLOW}Note: Build the Docker image first with: docker build -t cuttlefish .${NC}"
+    fi
     echo ""
     echo -e "${BOLD}Access:${NC}"
     echo "  WebUI:         http://${SERVER_HOST}:${SERVER_PORT}"
@@ -1069,17 +1720,21 @@ print_summary() {
     echo "  $INSTALL_DIR/cuttlefish-tui --server ws://${SERVER_HOST}:${SERVER_PORT} --api-key \$API_KEY"
     echo ""
     
-    if prompt_yn "Start Cuttlefish now?" "y"; then
-        systemctl enable cuttlefish
-        systemctl start cuttlefish
-        sleep 2
-        if systemctl is-active --quiet cuttlefish; then
-            success "Cuttlefish is running!"
+    if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
+        if prompt_yn "Start Cuttlefish now?" "y"; then
+            systemctl enable cuttlefish
+            systemctl start cuttlefish
+            sleep 2
+            if systemctl is-active --quiet cuttlefish; then
+                success "Cuttlefish is running!"
+            else
+                error "Failed to start. Check: journalctl -u cuttlefish -n 50"
+            fi
         else
-            error "Failed to start. Check: journalctl -u cuttlefish -n 50"
+            info "Run 'sudo systemctl start cuttlefish' when ready"
         fi
     else
-        info "Run 'sudo systemctl start cuttlefish' when ready"
+        info "Build and run the Docker container when ready (see commands above)"
     fi
 }
 
@@ -1097,6 +1752,9 @@ main() {
     if [[ "${1:-}" != "--no-root-check" ]]; then
         check_root
     fi
+    
+    detect_platform
+    select_deployment_mode
     
     check_dependencies
     install_rust
@@ -1119,7 +1777,9 @@ main() {
     build_cuttlefish
     write_config
     write_env_file
-    write_systemd_service
+    if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
+        write_systemd_service
+    fi
     
     print_summary
 }

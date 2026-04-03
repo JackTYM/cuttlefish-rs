@@ -212,13 +212,19 @@ curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install
 ```
 
 The installer will:
-1. Check and install dependencies (Rust, Docker, Git)
-2. Clone and build Cuttlefish from source
-3. Guide you through provider selection (choose which AI providers to configure)
-4. Set up API keys for your selected providers
-5. Configure server, database, and sandbox settings
-6. Optionally set up Discord bot integration
-7. Optionally create a systemd service for 24/7 operation
+1. **Detect your platform** (Linux, macOS, or WSL) and configure accordingly
+2. **Choose deployment mode**:
+   - **Systemd Service** (recommended) — Cuttlefish runs as a system service with Docker sandbox isolation per project
+   - **Docker Container** — Simpler setup, no systemd required (no project sandbox isolation)
+3. Check and install dependencies (Rust, Docker, Git) for your platform
+4. Guide you through **provider selection** (choose which AI providers to configure)
+5. Set up API keys for your selected providers
+6. For **AWS Bedrock**: select from all regional model variants (default, US, EU, global cross-region inference)
+7. Optionally configure **custom model IDs and API endpoints** for any provider
+8. Configure server, database, and sandbox settings
+9. Optionally set up Discord bot integration
+10. Build and install Cuttlefish from source
+11. Start the service (systemd mode) or provide Docker run command
 
 ### Manual Installation
 
@@ -332,19 +338,19 @@ max_concurrent = 5      # Maximum concurrent sandboxes
 # AWS Bedrock (recommended for production)
 [providers.claude]
 provider_type = "bedrock"
-model = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+model = "anthropic.claude-sonnet-4-6-20260101-v1:0"
 region = "us-east-1"
 
 # Fast model for quick tasks
 [providers.claude-fast]
 provider_type = "bedrock"
-model = "anthropic.claude-3-haiku-20240307-v1:0"
+model = "anthropic.claude-haiku-4-5-20260101-v1:0"
 region = "us-east-1"
 
 # Powerful model for complex reasoning
 [providers.claude-opus]
 provider_type = "bedrock"
-model = "anthropic.claude-3-opus-20240229-v1:0"
+model = "anthropic.claude-opus-4-6-20260101-v1:0"
 region = "us-east-1"
 
 # =============================================================================
@@ -364,7 +370,7 @@ category = "unspecified-high"   # Can use a different model
 # Optional: Override the model directly
 # [agents.coder]
 # category = "deep"
-# model_override = "anthropic.claude-3-opus-20240229-v1:0"
+# model_override = "anthropic.claude-opus-4-6-20260101-v1:0"
 
 # =============================================================================
 # Discord Configuration (Optional)
@@ -378,12 +384,12 @@ guild_ids = []                        # Empty = global commands, or specify guil
 
 | Task Type | Recommended Model | Why |
 |-----------|-------------------|-----|
-| **Planning & Orchestration** | Claude 3.5 Sonnet | Good balance of speed and reasoning |
-| **Code Generation** | Claude 3.5 Sonnet or Opus | Strong at code, handles complexity |
-| **Code Review** | Claude 3.5 Sonnet | Analytical, catches issues |
-| **Quick Searches** | Claude 3 Haiku | Fast, cheap, good enough for simple tasks |
-| **Architecture Decisions** | Claude 3 Opus | Deepest reasoning capability |
-| **Frontend/UI Work** | Claude 3.5 Sonnet | Strong visual understanding |
+| **Planning & Orchestration** | Claude Sonnet 4.6 | Good balance of speed and reasoning |
+| **Code Generation** | Claude Sonnet 4.6 or Opus 4.6 | Strong at code, handles complexity |
+| **Code Review** | Claude Sonnet 4.6 | Analytical, catches issues |
+| **Quick Searches** | Claude Haiku 4.5 | Fast, cheap, good enough for simple tasks |
+| **Architecture Decisions** | Claude Opus 4.6 | Deepest reasoning capability |
+| **Frontend/UI Work** | Gemini 2.0 Flash | Strong visual understanding |
 
 ---
 
