@@ -317,62 +317,89 @@ toggle_provider() {
 }
 
 print_provider_menu() {
+    local cursor_pos="$1"
+    local line=0
+    
     clear
     echo -e "${BOLD}=== Model Provider Setup ===${NC}"
     echo ""
-    echo "Select which providers to configure (enter number to toggle, 'done' to continue):"
+    echo "Use ↑/↓ to navigate, SPACE to toggle, ENTER when done"
     echo ""
     echo -e "${YELLOW}API Key Providers:${NC}"
     
-    local idx marker name models
+    local idx marker name models cursor
     for idx in 1 2 3 4 5 6 7; do
+        line=$((line + 1))
         if is_provider_selected "$idx"; then
-            marker="${GREEN}[*]${NC}"
+            marker="${GREEN}[✓]${NC}"
         else
             marker="[ ]"
         fi
+        if [[ "$line" -eq "$cursor_pos" ]]; then
+            cursor="${CYAN}▶${NC} "
+        else
+            cursor="  "
+        fi
         name=$(get_provider_field "$idx" name)
         models=$(get_provider_field "$idx" models)
-        printf "  %s %2d) %-20s (%s)\n" "$marker" "$idx" "$name" "$models"
+        echo -e "${cursor}${marker} ${idx}) ${name}  ${BLUE}(${models})${NC}"
     done
     
     echo ""
     echo -e "${YELLOW}OAuth Providers:${NC}"
     for idx in 8; do
+        line=$((line + 1))
         if is_provider_selected "$idx"; then
-            marker="${GREEN}[*]${NC}"
+            marker="${GREEN}[✓]${NC}"
         else
             marker="[ ]"
         fi
+        if [[ "$line" -eq "$cursor_pos" ]]; then
+            cursor="${CYAN}▶${NC} "
+        else
+            cursor="  "
+        fi
         name=$(get_provider_field "$idx" name)
         models=$(get_provider_field "$idx" models)
-        printf "  %s %2d) %-20s (%s)\n" "$marker" "$idx" "$name" "$models"
+        echo -e "${cursor}${marker} ${idx}) ${name}  ${BLUE}(${models})${NC}"
     done
     
     echo ""
     echo -e "${YELLOW}Local Providers:${NC}"
     for idx in 9; do
+        line=$((line + 1))
         if is_provider_selected "$idx"; then
-            marker="${GREEN}[*]${NC}"
+            marker="${GREEN}[✓]${NC}"
         else
             marker="[ ]"
         fi
+        if [[ "$line" -eq "$cursor_pos" ]]; then
+            cursor="${CYAN}▶${NC} "
+        else
+            cursor="  "
+        fi
         name=$(get_provider_field "$idx" name)
         models=$(get_provider_field "$idx" models)
-        printf "  %s %2d) %-20s (%s)\n" "$marker" "$idx" "$name" "$models"
+        echo -e "${cursor}${marker} ${idx}) ${name}  ${BLUE}(${models})${NC}"
     done
     
     echo ""
     echo -e "${YELLOW}Cloud Providers:${NC}"
     for idx in 10 11; do
+        line=$((line + 1))
         if is_provider_selected "$idx"; then
-            marker="${GREEN}[*]${NC}"
+            marker="${GREEN}[✓]${NC}"
         else
             marker="[ ]"
         fi
+        if [[ "$line" -eq "$cursor_pos" ]]; then
+            cursor="${CYAN}▶${NC} "
+        else
+            cursor="  "
+        fi
         name=$(get_provider_field "$idx" name)
         models=$(get_provider_field "$idx" models)
-        printf "  %s %2d) %-20s (%s)\n" "$marker" "$idx" "$name" "$models"
+        echo -e "${cursor}${marker} ${idx}) ${name}  ${BLUE}(${models})${NC}"
     done
     
     echo ""
@@ -380,35 +407,53 @@ print_provider_menu() {
 
 select_providers() {
     SELECTED_PROVIDERS="1"
+    local cursor_pos=1
+    local max_pos=11
+    local key
+    
+    # Hide cursor and set up cleanup
+    tput civis 2>/dev/null || true
+    trap 'tput cnorm 2>/dev/null || true' EXIT
     
     while true; do
-        print_provider_menu
-        echo -en "${CYAN}Enter provider number to toggle (or 'done' to continue): ${NC}"
-        read -r choice
+        print_provider_menu "$cursor_pos"
         
-        case "$choice" in
-            done|d|D|DONE|Done)
+        # Read single keypress
+        IFS= read -rsn1 key
+        
+        case "$key" in
+            $'\x1b')  # Escape sequence (arrow keys)
+                read -rsn2 -t 0.1 key
+                case "$key" in
+                    '[A')  # Up arrow
+                        ((cursor_pos > 1)) && ((cursor_pos--))
+                        ;;
+                    '[B')  # Down arrow
+                        ((cursor_pos < max_pos)) && ((cursor_pos++))
+                        ;;
+                esac
+                ;;
+            ' ')  # Space - toggle selection
+                toggle_provider "$cursor_pos"
+                ;;
+            ''|$'\n')  # Enter - done
                 if [[ -z "$SELECTED_PROVIDERS" ]]; then
-                    error "You must select at least one provider"
+                    echo -e "\n${RED}You must select at least one provider${NC}"
                     sleep 1
                     continue
                 fi
                 break
                 ;;
-            [1-9]|1[01])
-                if [[ "$choice" -ge 1 && "$choice" -le 11 ]]; then
-                    toggle_provider "$choice"
-                else
-                    warn "Invalid choice. Enter 1-11 or 'done'"
-                    sleep 1
-                fi
-                ;;
-            *)
-                warn "Invalid input. Enter a provider number (1-11) or 'done'"
-                sleep 1
+            q|Q)  # Quit
+                echo -e "\n${RED}Installation cancelled${NC}"
+                tput cnorm 2>/dev/null || true
+                exit 1
                 ;;
         esac
     done
+    
+    # Show cursor again
+    tput cnorm 2>/dev/null || true
     
     echo ""
     success "Selected providers: $(for idx in $SELECTED_PROVIDERS; do get_provider_field "$idx" name; done | tr '\n' ', ' | sed 's/,$//')"
@@ -808,6 +853,13 @@ check_dependencies() {
             error "$cmd is not installed"
         fi
     done
+    
+    if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
+        success "C compiler is installed"
+    else
+        missing+=("build-essential")
+        error "C compiler (cc/gcc) is not installed"
+    fi
     
     if command -v docker &> /dev/null; then
         success "docker is installed"
