@@ -1709,7 +1709,7 @@ write_systemd_service() {
     cat > /etc/systemd/system/cuttlefish.service << EOF
 [Unit]
 Description=Cuttlefish Multi-Agent AI Coding Platform
-Documentation=https://github.com/YOUR_USER/cuttlefish-rs
+Documentation=https://github.com/JackTYM/cuttlefish-rs
 After=network.target docker.service
 Requires=docker.service
 
