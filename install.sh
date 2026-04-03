@@ -90,9 +90,10 @@ PROVIDERS_DATA="
 7:xai:xAI/Grok:api:xai-:grok-2
 8:claude_oauth:Claude OAuth:oauth::claude.ai account - no API key needed
 9:chatgpt_oauth:ChatGPT OAuth:oauth::chatgpt.com account - no API key needed
-10:ollama:Ollama:local::local models - no API key needed
+10:ollama:Ollama:local::llama3.1, codellama, mistral, etc.
 11:bedrock:AWS Bedrock:cloud::requires AWS credentials
 12:azure:Azure OpenAI:cloud::requires Azure subscription
+13:custom:Custom Endpoint:custom::provide your own API endpoint
 "
 
 # Collected API keys (will be populated during configuration)
@@ -370,7 +371,7 @@ print_provider_menu() {
     
     echo ""
     echo -e "${YELLOW}OAuth Providers:${NC}"
-    for idx in 8; do
+    for idx in 8 9; do
         line=$((line + 1))
         if is_provider_selected "$idx"; then
             marker="${GREEN}[✓]${NC}"
@@ -389,7 +390,7 @@ print_provider_menu() {
     
     echo ""
     echo -e "${YELLOW}Local Providers:${NC}"
-    for idx in 9; do
+    for idx in 10; do
         line=$((line + 1))
         if is_provider_selected "$idx"; then
             marker="${GREEN}[✓]${NC}"
@@ -408,7 +409,26 @@ print_provider_menu() {
     
     echo ""
     echo -e "${YELLOW}Cloud Providers:${NC}"
-    for idx in 10 11; do
+    for idx in 11 12; do
+        line=$((line + 1))
+        if is_provider_selected "$idx"; then
+            marker="${GREEN}[✓]${NC}"
+        else
+            marker="[ ]"
+        fi
+        if [[ "$line" -eq "$cursor_pos" ]]; then
+            cursor="${CYAN}▶${NC} "
+        else
+            cursor="  "
+        fi
+        name=$(get_provider_field "$idx" name)
+        models=$(get_provider_field "$idx" models)
+        echo -e "${cursor}${marker} ${idx}) ${name}  ${BLUE}(${models})${NC}"
+    done
+    
+    echo ""
+    echo -e "${YELLOW}Custom:${NC}"
+    for idx in 13; do
         line=$((line + 1))
         if is_provider_selected "$idx"; then
             marker="${GREEN}[✓]${NC}"
@@ -431,7 +451,7 @@ print_provider_menu() {
 select_providers() {
     SELECTED_PROVIDERS="1"
     local cursor_pos=1
-    local max_pos=11
+    local max_pos=13
     local key
     
     # Hide cursor and set up cleanup
@@ -867,6 +887,7 @@ check_dependencies() {
     local missing=()
     local docker_missing=false
     local docker_not_running=false
+    local build_tools_missing=false
     
     for cmd in curl git; do
         if command -v "$cmd" &> /dev/null; then
@@ -876,6 +897,13 @@ check_dependencies() {
             error "$cmd is not installed"
         fi
     done
+    
+    if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
+        success "C compiler is installed"
+    else
+        error "C compiler (cc/gcc) is not installed"
+        build_tools_missing=true
+    fi
     
     if command -v docker &> /dev/null; then
         success "docker is installed"
@@ -896,6 +924,19 @@ check_dependencies() {
         echo ""
         info "Installing missing dependencies..."
         install_dependencies "${missing[@]}"
+    fi
+    
+    if [[ "$build_tools_missing" == true ]]; then
+        echo ""
+        info "Installing build tools (required for Rust compilation)..."
+        case "$PLATFORM" in
+            linux|wsl)
+                install_dependencies_linux "build-essential"
+                ;;
+            macos)
+                install_dependencies_macos "build-essential"
+                ;;
+        esac
     fi
     
     if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
