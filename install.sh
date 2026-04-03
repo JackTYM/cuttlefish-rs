@@ -854,13 +854,6 @@ check_dependencies() {
         fi
     done
     
-    if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
-        success "C compiler is installed"
-    else
-        missing+=("build-essential")
-        error "C compiler (cc/gcc) is not installed"
-    fi
-    
     if command -v docker &> /dev/null; then
         success "docker is installed"
         if docker info &> /dev/null; then
@@ -872,14 +865,6 @@ check_dependencies() {
     else
         error "docker is not installed"
         docker_missing=true
-    fi
-    
-    if command -v rustc &> /dev/null || [[ -x "$HOME/.cargo/bin/rustc" ]]; then
-        local rust_ver
-        rust_ver=$("${HOME}/.cargo/bin/rustc" --version 2>/dev/null || rustc --version | awk '{print $2}')
-        success "Rust $rust_ver is installed"
-    else
-        warn "Rust is not installed (will install)"
     fi
     
     if [[ ${#missing[@]} -gt 0 ]]; then
@@ -1313,40 +1298,109 @@ create_directories() {
     success "Created directories"
 }
 
-build_cuttlefish() {
+get_latest_release() {
+    curl -s "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" | \
+        grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+}
+
+detect_arch() {
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64|amd64)
+            echo "x86_64"
+            ;;
+        aarch64|arm64)
+            echo "aarch64"
+            ;;
+        *)
+            error "Unsupported architecture: $arch"
+            exit 1
+            ;;
+    esac
+}
+
+download_binary() {
     echo ""
-    echo -e "${BOLD}=== Building Cuttlefish ===${NC}"
+    echo -e "${BOLD}=== Installing Cuttlefish ===${NC}"
+    echo ""
+    
+    local version arch os_name download_url tarball
+    
+    version=$(get_latest_release)
+    if [[ -z "$version" ]]; then
+        warn "Could not fetch latest release, falling back to build from source"
+        build_from_source
+        return
+    fi
+    
+    arch=$(detect_arch)
+    
+    case "$PLATFORM" in
+        linux|wsl)
+            os_name="linux"
+            ;;
+        macos)
+            os_name="darwin"
+            ;;
+        *)
+            warn "Unknown platform, falling back to build from source"
+            build_from_source
+            return
+            ;;
+    esac
+    
+    tarball="cuttlefish-${os_name}-${arch}.tar.gz"
+    download_url="https://github.com/JackTYM/cuttlefish-rs/releases/download/${version}/${tarball}"
+    
+    info "Downloading Cuttlefish $version for ${os_name}-${arch}..."
+    
+    if ! curl -fSL "$download_url" -o "/tmp/$tarball" 2>/dev/null; then
+        warn "Binary not available for this platform, falling back to build from source"
+        build_from_source
+        return
+    fi
+    
+    info "Extracting binary..."
+    tar -xzf "/tmp/$tarball" -C /tmp
+    
+    mv /tmp/cuttlefish-rs "$INSTALL_DIR/"
+    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/cuttlefish-rs"
+    chmod +x "$INSTALL_DIR/cuttlefish-rs"
+    
+    rm -f "/tmp/$tarball"
+    
+    success "Installed Cuttlefish $version to $INSTALL_DIR"
+}
+
+build_from_source() {
+    echo ""
+    echo -e "${BOLD}=== Building Cuttlefish from Source ===${NC}"
     echo ""
     
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
-    # Check if we're in the source directory
     if [[ -f "$script_dir/Cargo.toml" ]]; then
         info "Building from source directory: $script_dir"
         cd "$script_dir"
     else
-        # Clone from GitHub
-        prompt REPO_URL "Git repository URL" "https://github.com/YOUR_USER/cuttlefish-rs.git"
         info "Cloning repository..."
-        git clone "$REPO_URL" /tmp/cuttlefish-build
+        git clone "https://github.com/JackTYM/cuttlefish-rs.git" /tmp/cuttlefish-build
         cd /tmp/cuttlefish-build
     fi
     
-    # Ensure Rust is available
-    if [[ -f "$HOME/.cargo/env" ]]; then
-        source "$HOME/.cargo/env"
-    fi
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
     
-    info "Building release binary (this may take a few minutes)..."
-    cargo build --release
+    install_rust
     
-    # Copy binary
+    info "Building release binary (this may take several minutes)..."
+    "$HOME/.cargo/bin/cargo" build --release 2>/dev/null || cargo build --release
+    
     cp target/release/cuttlefish-rs "$INSTALL_DIR/"
     chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/cuttlefish-rs"
     chmod +x "$INSTALL_DIR/cuttlefish-rs"
     
-    # Copy TUI binary if it exists
     if [[ -f target/release/cuttlefish-tui ]]; then
         cp target/release/cuttlefish-tui "$INSTALL_DIR/"
         chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/cuttlefish-tui"
@@ -1818,7 +1872,7 @@ main() {
     
     create_user
     create_directories
-    build_cuttlefish
+    download_binary
     write_config
     write_env_file
     if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
