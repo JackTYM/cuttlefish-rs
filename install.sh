@@ -5,6 +5,22 @@
 #
 set -euo pipefail
 
+# Check for interactive terminal
+if [[ ! -t 0 ]]; then
+    echo "Error: This script must be run interactively."
+    echo ""
+    echo "Please run it one of these ways:"
+    echo ""
+    echo "  # Download and run:"
+    echo "  curl -sSLO https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh"
+    echo "  bash install.sh"
+    echo ""
+    echo "  # Or use bash -s:"
+    echo "  bash -s < <(curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
+    echo ""
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
