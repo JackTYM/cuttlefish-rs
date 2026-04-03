@@ -18,14 +18,14 @@ pub mod librarian;
 pub mod orchestrator;
 /// Planner agent that creates detailed implementation plans.
 pub mod planner;
+/// Runtime prompt loading from YAML frontmatter markdown files.
+pub mod prompt_registry;
 /// Agent execution runner with tool calling and timeout enforcement.
 pub mod runner;
 /// Tool registry and built-in tool definitions.
 pub mod tools;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
 pub mod workflow;
-/// Runtime prompt loading from YAML frontmatter markdown files.
-pub mod prompt_registry;
 
 pub use bus::TokioMessageBus;
 pub use coder::CoderAgent;
@@ -35,13 +35,13 @@ pub use explorer::ExplorerAgent;
 pub use librarian::LibrarianAgent;
 pub use orchestrator::OrchestratorAgent;
 pub use planner::PlannerAgent;
+pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
 pub use runner::{
     AgentRunner, DEFAULT_TIMEOUT_SECS, MAX_ITERATIONS, RunnerConfig, ToolExecutionResult,
     ToolExecutor,
 };
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowConfig, WorkflowEngine, WorkflowResult};
-pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
 
 pub use cuttlefish_core::traits::{
     agent::{Agent, AgentContext, AgentOutput, AgentRole, Category},

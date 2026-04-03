@@ -1,7 +1,7 @@
 //! Authentication for tunnel connections — link codes and JWTs.
 
 use crate::error::TunnelError;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -252,9 +252,10 @@ mod tests {
         assert_eq!(code.len(), LINK_CODE_LENGTH);
 
         // Check all characters are uppercase alphanumeric
-        assert!(code
-            .chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
+        assert!(
+            code.chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        );
 
         // Check no confusing characters are present
         assert!(!code.contains('0'));

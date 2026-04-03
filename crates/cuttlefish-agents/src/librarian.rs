@@ -159,10 +159,7 @@ category: quick
         mock.add_response("Here is the documentation.");
         let agent = LibrarianAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
-        let out = agent
-            .execute(&mut ctx, "Find docs")
-            .await
-            .expect("exec");
+        let out = agent.execute(&mut ctx, "Find docs").await.expect("exec");
         assert!(out.success);
     }
 
@@ -175,10 +172,7 @@ category: quick
         mock.add_response("Done retrieving docs.");
         let agent = LibrarianAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
-        agent
-            .execute(&mut ctx, "Find docs")
-            .await
-            .expect("exec");
+        agent.execute(&mut ctx, "Find docs").await.expect("exec");
         assert_eq!(ctx.messages.len(), 2);
         assert!(matches!(ctx.messages[1].role, MessageRole::Assistant));
     }

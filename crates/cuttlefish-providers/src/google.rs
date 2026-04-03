@@ -12,8 +12,8 @@ use cuttlefish_core::{
 use futures::stream::{self, BoxStream, StreamExt};
 use reqwest::Client;
 use serde_json::{Value, json};
-use tracing::debug;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tracing::debug;
 
 static CALL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -41,8 +41,9 @@ impl GoogleProvider {
     /// # Errors
     /// Returns an error if `GOOGLE_API_KEY` is not set.
     pub fn new(model: impl Into<String>) -> Result<Self, ProviderError> {
-        let api_key = std::env::var("GOOGLE_API_KEY")
-            .map_err(|_| ProviderError("GOOGLE_API_KEY environment variable not set".to_string()))?;
+        let api_key = std::env::var("GOOGLE_API_KEY").map_err(|_| {
+            ProviderError("GOOGLE_API_KEY environment variable not set".to_string())
+        })?;
         Ok(Self::with_api_key(api_key, model))
     }
 
@@ -293,7 +294,10 @@ mod tests {
 
         let body = provider.build_request_body(&request);
 
-        assert_eq!(body["systemInstruction"]["parts"][0]["text"], "You are helpful.");
+        assert_eq!(
+            body["systemInstruction"]["parts"][0]["text"],
+            "You are helpful."
+        );
         assert_eq!(body["generationConfig"]["maxOutputTokens"], 4096);
     }
 
@@ -351,7 +355,10 @@ mod tests {
         let body = provider.build_request_body(&request);
 
         // System message should be extracted to systemInstruction
-        assert_eq!(body["systemInstruction"]["parts"][0]["text"], "System prompt");
+        assert_eq!(
+            body["systemInstruction"]["parts"][0]["text"],
+            "System prompt"
+        );
 
         // Contents should only have the user message
         let contents = body["contents"].as_array().expect("contents array");

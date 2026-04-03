@@ -13,15 +13,9 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    bus::TokioMessageBus,
-    coder::CoderAgent,
-    critic::CriticAgent,
-    devops::DevOpsAgent,
-    explorer::ExplorerAgent,
-    librarian::LibrarianAgent,
-    orchestrator::OrchestratorAgent,
-    planner::PlannerAgent,
-    prompt_registry::PromptRegistry,
+    bus::TokioMessageBus, coder::CoderAgent, critic::CriticAgent, devops::DevOpsAgent,
+    explorer::ExplorerAgent, librarian::LibrarianAgent, orchestrator::OrchestratorAgent,
+    planner::PlannerAgent, prompt_registry::PromptRegistry,
 };
 
 /// Maximum Coder↔Critic iterations per task (Metis guardrail).
@@ -426,7 +420,15 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
+        for name in [
+            "orchestrator",
+            "coder",
+            "critic",
+            "planner",
+            "explorer",
+            "librarian",
+            "devops",
+        ] {
             let content = format!(
                 r#"---
 name: {name}
@@ -598,7 +600,12 @@ You are the {name} agent."#
             .dispatch_to_agent(AgentRole::Planner, &mut ctx, "Plan")
             .await;
         assert!(result.is_err());
-        assert!(result.expect_err("should fail").to_string().contains("not enabled"));
+        assert!(
+            result
+                .expect_err("should fail")
+                .to_string()
+                .contains("not enabled")
+        );
     }
 
     #[test]
@@ -607,7 +614,11 @@ You are the {name} agent."#
         let temp_dir = TempDir::new().expect("temp dir");
         create_test_prompts(temp_dir.path());
 
-        let engine = WorkflowEngine::new(Arc::new(mock.clone()), TokioMessageBus::new(), temp_dir.path());
+        let engine = WorkflowEngine::new(
+            Arc::new(mock.clone()),
+            TokioMessageBus::new(),
+            temp_dir.path(),
+        );
         assert!(engine.is_agent_enabled(AgentRole::Orchestrator));
         assert!(engine.is_agent_enabled(AgentRole::Coder));
         assert!(engine.is_agent_enabled(AgentRole::Critic));
@@ -618,7 +629,11 @@ You are the {name} agent."#
 
         let temp_dir2 = TempDir::new().expect("temp dir");
         create_test_prompts(temp_dir2.path());
-        let engine_all = WorkflowEngine::with_all_agents(Arc::new(mock), TokioMessageBus::new(), temp_dir2.path());
+        let engine_all = WorkflowEngine::with_all_agents(
+            Arc::new(mock),
+            TokioMessageBus::new(),
+            temp_dir2.path(),
+        );
         assert!(engine_all.is_agent_enabled(AgentRole::Planner));
         assert!(engine_all.is_agent_enabled(AgentRole::Explorer));
         assert!(engine_all.is_agent_enabled(AgentRole::Librarian));

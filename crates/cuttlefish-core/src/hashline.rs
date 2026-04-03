@@ -309,7 +309,8 @@ mod tests {
         let lines = hash_file_lines(content);
         let hash = lines[0].hash.clone();
 
-        let result = insert_after(content, &hash, &["inserted".to_string()]).expect("insert should succeed");
+        let result =
+            insert_after(content, &hash, &["inserted".to_string()]).expect("insert should succeed");
         let new_lines: Vec<&str> = result.lines().collect();
         assert_eq!(new_lines.len(), 4);
         assert_eq!(new_lines[1], "inserted");

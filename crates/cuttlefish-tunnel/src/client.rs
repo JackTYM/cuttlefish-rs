@@ -12,8 +12,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, RwLock};
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio::sync::{RwLock, mpsc};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 /// Policy for automatic reconnection with exponential backoff.
@@ -390,18 +390,18 @@ impl ReconnectingTunnelClient {
                     self.policy.max_attempts.unwrap_or(0)
                 );
                 error!("{}", error_msg);
-                self.send_event(TunnelEvent::ReconnectFailed { error: error_msg.clone() }).await;
+                self.send_event(TunnelEvent::ReconnectFailed {
+                    error: error_msg.clone(),
+                })
+                .await;
                 return Err(TunnelError::ConnectionClosed(error_msg));
             }
 
             let delay = self.policy.delay_for_attempt(attempt);
             attempt = attempt.saturating_add(1);
 
-            self.send_event(TunnelEvent::Reconnecting {
-                attempt,
-                delay,
-            })
-            .await;
+            self.send_event(TunnelEvent::Reconnecting { attempt, delay })
+                .await;
 
             info!(
                 attempt = attempt,
@@ -521,7 +521,16 @@ where
             let local_addr = config.local_addr;
 
             let response = tokio::spawn(async move {
-                forward_http_request(&http_client, local_addr, request_id, method, path, headers, body).await
+                forward_http_request(
+                    &http_client,
+                    local_addr,
+                    request_id,
+                    method,
+                    path,
+                    headers,
+                    body,
+                )
+                .await
             })
             .await
             .map_err(|e| TunnelError::HttpForward(format!("Task join error: {e}")))?;
@@ -770,12 +779,8 @@ mod tests {
 
     #[test]
     fn test_reconnect_policy_delay_calculation() {
-        let policy = ReconnectPolicy::new(
-            Duration::from_secs(1),
-            Duration::from_secs(300),
-            2.0,
-            None,
-        );
+        let policy =
+            ReconnectPolicy::new(Duration::from_secs(1), Duration::from_secs(300), 2.0, None);
 
         assert_eq!(policy.delay_for_attempt(0), Duration::from_secs(1));
         assert_eq!(policy.delay_for_attempt(1), Duration::from_secs(2));
@@ -786,12 +791,8 @@ mod tests {
 
     #[test]
     fn test_reconnect_policy_delay_capped_at_max() {
-        let policy = ReconnectPolicy::new(
-            Duration::from_secs(1),
-            Duration::from_secs(10),
-            2.0,
-            None,
-        );
+        let policy =
+            ReconnectPolicy::new(Duration::from_secs(1), Duration::from_secs(10), 2.0, None);
 
         assert_eq!(policy.delay_for_attempt(0), Duration::from_secs(1));
         assert_eq!(policy.delay_for_attempt(1), Duration::from_secs(2));
@@ -804,12 +805,8 @@ mod tests {
 
     #[test]
     fn test_reconnect_policy_should_retry_infinite() {
-        let policy = ReconnectPolicy::new(
-            Duration::from_secs(1),
-            Duration::from_secs(60),
-            2.0,
-            None,
-        );
+        let policy =
+            ReconnectPolicy::new(Duration::from_secs(1), Duration::from_secs(60), 2.0, None);
 
         assert!(policy.should_retry(0));
         assert!(policy.should_retry(100));
@@ -846,12 +843,8 @@ mod tests {
 
     #[test]
     fn test_reconnect_policy_fractional_multiplier() {
-        let policy = ReconnectPolicy::new(
-            Duration::from_secs(10),
-            Duration::from_secs(300),
-            1.5,
-            None,
-        );
+        let policy =
+            ReconnectPolicy::new(Duration::from_secs(10), Duration::from_secs(300), 1.5, None);
 
         assert_eq!(policy.delay_for_attempt(0), Duration::from_secs(10));
         assert_eq!(policy.delay_for_attempt(1), Duration::from_secs(15));
@@ -928,7 +921,9 @@ mod tests {
     #[test]
     fn test_reconnect_policy_exponential_sequence() {
         let policy = ReconnectPolicy::default();
-        let delays: Vec<u64> = (0..10).map(|i| policy.delay_for_attempt(i).as_secs()).collect();
+        let delays: Vec<u64> = (0..10)
+            .map(|i| policy.delay_for_attempt(i).as_secs())
+            .collect();
 
         assert_eq!(delays[0], 1);
         assert_eq!(delays[1], 2);

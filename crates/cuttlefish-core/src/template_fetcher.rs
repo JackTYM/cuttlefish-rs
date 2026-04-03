@@ -27,7 +27,7 @@ use std::path::PathBuf;
 
 use reqwest::Client;
 
-use crate::template_manifest::{parse_manifest, TemplateError};
+use crate::template_manifest::{TemplateError, parse_manifest};
 use crate::template_registry::{LoadedTemplate, TemplateSource};
 
 /// Fetches templates from remote URLs (GitHub, etc.).
@@ -119,18 +119,20 @@ impl TemplateFetcher {
             request = request.header("Authorization", format!("token {token}"));
         }
 
-        let response = request.send().await.map_err(|e| {
-            TemplateError::Io(std::io::Error::other(format!("HTTP error: {e}")))
-        })?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| TemplateError::Io(std::io::Error::other(format!("HTTP error: {e}"))))?;
 
         if !response.status().is_success() {
             let status = response.status();
             return Err(TemplateError::NotFound(format!("HTTP {status}: {url}")));
         }
 
-        let content = response.text().await.map_err(|e| {
-            TemplateError::Io(std::io::Error::other(format!("Read error: {e}")))
-        })?;
+        let content = response
+            .text()
+            .await
+            .map_err(|e| TemplateError::Io(std::io::Error::other(format!("Read error: {e}"))))?;
 
         // Parse and validate
         let (manifest, body) = parse_manifest(&content)?;

@@ -178,7 +178,9 @@ pub async fn create_project(
         let _template = state.template_registry.get(template_name).ok_or_else(|| {
             (
                 StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": format!("Unknown template: {}", template_name) })),
+                Json(
+                    serde_json::json!({ "error": format!("Unknown template: {}", template_name) }),
+                ),
             )
         })?;
 

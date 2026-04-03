@@ -33,8 +33,9 @@ impl OpenAiProvider {
     /// # Errors
     /// Returns `ProviderError` if `OPENAI_API_KEY` is not set.
     pub fn new(model: impl Into<String>) -> Result<Self, ProviderError> {
-        let api_key = std::env::var("OPENAI_API_KEY")
-            .map_err(|_| ProviderError("OPENAI_API_KEY environment variable not set".to_string()))?;
+        let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
+            ProviderError("OPENAI_API_KEY environment variable not set".to_string())
+        })?;
         Ok(Self::with_api_key(api_key, model))
     }
 
@@ -111,7 +112,9 @@ impl OpenAiProvider {
             .to_string();
 
         let input_tokens = resp_json["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
-        let output_tokens = resp_json["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
+        let output_tokens = resp_json["usage"]["completion_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
 
         // Parse tool calls if present
         let tool_calls = self.parse_tool_calls(resp_json);
@@ -339,7 +342,10 @@ mod tests {
     #[tokio::test]
     async fn test_count_tokens() {
         let provider = OpenAiProvider::with_api_key("test-key", "gpt-5.4");
-        let count = provider.count_tokens("Hello world test").await.expect("count");
+        let count = provider
+            .count_tokens("Hello world test")
+            .await
+            .expect("count");
         assert!(count > 0);
         // "Hello world test" is 16 chars, so 16/4 + 1 = 5
         assert_eq!(count, 5);

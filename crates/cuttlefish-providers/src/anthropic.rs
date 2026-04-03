@@ -357,7 +357,10 @@ mod tests {
     #[tokio::test]
     async fn test_count_tokens() {
         let provider = AnthropicProvider::with_api_key("test-key", "claude-sonnet-4-6");
-        let count = provider.count_tokens("Hello world test").await.expect("count");
+        let count = provider
+            .count_tokens("Hello world test")
+            .await
+            .expect("count");
         assert!(count > 0);
         assert_eq!(count, 5); // 16 chars / 4 + 1 = 5
     }

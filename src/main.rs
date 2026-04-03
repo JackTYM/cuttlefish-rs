@@ -3,8 +3,8 @@
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
 use cuttlefish_api::{build_app, routes::AppState};
-use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::TemplateRegistry;
+use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_tunnel::client::{TunnelClient, TunnelClientConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -189,7 +189,10 @@ async fn tunnel_connect(args: &[String]) -> anyhow::Result<()> {
     if let Some(code) = link_code {
         let jwt = client.connect_with_link_code(&code).await?;
         save_jwt(&jwt)?;
-        println!("✓ Connected! JWT saved to {}", get_config_dir().join("tunnel.jwt").display());
+        println!(
+            "✓ Connected! JWT saved to {}",
+            get_config_dir().join("tunnel.jwt").display()
+        );
     } else if let Some(path) = jwt_path {
         let jwt = std::fs::read_to_string(&path)?;
         client.connect_with_jwt(jwt.trim()).await?;
@@ -202,7 +205,10 @@ async fn tunnel_connect(args: &[String]) -> anyhow::Result<()> {
     }
 
     if let Some(subdomain) = client.subdomain() {
-        println!("🌐 Tunnel available at: https://{}.cuttlefish.ai", subdomain);
+        println!(
+            "🌐 Tunnel available at: https://{}.cuttlefish.ai",
+            subdomain
+        );
     }
 
     // Run until Ctrl+C
@@ -231,23 +237,21 @@ async fn tunnel_status() -> anyhow::Result<()> {
         if parts.len() == 3 {
             use base64::Engine;
             match base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[1]) {
-                Ok(payload) => {
-                    match serde_json::from_slice::<serde_json::Value>(&payload) {
-                        Ok(claims) => {
-                            if let Some(subdomain) = claims["subdomain"].as_str() {
-                                println!("✓ Connected");
-                                println!("  Subdomain: {}", subdomain);
-                                println!("  URL: https://{}.cuttlefish.ai", subdomain);
-                            }
-                            if let Some(exp) = claims["exp"].as_i64() {
-                                println!("  Expires: {}", exp);
-                            }
+                Ok(payload) => match serde_json::from_slice::<serde_json::Value>(&payload) {
+                    Ok(claims) => {
+                        if let Some(subdomain) = claims["subdomain"].as_str() {
+                            println!("✓ Connected");
+                            println!("  Subdomain: {}", subdomain);
+                            println!("  URL: https://{}.cuttlefish.ai", subdomain);
                         }
-                        Err(_) => {
-                            println!("✓ JWT saved at: {}", jwt_path.display());
+                        if let Some(exp) = claims["exp"].as_i64() {
+                            println!("  Expires: {}", exp);
                         }
                     }
-                }
+                    Err(_) => {
+                        println!("✓ JWT saved at: {}", jwt_path.display());
+                    }
+                },
                 Err(_) => {
                     println!("✓ JWT saved at: {}", jwt_path.display());
                 }

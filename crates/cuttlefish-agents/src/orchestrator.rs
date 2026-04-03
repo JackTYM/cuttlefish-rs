@@ -302,7 +302,10 @@ category: deep
         let result = agent.execute(&mut ctx, "Do something").await;
         assert!(result.is_err());
         let err = result.expect_err("should fail");
-        assert!(err.to_string().contains("Failed to load orchestrator prompt"));
+        assert!(
+            err.to_string()
+                .contains("Failed to load orchestrator prompt")
+        );
     }
 
     #[test]

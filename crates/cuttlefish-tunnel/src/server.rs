@@ -7,18 +7,18 @@
 
 use crate::auth::{validate_jwt, validate_link_code};
 use crate::error::TunnelError;
-use crate::protocol::{generate_request_id, ClientMessage, ServerMessage};
+use crate::protocol::{ClientMessage, ServerMessage, generate_request_id};
 use chrono::{DateTime, Utc};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, oneshot, RwLock};
-use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
+use tokio::sync::{RwLock, mpsc, oneshot};
+use tokio_tungstenite::{WebSocketStream, accept_async, tungstenite::Message};
 use tracing::{debug, info, warn};
 
 /// Statistics for a tunnel connection
@@ -292,7 +292,8 @@ impl TunnelServer {
             let connected_since = conn.stats.connected_at.to_rfc3339();
             let last_heartbeat = {
                 let elapsed = conn.last_heartbeat.elapsed();
-                let heartbeat_time = Utc::now() - chrono::Duration::seconds(elapsed.as_secs() as i64);
+                let heartbeat_time =
+                    Utc::now() - chrono::Duration::seconds(elapsed.as_secs() as i64);
                 heartbeat_time.to_rfc3339()
             };
 
@@ -337,7 +338,7 @@ async fn handle_client_connection(
         _ => {
             return Err(TunnelError::AuthFailed(
                 "Expected text message for auth".to_string(),
-            ))
+            ));
         }
     };
 
@@ -381,10 +382,7 @@ async fn handle_client_connection(
         let mut conns = connections.write().await;
         // Remove existing connection for this subdomain if any
         if conns.contains_key(&subdomain) {
-            warn!(
-                "Replacing existing connection for subdomain: {}",
-                subdomain
-            );
+            warn!("Replacing existing connection for subdomain: {}", subdomain);
         }
         conns.insert(
             subdomain.clone(),

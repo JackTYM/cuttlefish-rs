@@ -142,7 +142,9 @@ impl ModelProvider for ChatGptOAuthProvider {
             .to_string();
 
         let input_tokens = resp_json["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
-        let output_tokens = resp_json["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
+        let output_tokens = resp_json["usage"]["completion_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
 
         Ok(CompletionResponse {
             content,

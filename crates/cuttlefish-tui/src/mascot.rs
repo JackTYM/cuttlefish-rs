@@ -94,11 +94,7 @@ impl MascotWidget {
 
         let scale = max_scale_by_width.min(max_scale_by_height);
 
-        if scale >= 1 {
-            Some(scale)
-        } else {
-            None
-        }
+        if scale >= 1 { Some(scale) } else { None }
     }
 }
 

@@ -139,7 +139,10 @@ impl ModelProvider for OllamaProvider {
             .map_err(|e| ProviderError(format!("JSON serialization error: {e}")))?;
 
         let api_url = format!("{}/api/chat", self.base_url);
-        debug!("Sending request to Ollama API at {}, model={}", api_url, self.model);
+        debug!(
+            "Sending request to Ollama API at {}, model={}",
+            api_url, self.model
+        );
 
         let response = self
             .client
@@ -218,7 +221,9 @@ mod tests {
         let body = provider.build_request_body(&request);
         assert_eq!(body["model"], "llama3.1");
         assert_eq!(body["stream"], false);
-        let temp = body["options"]["temperature"].as_f64().expect("temperature");
+        let temp = body["options"]["temperature"]
+            .as_f64()
+            .expect("temperature");
         assert!((temp - 0.7).abs() < 0.001);
     }
 

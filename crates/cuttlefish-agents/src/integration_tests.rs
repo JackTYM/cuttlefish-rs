@@ -5,7 +5,10 @@
 
 #[cfg(test)]
 mod workflow_integration {
-    use crate::{bus::TokioMessageBus, workflow::{WorkflowConfig, WorkflowEngine}};
+    use crate::{
+        bus::TokioMessageBus,
+        workflow::{WorkflowConfig, WorkflowEngine},
+    };
     use cuttlefish_core::traits::bus::MessageBus;
     use cuttlefish_providers::mock::MockModelProvider;
     use std::fs;
@@ -14,7 +17,15 @@ mod workflow_integration {
     use uuid::Uuid;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
+        for name in [
+            "orchestrator",
+            "coder",
+            "critic",
+            "planner",
+            "explorer",
+            "librarian",
+            "devops",
+        ] {
             let content = format!(
                 r#"---
 name: {name}
@@ -52,7 +63,10 @@ You are the {name} agent."#
         assert!(result.success, "Workflow should succeed with approved code");
         assert_eq!(result.iterations, 1, "Should complete in one iteration");
         assert_eq!(result.final_verdict.as_deref(), Some("approve"));
-        assert!(!result.planning_executed, "Planning should not run by default");
+        assert!(
+            !result.planning_executed,
+            "Planning should not run by default"
+        );
     }
 
     #[tokio::test]
@@ -142,8 +156,12 @@ You are the {name} agent."#
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "Still broken"}"#);
         }
 
-        let engine =
-            WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), 3);
+        let engine = WorkflowEngine::with_max_iterations(
+            Arc::new(mock),
+            TokioMessageBus::new(),
+            temp_dir.path(),
+            3,
+        );
         let result = engine
             .execute(Uuid::new_v4(), "Task")
             .await
@@ -180,7 +198,9 @@ You are the {name} agent."#
         create_test_prompts(temp_dir.path());
 
         let mock = MockModelProvider::new("planner-test");
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Build feature", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Build feature", "agent": "coder"}]}"#,
+        );
         mock.add_response("Step 1: Create module\nStep 2: Add tests\nStep 3: Document");
         mock.add_response("Feature implemented with tests");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Well planned"}"#);
@@ -189,7 +209,12 @@ You are the {name} agent."#
             enable_planner: true,
             ..Default::default()
         };
-        let engine = WorkflowEngine::with_config(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), config);
+        let engine = WorkflowEngine::with_config(
+            Arc::new(mock),
+            TokioMessageBus::new(),
+            temp_dir.path(),
+            config,
+        );
         let result = engine
             .execute(Uuid::new_v4(), "Build a new feature")
             .await
@@ -205,19 +230,28 @@ You are the {name} agent."#
         create_test_prompts(temp_dir.path());
 
         let mock = MockModelProvider::new("all-agents-test");
-        mock.add_response(r#"{"tasks": [{"id": "1", "description": "Build app", "agent": "coder"}]}"#);
+        mock.add_response(
+            r#"{"tasks": [{"id": "1", "description": "Build app", "agent": "coder"}]}"#,
+        );
         mock.add_response("Detailed implementation plan");
         mock.add_response("App built successfully");
         mock.add_response(r#"{"verdict": "approve", "issues": [], "summary": "Complete"}"#);
 
-        let engine = WorkflowEngine::with_all_agents(Arc::new(mock), TokioMessageBus::new(), temp_dir.path());
+        let engine = WorkflowEngine::with_all_agents(
+            Arc::new(mock),
+            TokioMessageBus::new(),
+            temp_dir.path(),
+        );
         let result = engine
             .execute(Uuid::new_v4(), "Build an application")
             .await
             .expect("workflow should execute");
 
         assert!(result.success, "Should succeed with all agents");
-        assert!(result.planning_executed, "Planning should run when all agents enabled");
+        assert!(
+            result.planning_executed,
+            "Planning should run when all agents enabled"
+        );
     }
 }
 
@@ -356,7 +390,15 @@ mod cross_crate_wiring {
     use uuid::Uuid;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
+        for name in [
+            "orchestrator",
+            "coder",
+            "critic",
+            "planner",
+            "explorer",
+            "librarian",
+            "devops",
+        ] {
             let content = format!(
                 r#"---
 name: {name}
@@ -408,8 +450,12 @@ You are the {name} agent."#
             mock.add_response(r#"{"verdict": "reject", "issues": [], "summary": "No"}"#);
         }
 
-        let engine =
-            WorkflowEngine::with_max_iterations(Arc::new(mock), TokioMessageBus::new(), temp_dir.path(), 2);
+        let engine = WorkflowEngine::with_max_iterations(
+            Arc::new(mock),
+            TokioMessageBus::new(),
+            temp_dir.path(),
+            2,
+        );
         let result = engine
             .execute(Uuid::new_v4(), "Task")
             .await
@@ -448,8 +494,8 @@ You are the {name} agent."#
 #[cfg(test)]
 mod all_agents_instantiation {
     use crate::{
-        CoderAgent, CriticAgent, DevOpsAgent, ExplorerAgent, LibrarianAgent,
-        OrchestratorAgent, PlannerAgent, TokioMessageBus,
+        CoderAgent, CriticAgent, DevOpsAgent, ExplorerAgent, LibrarianAgent, OrchestratorAgent,
+        PlannerAgent, TokioMessageBus,
     };
     use cuttlefish_core::traits::agent::{Agent, AgentRole};
     use cuttlefish_core::traits::provider::ModelProvider;
@@ -459,7 +505,15 @@ mod all_agents_instantiation {
     use tempfile::TempDir;
 
     fn create_test_prompts(dir: &std::path::Path) {
-        for name in ["orchestrator", "coder", "critic", "planner", "explorer", "librarian", "devops"] {
+        for name in [
+            "orchestrator",
+            "coder",
+            "critic",
+            "planner",
+            "explorer",
+            "librarian",
+            "devops",
+        ] {
             let content = format!(
                 r#"---
 name: {name}

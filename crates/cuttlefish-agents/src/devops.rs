@@ -156,10 +156,7 @@ category: unspecified-high
         mock.add_response("Deployment complete.");
         let agent = DevOpsAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
-        let out = agent
-            .execute(&mut ctx, "Deploy")
-            .await
-            .expect("exec");
+        let out = agent.execute(&mut ctx, "Deploy").await.expect("exec");
         assert!(out.success);
     }
 
@@ -172,10 +169,7 @@ category: unspecified-high
         mock.add_response("Done deploying.");
         let agent = DevOpsAgent::new(Arc::new(mock), temp_dir.path());
         let mut ctx = test_ctx();
-        agent
-            .execute(&mut ctx, "Deploy")
-            .await
-            .expect("exec");
+        agent.execute(&mut ctx, "Deploy").await.expect("exec");
         assert_eq!(ctx.messages.len(), 2);
         assert!(matches!(ctx.messages[1].role, MessageRole::Assistant));
     }

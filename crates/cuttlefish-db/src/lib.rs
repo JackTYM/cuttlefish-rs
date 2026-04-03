@@ -911,9 +911,7 @@ mod tests {
             .expect("exists");
         assert_eq!(found.id, code.id);
 
-        db.mark_link_code_used(&code.id)
-            .await
-            .expect("mark used");
+        db.mark_link_code_used(&code.id).await.expect("mark used");
 
         let found = db
             .find_link_code_by_hash("hash123")
@@ -934,22 +932,13 @@ mod tests {
             .await
             .expect("create valid");
 
-        let cleaned = db
-            .cleanup_expired_link_codes()
-            .await
-            .expect("cleanup");
+        let cleaned = db.cleanup_expired_link_codes().await.expect("cleanup");
         assert_eq!(cleaned, 1);
 
-        let found = db
-            .find_link_code_by_hash("hash1")
-            .await
-            .expect("find");
+        let found = db.find_link_code_by_hash("hash1").await.expect("find");
         assert!(found.is_none());
 
-        let found = db
-            .find_link_code_by_hash("hash2")
-            .await
-            .expect("find");
+        let found = db.find_link_code_by_hash("hash2").await.expect("find");
         assert!(found.is_some());
     }
 
@@ -975,16 +964,10 @@ mod tests {
             .await
             .expect("heartbeat");
 
-        let tunnels = db
-            .list_active_tunnels()
-            .await
-            .expect("list");
+        let tunnels = db.list_active_tunnels().await.expect("list");
         assert_eq!(tunnels.len(), 1);
 
-        let removed = db
-            .remove_tunnel("alice")
-            .await
-            .expect("remove");
+        let removed = db.remove_tunnel("alice").await.expect("remove");
         assert!(removed);
 
         let found = db
@@ -1006,22 +989,13 @@ mod tests {
             .await
             .expect("register");
 
-        let tunnels = db
-            .list_active_tunnels()
-            .await
-            .expect("list before cleanup");
+        let tunnels = db.list_active_tunnels().await.expect("list before cleanup");
         assert_eq!(tunnels.len(), 2);
 
-        let cleaned = db
-            .cleanup_stale_tunnels(0)
-            .await
-            .expect("cleanup");
+        let cleaned = db.cleanup_stale_tunnels(0).await.expect("cleanup");
         assert_eq!(cleaned, 2);
 
-        let tunnels = db
-            .list_active_tunnels()
-            .await
-            .expect("list after cleanup");
+        let tunnels = db.list_active_tunnels().await.expect("list after cleanup");
         assert_eq!(tunnels.len(), 0);
     }
 }

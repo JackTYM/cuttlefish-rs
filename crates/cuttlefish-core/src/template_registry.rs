@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use crate::template_engine::TemplateEngine;
-use crate::template_manifest::{parse_manifest, TemplateError, TemplateManifest};
+use crate::template_manifest::{TemplateError, TemplateManifest, parse_manifest};
 
 /// Source of a loaded template.
 #[derive(Debug, Clone, PartialEq, Eq)]
