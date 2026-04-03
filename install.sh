@@ -3,10 +3,45 @@
 # Cuttlefish Install Script
 # Guides you through setting up Cuttlefish on a fresh system.
 #
-set -euo pipefail
+set -uo pipefail
+
+# Global error handler - show useful info on failure
+trap 'handle_error $? $LINENO "$BASH_COMMAND"' ERR
+
+handle_error() {
+    local exit_code=$1
+    local line_no=$2
+    local command=$3
+    echo ""
+    echo -e "${RED}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║                    INSTALLATION FAILED                         ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${RED}[ERROR]${NC} Command failed with exit code $exit_code"
+    echo -e "${RED}[ERROR]${NC} Line $line_no: $command"
+    echo ""
+    echo -e "${YELLOW}Please report this issue at:${NC}"
+    echo -e "${CYAN}https://github.com/JackTYM/cuttlefish-rs/issues${NC}"
+    echo ""
+    echo "Include the following information:"
+    echo "  - Platform: ${PLATFORM:-unknown}"
+    echo "  - Distro: ${DISTRO:-unknown}"
+    echo "  - Error line: $line_no"
+    echo "  - Failed command: $command"
+    echo ""
+    exit "$exit_code"
+}
 
 # Ensure we can read from terminal even when piped
-exec < /dev/tty
+if [[ -t 0 ]]; then
+    : # Already have a TTY
+elif [[ -e /dev/tty ]]; then
+    exec < /dev/tty
+else
+    echo -e "${RED}[ERROR]${NC} No TTY available for interactive input."
+    echo "Please run this script in an interactive terminal."
+    exit 1
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -54,9 +89,10 @@ PROVIDERS_DATA="
 6:minimax:MiniMax:api::abab6.5s-chat
 7:xai:xAI/Grok:api:xai-:grok-2
 8:claude_oauth:Claude OAuth:oauth::claude.ai account - no API key needed
-9:ollama:Ollama:local::local models - no API key needed
-10:bedrock:AWS Bedrock:cloud::requires AWS credentials
-11:azure:Azure OpenAI:cloud::requires Azure subscription
+9:chatgpt_oauth:ChatGPT OAuth:oauth::chatgpt.com account - no API key needed
+10:ollama:Ollama:local::local models - no API key needed
+11:bedrock:AWS Bedrock:cloud::requires AWS credentials
+12:azure:Azure OpenAI:cloud::requires Azure subscription
 "
 
 # Collected API keys (will be populated during configuration)
@@ -1286,8 +1322,23 @@ create_directories() {
 }
 
 get_latest_release() {
-    curl -s "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" | \
-        grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    local response
+    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" 2>&1) || {
+        warn "Failed to fetch releases from GitHub API"
+        warn "Response: $response"
+        return 1
+    }
+    
+    local tag
+    tag=$(echo "$response" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    
+    if [[ -z "$tag" ]]; then
+        warn "No releases found (repository may not have any releases yet)"
+        warn "API response: ${response:0:200}..."
+        return 1
+    fi
+    
+    echo "$tag"
 }
 
 detect_arch() {
@@ -1314,7 +1365,12 @@ download_binary() {
     
     local version arch os_name download_url tarball
     
-    version=$(get_latest_release)
+    if ! version=$(get_latest_release); then
+        info "Falling back to build from source..."
+        build_from_source
+        return
+    fi
+    
     if [[ -z "$version" ]]; then
         warn "Could not fetch latest release, falling back to build from source"
         build_from_source
@@ -1365,24 +1421,40 @@ build_from_source() {
     echo -e "${BOLD}=== Building Cuttlefish from Source ===${NC}"
     echo ""
     
-    local script_dir
+    local script_dir build_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
     if [[ -f "$script_dir/Cargo.toml" ]]; then
         info "Building from source directory: $script_dir"
-        cd "$script_dir"
+        build_dir="$script_dir"
     else
         info "Cloning repository..."
-        git clone "https://github.com/JackTYM/cuttlefish-rs.git" /tmp/cuttlefish-build
-        cd /tmp/cuttlefish-build
+        if ! git clone "https://github.com/JackTYM/cuttlefish-rs.git" /tmp/cuttlefish-build; then
+            error "Failed to clone repository"
+            error "Check your network connection and try again"
+            exit 1
+        fi
+        build_dir="/tmp/cuttlefish-build"
     fi
+    
+    cd "$build_dir"
     
     [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
     
     install_rust
     
     info "Building release binary (this may take several minutes)..."
-    "$HOME/.cargo/bin/cargo" build --release 2>/dev/null || cargo build --release
+    local cargo_cmd="${HOME}/.cargo/bin/cargo"
+    [[ ! -x "$cargo_cmd" ]] && cargo_cmd="cargo"
+    
+    if ! "$cargo_cmd" build --release; then
+        error "Build failed! See errors above."
+        error "Common fixes:"
+        error "  - Ensure you have build-essential/gcc installed"
+        error "  - Ensure you have at least 4GB free RAM"
+        error "  - Check disk space (build needs ~2GB)"
+        exit 1
+    fi
     
     cp target/release/cuttlefish-rs "$INSTALL_DIR/"
     chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/cuttlefish-rs"
