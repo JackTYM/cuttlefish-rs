@@ -1469,13 +1469,32 @@ build_from_source() {
         info "Building from source directory: $script_dir"
         build_dir="$script_dir"
     else
-        info "Cloning repository..."
-        if ! git clone "https://github.com/JackTYM/cuttlefish-rs.git" /tmp/cuttlefish-build; then
-            error "Failed to clone repository"
-            error "Check your network connection and try again"
-            exit 1
-        fi
         build_dir="/tmp/cuttlefish-build"
+        
+        if [[ -d "$build_dir" ]]; then
+            warn "Previous build directory exists: $build_dir"
+            if prompt_yn "Remove it and clone fresh?" "y"; then
+                rm -rf "$build_dir"
+            else
+                info "Using existing directory..."
+                if [[ -d "$build_dir/.git" ]]; then
+                    info "Pulling latest changes..."
+                    cd "$build_dir"
+                    git fetch origin
+                    git reset --hard origin/master
+                    cd - > /dev/null
+                fi
+            fi
+        fi
+        
+        if [[ ! -d "$build_dir" ]]; then
+            info "Cloning repository..."
+            if ! git clone "https://github.com/JackTYM/cuttlefish-rs.git" "$build_dir"; then
+                error "Failed to clone repository"
+                error "Check your network connection and try again"
+                exit 1
+            fi
+        fi
     fi
     
     cd "$build_dir"
