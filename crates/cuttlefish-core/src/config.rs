@@ -167,11 +167,17 @@ impl CuttlefishConfig {
     ///
     /// Tries in order:
     /// 1. `./cuttlefish.toml`
-    /// 2. `~/.config/cuttlefish/config.toml`
+    /// 2. `/etc/cuttlefish/cuttlefish.toml`
+    /// 3. `~/.config/cuttlefish/config.toml`
     pub fn load() -> Result<Self, ConfigError> {
         let local_path = PathBuf::from("cuttlefish.toml");
         if local_path.exists() {
             return Self::load_from_file(&local_path);
+        }
+
+        let system_path = PathBuf::from("/etc/cuttlefish/cuttlefish.toml");
+        if system_path.exists() {
+            return Self::load_from_file(&system_path);
         }
 
         if let Ok(home) = std::env::var("HOME") {
@@ -185,9 +191,14 @@ impl CuttlefishConfig {
         }
 
         Err(ConfigError(
-            "No configuration file found at ./cuttlefish.toml or ~/.config/cuttlefish/config.toml"
+            "No configuration file found at ./cuttlefish.toml, /etc/cuttlefish/cuttlefish.toml, or ~/.config/cuttlefish/config.toml"
                 .to_string(),
         ))
+    }
+
+    /// Load from a specific file path
+    pub fn load_from_path(path: &std::path::Path) -> Result<Self, ConfigError> {
+        Self::load_from_file(path)
     }
 }
 

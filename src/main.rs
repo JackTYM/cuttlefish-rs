@@ -17,58 +17,84 @@ async fn main() -> anyhow::Result<()> {
     // Initialize structured logging first
     cuttlefish_core::tracing::init_tracing();
 
-    // Check for CLI commands
+    // Parse CLI arguments
     let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1 {
-        match args[1].as_str() {
+    let mut config_path: Option<PathBuf> = None;
+    let mut i = 1;
+    
+    while i < args.len() {
+        match args[i].as_str() {
+            "--config" | "-c" => {
+                if i + 1 < args.len() {
+                    config_path = Some(PathBuf::from(&args[i + 1]));
+                    i += 2;
+                } else {
+                    eprintln!("Error: --config requires a path argument");
+                    std::process::exit(1);
+                }
+            }
             "validate-templates" => {
                 let dir = args
-                    .get(2)
+                    .get(i + 1)
                     .map(PathBuf::from)
                     .unwrap_or_else(|| PathBuf::from("templates"));
                 return validate_templates(&dir);
             }
             "tunnel" => {
-                if args.len() < 3 {
+                if i + 1 >= args.len() {
                     eprintln!("Usage: cuttlefish tunnel <connect|status|disconnect>");
                     std::process::exit(1);
                 }
-                return match args[2].as_str() {
-                    "connect" => tunnel_connect(&args[3..]).await,
+                return match args[i + 1].as_str() {
+                    "connect" => tunnel_connect(&args[i + 2..]).await,
                     "status" => tunnel_status().await,
                     "disconnect" => tunnel_disconnect().await,
                     _ => {
-                        eprintln!("Unknown tunnel command: {}", args[2]);
+                        eprintln!("Unknown tunnel command: {}", args[i + 1]);
                         std::process::exit(1);
                     }
                 };
             }
-            _ => {}
+            "--help" | "-h" => {
+                print_help();
+                return Ok(());
+            }
+            _ => {
+                i += 1;
+            }
         }
     }
 
-    // Load configuration (falls back gracefully if no config file)
-    let config = CuttlefishConfig::load().unwrap_or_else(|_| {
-        // Default config if no file found — useful for first-time run
-        tracing::warn!(
-            "No cuttlefish.toml found, using defaults. Copy cuttlefish.example.toml to get started."
-        );
-        CuttlefishConfig {
-            server: cuttlefish_core::config::ServerConfig {
-                host: "127.0.0.1".to_string(),
-                port: 8080,
-                api_key: std::env::var("CUTTLEFISH_API_KEY").ok(),
-            },
-            database: cuttlefish_core::config::DatabaseConfig {
-                path: PathBuf::from("cuttlefish.db"),
-            },
-            providers: HashMap::new(),
-            agents: HashMap::new(),
-            discord: None,
-            sandbox: cuttlefish_core::config::SandboxConfig::default(),
-            routing: cuttlefish_core::RoutingConfig::default(),
+    // Load configuration
+    let config = match &config_path {
+        Some(path) => {
+            info!("Loading config from: {}", path.display());
+            CuttlefishConfig::load_from_path(path).unwrap_or_else(|e| {
+                eprintln!("Error loading config from {}: {}", path.display(), e);
+                std::process::exit(1);
+            })
         }
-    });
+        None => CuttlefishConfig::load().unwrap_or_else(|_| {
+            tracing::warn!(
+                "No cuttlefish.toml found, using defaults. Copy cuttlefish.example.toml to get started."
+            );
+            CuttlefishConfig {
+                server: cuttlefish_core::config::ServerConfig {
+                    host: "127.0.0.1".to_string(),
+                    port: 8080,
+                    api_key: std::env::var("CUTTLEFISH_API_KEY").ok(),
+                },
+                database: cuttlefish_core::config::DatabaseConfig {
+                    path: PathBuf::from("cuttlefish.db"),
+                },
+                providers: HashMap::new(),
+                agents: HashMap::new(),
+                discord: None,
+                sandbox: cuttlefish_core::config::SandboxConfig::default(),
+                routing: cuttlefish_core::RoutingConfig::default(),
+            }
+        }),
+    };
 
     let api_key = config
         .server
@@ -108,6 +134,30 @@ async fn shutdown_signal() {
         .await
         .expect("Failed to install CTRL+C signal handler");
     tracing::info!("Shutdown signal received");
+}
+
+fn print_help() {
+    println!("Cuttlefish - Multi-agent, multi-model agentic coding platform");
+    println!();
+    println!("USAGE:");
+    println!("    cuttlefish-rs [OPTIONS] [COMMAND]");
+    println!();
+    println!("OPTIONS:");
+    println!("    -c, --config <PATH>    Path to configuration file");
+    println!("    -h, --help             Print this help message");
+    println!();
+    println!("COMMANDS:");
+    println!("    validate-templates     Validate template files in a directory");
+    println!("    tunnel <SUBCOMMAND>    Manage tunnel connections");
+    println!();
+    println!("CONFIG SEARCH ORDER (if --config not specified):");
+    println!("    1. ./cuttlefish.toml");
+    println!("    2. /etc/cuttlefish/cuttlefish.toml");
+    println!("    3. ~/.config/cuttlefish/config.toml");
+    println!();
+    println!("ENVIRONMENT VARIABLES:");
+    println!("    CUTTLEFISH_API_KEY     API key for authentication");
+    println!("    RUST_LOG               Log level (e.g., info, debug, trace)");
 }
 
 /// Validate template files in a directory.
