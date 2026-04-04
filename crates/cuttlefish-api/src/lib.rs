@@ -88,9 +88,18 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/templates", get(api_routes::list_templates))
         .route("/api/templates/{name}", get(api_routes::get_template))
         .route("/api/templates/fetch", post(api_routes::fetch_template))
-        .route("/api/projects", get(api_routes::list_projects).post(api_routes::create_project))
-        .route("/api/projects/{id}", get(api_routes::get_project).delete(api_routes::cancel_project))
-        .route("/api/projects/{id}/archive", post(api_routes::archive_project))
+        .route(
+            "/api/projects",
+            get(api_routes::list_projects).post(api_routes::create_project),
+        )
+        .route(
+            "/api/projects/{id}",
+            get(api_routes::get_project).delete(api_routes::cancel_project),
+        )
+        .route(
+            "/api/projects/{id}/archive",
+            post(api_routes::archive_project),
+        )
         .fallback(routes::not_found_handler)
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
@@ -102,18 +111,9 @@ pub fn build_full_app(config: ApiConfig) -> Router {
     let usage_state = UsageState::new(config.pool.clone(), config.pricing_config.clone());
     let safety_state = SafetyState::new(&config.projects_dir, config.auth_config.clone());
     let memory_state = MemoryState::new(&config.projects_dir);
-    let collab_state = CollaborationState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
-    let org_state = OrganizationState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
-    let auth_state = AuthState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
+    let collab_state = CollaborationState::new((*config.pool).clone(), config.auth_config.clone());
+    let org_state = OrganizationState::new((*config.pool).clone(), config.auth_config.clone());
+    let auth_state = AuthState::new((*config.pool).clone(), config.auth_config.clone());
 
     Router::new()
         .route("/health", get(routes::health_handler))
@@ -121,9 +121,18 @@ pub fn build_full_app(config: ApiConfig) -> Router {
         .route("/api/templates", get(api_routes::list_templates))
         .route("/api/templates/{name}", get(api_routes::get_template))
         .route("/api/templates/fetch", post(api_routes::fetch_template))
-        .route("/api/projects", get(api_routes::list_projects).post(api_routes::create_project))
-        .route("/api/projects/{id}", get(api_routes::get_project).delete(api_routes::cancel_project))
-        .route("/api/projects/{id}/archive", post(api_routes::archive_project))
+        .route(
+            "/api/projects",
+            get(api_routes::list_projects).post(api_routes::create_project),
+        )
+        .route(
+            "/api/projects/{id}",
+            get(api_routes::get_project).delete(api_routes::cancel_project),
+        )
+        .route(
+            "/api/projects/{id}/archive",
+            post(api_routes::archive_project),
+        )
         .with_state(config.app_state)
         .merge(usage_router().with_state(usage_state))
         .merge(safety_router(safety_state))
@@ -146,9 +155,18 @@ pub fn build_app_with_webui(state: AppState, webui_config: WebUiConfig) -> Route
         .route("/api/templates", get(api_routes::list_templates))
         .route("/api/templates/{name}", get(api_routes::get_template))
         .route("/api/templates/fetch", post(api_routes::fetch_template))
-        .route("/api/projects", get(api_routes::list_projects).post(api_routes::create_project))
-        .route("/api/projects/{id}", get(api_routes::get_project).delete(api_routes::cancel_project))
-        .route("/api/projects/{id}/archive", post(api_routes::archive_project))
+        .route(
+            "/api/projects",
+            get(api_routes::list_projects).post(api_routes::create_project),
+        )
+        .route(
+            "/api/projects/{id}",
+            get(api_routes::get_project).delete(api_routes::cancel_project),
+        )
+        .route(
+            "/api/projects/{id}/archive",
+            post(api_routes::archive_project),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -182,18 +200,9 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
     let usage_state = UsageState::new(config.pool.clone(), config.pricing_config.clone());
     let safety_state = SafetyState::new(&config.projects_dir, config.auth_config.clone());
     let memory_state = MemoryState::new(&config.projects_dir);
-    let collab_state = CollaborationState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
-    let org_state = OrganizationState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
-    let auth_state = AuthState::new(
-        (*config.pool).clone(),
-        config.auth_config.clone(),
-    );
+    let collab_state = CollaborationState::new((*config.pool).clone(), config.auth_config.clone());
+    let org_state = OrganizationState::new((*config.pool).clone(), config.auth_config.clone());
+    let auth_state = AuthState::new((*config.pool).clone(), config.auth_config.clone());
 
     let api_router = Router::new()
         .route("/health", get(routes::health_handler))
@@ -201,9 +210,18 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
         .route("/api/templates", get(api_routes::list_templates))
         .route("/api/templates/{name}", get(api_routes::get_template))
         .route("/api/templates/fetch", post(api_routes::fetch_template))
-        .route("/api/projects", get(api_routes::list_projects).post(api_routes::create_project))
-        .route("/api/projects/{id}", get(api_routes::get_project).delete(api_routes::cancel_project))
-        .route("/api/projects/{id}/archive", post(api_routes::archive_project))
+        .route(
+            "/api/projects",
+            get(api_routes::list_projects).post(api_routes::create_project),
+        )
+        .route(
+            "/api/projects/{id}",
+            get(api_routes::get_project).delete(api_routes::cancel_project),
+        )
+        .route(
+            "/api/projects/{id}/archive",
+            post(api_routes::archive_project),
+        )
         .with_state(config.app_state)
         .merge(usage_router().with_state(usage_state))
         .merge(safety_router(safety_state))

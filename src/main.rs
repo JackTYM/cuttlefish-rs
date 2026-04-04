@@ -3,8 +3,7 @@
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
 use cuttlefish_api::{
-    ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui,
-    routes::AppState,
+    ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui, routes::AppState,
 };
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};

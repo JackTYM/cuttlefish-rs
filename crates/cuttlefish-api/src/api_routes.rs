@@ -104,11 +104,26 @@ pub async fn list_templates(State(state): State<AppState>) -> Json<Vec<TemplateS
                 // Derive category from language or tags
                 let category = if t.manifest.tags.iter().any(|tag| tag == "cli") {
                     "CLI".to_string()
-                } else if t.manifest.tags.iter().any(|tag| tag == "web" || tag == "frontend") {
+                } else if t
+                    .manifest
+                    .tags
+                    .iter()
+                    .any(|tag| tag == "web" || tag == "frontend")
+                {
                     "Web".to_string()
-                } else if t.manifest.tags.iter().any(|tag| tag == "library" || tag == "lib") {
+                } else if t
+                    .manifest
+                    .tags
+                    .iter()
+                    .any(|tag| tag == "library" || tag == "lib")
+                {
                     "Library".to_string()
-                } else if t.manifest.tags.iter().any(|tag| tag == "api" || tag == "backend") {
+                } else if t
+                    .manifest
+                    .tags
+                    .iter()
+                    .any(|tag| tag == "api" || tag == "backend")
+                {
                     "API".to_string()
                 } else {
                     "Other".to_string()

@@ -302,7 +302,9 @@ mod api_integration {
     async fn test_app_state_creation() {
         let dir = tempfile::TempDir::new().expect("temp dir");
         let db_path = dir.path().join("test.db");
-        let db = cuttlefish_db::Database::open(&db_path).await.expect("db open");
+        let db = cuttlefish_db::Database::open(&db_path)
+            .await
+            .expect("db open");
         let db = std::sync::Arc::new(db);
         let registry = std::sync::Arc::new(cuttlefish_core::TemplateRegistry::new());
         let state = AppState {
@@ -318,7 +320,9 @@ mod api_integration {
     async fn test_build_app_returns_router() {
         let dir = tempfile::TempDir::new().expect("temp dir");
         let db_path = dir.path().join("test.db");
-        let db = cuttlefish_db::Database::open(&db_path).await.expect("db open");
+        let db = cuttlefish_db::Database::open(&db_path)
+            .await
+            .expect("db open");
         let db = std::sync::Arc::new(db);
         let registry = std::sync::Arc::new(cuttlefish_core::TemplateRegistry::new());
         let state = AppState {
