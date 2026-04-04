@@ -9,22 +9,22 @@
 use std::sync::Arc;
 
 use axum::{
+    Extension, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     middleware::from_fn_with_state,
     response::Json,
     routing::{delete, get, post, put},
-    Extension, Router,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use cuttlefish_db::{
-    activity::{get_project_activity, log_activity, ActivityAction},
+    activity::{ActivityAction, get_project_activity, log_activity},
     handoffs::{
-        accept_handoff, create_handoff, get_handoff, get_pending_handoffs, reject_handoff,
         ContextSnapshot, CreateHandoffRequest, HandoffError, HandoffPriority, HandoffSummary,
+        accept_handoff, create_handoff, get_handoff, get_pending_handoffs, reject_handoff,
     },
     invites::{
         accept_invite, create_invite, get_invite_by_token, get_pending_invites_for_email,
@@ -446,7 +446,9 @@ pub async fn list_members_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?;
 
-    Ok(Json(shares.into_iter().map(ProjectMemberInfo::from).collect()))
+    Ok(Json(
+        shares.into_iter().map(ProjectMemberInfo::from).collect(),
+    ))
 }
 
 /// Remove a member from a project.
@@ -465,7 +467,10 @@ pub async fn remove_member_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?
         .ok_or_else(|| {
-            error_response(StatusCode::FORBIDDEN, "You don't have access to this project")
+            error_response(
+                StatusCode::FORBIDDEN,
+                "You don't have access to this project",
+            )
         })?;
 
     // Get target's role
@@ -543,7 +548,9 @@ pub async fn remove_member_handler(
         "Member removed"
     );
 
-    Ok(Json(serde_json::json!({ "message": "Member removed successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Member removed successfully" }),
+    ))
 }
 
 /// Update a member's role.
@@ -571,7 +578,10 @@ pub async fn update_role_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?
         .ok_or_else(|| {
-            error_response(StatusCode::FORBIDDEN, "You don't have access to this project")
+            error_response(
+                StatusCode::FORBIDDEN,
+                "You don't have access to this project",
+            )
         })?;
 
     // Get target's current role
@@ -699,12 +709,19 @@ pub async fn create_invite_handler(
     let role = ProjectRole::parse(&req.role);
     let invite_id = Uuid::new_v4().to_string();
 
-    let invite = create_invite(&state.db, &invite_id, &project_id, &email, role, &user.user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to create invite: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite")
-        })?;
+    let invite = create_invite(
+        &state.db,
+        &invite_id,
+        &project_id,
+        &email,
+        role,
+        &user.user_id,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to create invite: {}", e);
+        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to create invite")
+    })?;
 
     // Log activity
     let activity_id = Uuid::new_v4().to_string();
@@ -764,7 +781,9 @@ pub async fn get_pending_invites_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?;
 
-    Ok(Json(invites.into_iter().map(PendingInviteInfo::from).collect()))
+    Ok(Json(
+        invites.into_iter().map(PendingInviteInfo::from).collect(),
+    ))
 }
 
 /// Get pending invites for a project.
@@ -797,7 +816,9 @@ pub async fn get_project_invites_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?;
 
-    Ok(Json(invites.into_iter().map(PendingInviteInfo::from).collect()))
+    Ok(Json(
+        invites.into_iter().map(PendingInviteInfo::from).collect(),
+    ))
 }
 
 /// Accept an invite.
@@ -841,7 +862,10 @@ pub async fn accept_invite_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to accept invite")
         })?
         .ok_or_else(|| {
-            error_response(StatusCode::BAD_REQUEST, "Invite already accepted or expired")
+            error_response(
+                StatusCode::BAD_REQUEST,
+                "Invite already accepted or expired",
+            )
         })?;
 
     // Create the share
@@ -1017,12 +1041,17 @@ pub async fn get_handoff_handler(
         .ok_or_else(|| error_response(StatusCode::NOT_FOUND, "Handoff not found"))?;
 
     // Verify user has access to the project
-    let can_view = can_user_access(&state.db, &user.user_id, &handoff.project_id, ProjectRole::Viewer)
-        .await
-        .map_err(|e| {
-            tracing::error!("Database error: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+    let can_view = can_user_access(
+        &state.db,
+        &user.user_id,
+        &handoff.project_id,
+        ProjectRole::Viewer,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Database error: {}", e);
+        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+    })?;
 
     if !can_view {
         return Err(error_response(
@@ -1062,12 +1091,13 @@ pub async fn get_activity_handler(
         ));
     }
 
-    let activities = get_project_activity(&state.db, &project_id, query.limit, query.before.as_deref())
-        .await
-        .map_err(|e| {
-            tracing::error!("Database error: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+    let activities =
+        get_project_activity(&state.db, &project_id, query.limit, query.before.as_deref())
+            .await
+            .map_err(|e| {
+                tracing::error!("Database error: {}", e);
+                error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+            })?;
 
     Ok(Json(
         activities
@@ -1098,7 +1128,10 @@ pub fn collaboration_router(state: CollaborationState) -> Router {
             put(update_role_handler),
         )
         // Invite endpoints
-        .route("/projects/{id}/invites", post(create_invite_handler).get(get_project_invites_handler))
+        .route(
+            "/projects/{id}/invites",
+            post(create_invite_handler).get(get_project_invites_handler),
+        )
         .route("/invites/pending", get(get_pending_invites_handler))
         .route("/invites/{token}/accept", post(accept_invite_handler))
         // Handoff endpoints
@@ -1109,7 +1142,10 @@ pub fn collaboration_router(state: CollaborationState) -> Router {
         .route("/handoffs/{id}/reject", post(reject_handoff_handler))
         // Activity endpoints
         .route("/projects/{id}/activity", get(get_activity_handler))
-        .layer(from_fn_with_state(auth_config, crate::middleware::require_auth))
+        .layer(from_fn_with_state(
+            auth_config,
+            crate::middleware::require_auth,
+        ))
         .with_state(state)
 }
 

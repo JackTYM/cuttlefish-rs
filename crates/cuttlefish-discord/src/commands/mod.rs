@@ -38,10 +38,7 @@ pub mod names {
 /// # Errors
 ///
 /// Returns an error if command registration fails.
-pub async fn register_guild_commands(
-    ctx: &Context,
-    guild_id: GuildId,
-) -> Result<(), DiscordError> {
+pub async fn register_guild_commands(ctx: &Context, guild_id: GuildId) -> Result<(), DiscordError> {
     let commands = vec![
         new_project::register(),
         status::register(),
@@ -57,7 +54,11 @@ pub async fn register_guild_commands(
         .await
         .map_err(|e| DiscordError(format!("Failed to register commands: {e}")))?;
 
-    tracing::info!("Registered {} slash commands for guild {}", command_count, guild_id);
+    tracing::info!(
+        "Registered {} slash commands for guild {}",
+        command_count,
+        guild_id
+    );
     Ok(())
 }
 
@@ -71,7 +72,10 @@ pub async fn register_guild_commands(
 /// # Errors
 ///
 /// Returns an error if the command handler fails or if responding fails.
-pub async fn route_command(ctx: &Context, command: &CommandInteraction) -> Result<(), DiscordError> {
+pub async fn route_command(
+    ctx: &Context,
+    command: &CommandInteraction,
+) -> Result<(), DiscordError> {
     let command_name = command.data.name.as_str();
 
     match command_name {
@@ -117,9 +121,7 @@ pub async fn defer_reply(
     ephemeral: bool,
 ) -> Result<(), DiscordError> {
     let response = if ephemeral {
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        )
+        CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true))
     } else {
         CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new())
     };
@@ -135,7 +137,9 @@ pub fn get_string_option(command: &CommandInteraction, name: &str) -> Option<Str
     use serenity::model::application::ResolvedValue;
 
     command.data.options().iter().find_map(|opt| {
-        if opt.name == name && let ResolvedValue::String(s) = opt.value {
+        if opt.name == name
+            && let ResolvedValue::String(s) = opt.value
+        {
             return Some(s.to_string());
         }
         None

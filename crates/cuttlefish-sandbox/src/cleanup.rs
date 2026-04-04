@@ -1,10 +1,10 @@
 //! Cleanup and garbage collection for sandbox resources.
 
 use async_trait::async_trait;
+use bollard::Docker;
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 use bollard::image::{ListImagesOptions, RemoveImageOptions};
 use bollard::volume::{ListVolumesOptions, RemoveVolumeOptions};
-use bollard::Docker;
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{
     CleanupManager, CleanupPolicy, CleanupResult, SandboxResult, SandboxUsage,

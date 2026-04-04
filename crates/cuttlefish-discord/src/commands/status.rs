@@ -6,8 +6,8 @@ use serenity::builder::{
     CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedFooter,
     CreateInteractionResponseMessage,
 };
-use serenity::model::application::CommandOptionType;
 use serenity::model::Colour;
+use serenity::model::application::CommandOptionType;
 
 use super::{get_string_option, names};
 use crate::api_client::{AgentInfo, ProjectStatus, get_api_client};
@@ -92,15 +92,9 @@ fn build_status_embed_from_api(status: &ProjectStatus) -> CreateEmbed {
         format_agents(&status.active_agents)
     };
 
-    let last_activity = status
-        .last_activity
-        .as_deref()
-        .unwrap_or("N/A");
+    let last_activity = status.last_activity.as_deref().unwrap_or("N/A");
 
-    let current_task = status
-        .current_task
-        .as_deref()
-        .unwrap_or("_No active task_");
+    let current_task = status.current_task.as_deref().unwrap_or("_No active task_");
 
     CreateEmbed::new()
         .title(format!("📊 Project: {}", status.name))

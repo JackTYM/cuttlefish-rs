@@ -13,12 +13,13 @@ mod gates;
 
 pub use checkpoint::{
     Checkpoint, CheckpointComponents, CheckpointConfig, CheckpointError, CheckpointId,
-    CheckpointManager, CheckpointResult, CheckpointStore, CheckpointTrigger, InMemoryCheckpointStore,
-    RollbackResult, DEFAULT_CHECKPOINT_TIMEOUT_SECS, MAX_CHECKPOINTS_PER_PROJECT,
+    CheckpointManager, CheckpointResult, CheckpointStore, CheckpointTrigger,
+    DEFAULT_CHECKPOINT_TIMEOUT_SECS, InMemoryCheckpointStore, MAX_CHECKPOINTS_PER_PROJECT,
+    RollbackResult,
 };
 pub use confidence::{ConfidenceCalculator, ConfidenceFactor, ConfidenceScore, RiskFactor};
 pub use diff::{
-    detect_language, ChangeType, DiffHunk, DiffLine, DiffStats, FileDiff, MAX_DIFF_FILE_SIZE,
+    ChangeType, DiffHunk, DiffLine, DiffStats, FileDiff, MAX_DIFF_FILE_SIZE, detect_language,
 };
 pub use gates::{
     ActionGate, ActionPreview, ActionType, GateConfig, GateDecision, QuickDecision,

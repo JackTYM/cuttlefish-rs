@@ -35,10 +35,10 @@ pub mod safety_routes;
 pub mod sandbox_routes;
 /// Usage tracking and billing API endpoints.
 pub mod usage_routes;
-/// WebSocket handler and message protocol.
-pub mod ws;
 /// WebUI static file serving.
 pub mod webui;
+/// WebSocket handler and message protocol.
+pub mod ws;
 
 use axum::{
     Router,
@@ -52,7 +52,9 @@ pub use memory_routes::{MemoryState, memory_router};
 pub use organization_routes::{OrganizationState, organization_router};
 pub use proxy::{ProxyRegistry, ProxyRoute};
 pub use routes::AppState;
-pub use safety_routes::{SafetyState, safety_router, queue_pending_action, is_action_approved, wait_for_approval};
+pub use safety_routes::{
+    SafetyState, is_action_approved, queue_pending_action, safety_router, wait_for_approval,
+};
 pub use webui::{WebUiConfig, WebUiState, webui_router};
 pub use ws::{ClientMessage, ServerMessage};
 
@@ -73,7 +75,7 @@ pub fn build_app(state: AppState) -> Router {
 /// Build the axum application router with WebUI static file serving.
 pub fn build_app_with_webui(state: AppState, webui_config: WebUiConfig) -> Router {
     use tower_http::services::ServeDir;
-    
+
     let api_router = Router::new()
         .route("/health", get(routes::health_handler))
         .route("/ws", any(ws::ws_handler))

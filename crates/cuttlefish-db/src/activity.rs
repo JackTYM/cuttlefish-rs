@@ -150,10 +150,7 @@ pub async fn count_project_activity(
 }
 
 /// Delete old activity entries (for cleanup/retention policy).
-pub async fn delete_old_activity(
-    pool: &SqlitePool,
-    before: &str,
-) -> Result<u64, sqlx::Error> {
+pub async fn delete_old_activity(pool: &SqlitePool, before: &str) -> Result<u64, sqlx::Error> {
     let result = sqlx::query("DELETE FROM activity_log WHERE created_at < ?")
         .bind(before)
         .execute(pool)
@@ -351,7 +348,9 @@ mod tests {
             .expect("log");
         }
 
-        let count = count_project_activity(&pool, "proj-1").await.expect("count");
+        let count = count_project_activity(&pool, "proj-1")
+            .await
+            .expect("count");
         assert_eq!(count, 3);
     }
 

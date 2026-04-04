@@ -711,10 +711,12 @@ mod tests {
         checkpointer.save_task_state(&state).expect("save");
 
         // Verify it exists
-        assert!(checkpointer
-            .load_task_state("task-to-remove")
-            .expect("load")
-            .is_some());
+        assert!(
+            checkpointer
+                .load_task_state("task-to-remove")
+                .expect("load")
+                .is_some()
+        );
 
         // Remove it
         checkpointer
@@ -722,10 +724,12 @@ mod tests {
             .expect("remove");
 
         // Verify it's gone
-        assert!(checkpointer
-            .load_task_state("task-to-remove")
-            .expect("load")
-            .is_none());
+        assert!(
+            checkpointer
+                .load_task_state("task-to-remove")
+                .expect("load")
+                .is_none()
+        );
     }
 
     #[test]
@@ -884,10 +888,12 @@ mod tests {
         checkpointer.clear_all().expect("clear");
 
         // Verify everything is gone
-        assert!(checkpointer
-            .list_checkpointed_tasks()
-            .expect("list")
-            .is_empty());
+        assert!(
+            checkpointer
+                .list_checkpointed_tasks()
+                .expect("list")
+                .is_empty()
+        );
         assert!(checkpointer.load_server_state().expect("load").is_none());
     }
 

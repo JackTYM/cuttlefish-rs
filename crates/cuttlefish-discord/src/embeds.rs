@@ -1019,11 +1019,12 @@ mod tests {
             .build_success();
 
         let json = serde_json::to_value(&embed).expect("should serialize");
-        assert!(json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .starts_with("✅"));
+        assert!(
+            json.get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .starts_with("✅")
+        );
     }
 
     #[test]
@@ -1034,11 +1035,12 @@ mod tests {
             .build_failure("Connection refused");
 
         let json = serde_json::to_value(&embed).expect("should serialize");
-        assert!(json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .starts_with("❌"));
+        assert!(
+            json.get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .starts_with("❌")
+        );
     }
 
     #[test]
@@ -1049,11 +1051,12 @@ mod tests {
             .build();
 
         let json = serde_json::to_value(&embed).expect("should serialize");
-        assert!(json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .contains("Building"));
+        assert!(
+            json.get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .contains("Building")
+        );
     }
 
     #[test]
@@ -1061,11 +1064,12 @@ mod tests {
         let embed = BuildProgressEmbed::new("my-project").complete(true).build();
 
         let json = serde_json::to_value(&embed).expect("should serialize");
-        assert!(json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .contains("Succeeded"));
+        assert!(
+            json.get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .contains("Succeeded")
+        );
     }
 
     #[test]
@@ -1076,11 +1080,12 @@ mod tests {
             .build();
 
         let json = serde_json::to_value(&embed).expect("should serialize");
-        assert!(json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .contains("Failed"));
+        assert!(
+            json.get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .contains("Failed")
+        );
     }
 
     #[test]

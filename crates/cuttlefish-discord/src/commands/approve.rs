@@ -2,7 +2,9 @@
 
 use cuttlefish_core::error::DiscordError;
 use serenity::all::{CommandInteraction, Context, CreateInteractionResponse};
-use serenity::builder::{CreateCommand, CreateEmbed, CreateEmbedFooter, CreateInteractionResponseMessage};
+use serenity::builder::{
+    CreateCommand, CreateEmbed, CreateEmbedFooter, CreateInteractionResponseMessage,
+};
 use serenity::model::Colour;
 
 use super::{names, send_error_response};

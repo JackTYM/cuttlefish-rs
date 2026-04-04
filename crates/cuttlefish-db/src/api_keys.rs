@@ -77,19 +77,14 @@ pub async fn get_api_key_by_hash(
     pool: &SqlitePool,
     key_hash: &str,
 ) -> Result<Option<ApiKey>, sqlx::Error> {
-    sqlx::query_as::<_, ApiKey>(
-        "SELECT * FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL",
-    )
-    .bind(key_hash)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, ApiKey>("SELECT * FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL")
+        .bind(key_hash)
+        .fetch_optional(pool)
+        .await
 }
 
 /// Get an API key by ID.
-pub async fn get_api_key_by_id(
-    pool: &SqlitePool,
-    id: &str,
-) -> Result<Option<ApiKey>, sqlx::Error> {
+pub async fn get_api_key_by_id(pool: &SqlitePool, id: &str) -> Result<Option<ApiKey>, sqlx::Error> {
     sqlx::query_as::<_, ApiKey>("SELECT * FROM api_keys WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
@@ -112,13 +107,12 @@ pub async fn list_user_api_keys(
 /// Revoke an API key.
 pub async fn revoke_api_key(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
-    )
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL")
+            .bind(&now)
+            .bind(id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -129,13 +123,12 @@ pub async fn revoke_all_user_api_keys(
     user_id: &str,
 ) -> Result<u64, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-    )
-    .bind(&now)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+            .bind(&now)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected())
 }
@@ -154,12 +147,11 @@ pub async fn update_api_key_last_used(pool: &SqlitePool, id: &str) -> Result<(),
 /// Delete expired API keys.
 pub async fn cleanup_expired_api_keys(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "DELETE FROM api_keys WHERE expires_at IS NOT NULL AND expires_at < ?",
-    )
-    .bind(&now)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("DELETE FROM api_keys WHERE expires_at IS NOT NULL AND expires_at < ?")
+            .bind(&now)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected())
 }
@@ -176,7 +168,9 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", db_path.to_string_lossy());
         let pool = SqlitePool::connect(&url).await.expect("connect");
         create_users_table(&pool).await.expect("create users table");
-        create_api_keys_table(&pool).await.expect("create api_keys table");
+        create_api_keys_table(&pool)
+            .await
+            .expect("create api_keys table");
 
         sqlx::query(
             "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ('user-1', 'test@example.com', 'hash', datetime('now'), datetime('now'))",

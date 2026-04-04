@@ -156,7 +156,10 @@ pub async fn get_pending_project_invites(
 }
 
 /// Accept an invite by token.
-pub async fn accept_invite(pool: &SqlitePool, token: &str) -> Result<Option<ProjectInvite>, sqlx::Error> {
+pub async fn accept_invite(
+    pool: &SqlitePool,
+    token: &str,
+) -> Result<Option<ProjectInvite>, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
 
     sqlx::query_as::<_, ProjectInvite>(
@@ -356,7 +359,9 @@ mod tests {
             .expect("found");
         assert!(accepted.accepted_at.is_some());
 
-        let again = accept_invite(&pool, &invite.token).await.expect("accept again");
+        let again = accept_invite(&pool, &invite.token)
+            .await
+            .expect("accept again");
         assert!(again.is_none());
     }
 

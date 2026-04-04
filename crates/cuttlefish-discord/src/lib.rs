@@ -22,7 +22,10 @@ pub mod formatter;
 /// Per-guild configuration for multi-server support.
 pub mod guild_config;
 /// Legacy command parsing (deprecated, use `commands` module instead).
-#[deprecated(since = "0.2.0", note = "Use the `commands` module for slash command handling")]
+#[deprecated(
+    since = "0.2.0",
+    note = "Use the `commands` module for slash command handling"
+)]
 #[allow(deprecated)]
 pub mod legacy_commands;
 

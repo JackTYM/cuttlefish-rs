@@ -24,9 +24,11 @@ pub async fn create_project_members_table(pool: &SqlitePool) -> Result<(), sqlx:
     .execute(pool)
     .await?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id)")
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id)",
+    )
+    .execute(pool)
+    .await?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id)")
         .execute(pool)
@@ -109,14 +111,13 @@ pub async fn update_member_role(
     user_id: &str,
     new_role: &str,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?",
-    )
-    .bind(new_role)
-    .bind(project_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?")
+            .bind(new_role)
+            .bind(project_id)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -127,13 +128,11 @@ pub async fn remove_project_member(
     project_id: &str,
     user_id: &str,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query(
-        "DELETE FROM project_members WHERE project_id = ? AND user_id = ?",
-    )
-    .bind(project_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM project_members WHERE project_id = ? AND user_id = ?")
+        .bind(project_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -193,7 +192,9 @@ mod tests {
         .expect("create projects table");
 
         create_users_table(&pool).await.expect("create users table");
-        create_project_members_table(&pool).await.expect("create project_members table");
+        create_project_members_table(&pool)
+            .await
+            .expect("create project_members table");
 
         sqlx::query("INSERT INTO projects (id, name) VALUES ('proj-1', 'Test Project')")
             .execute(&pool)
@@ -221,16 +222,9 @@ mod tests {
     async fn test_add_and_get_member() {
         let (pool, _dir) = test_pool().await;
 
-        let member = add_project_member(
-            &pool,
-            "member-1",
-            "proj-1",
-            "user-1",
-            "owner",
-            None,
-        )
-        .await
-        .expect("add member");
+        let member = add_project_member(&pool, "member-1", "proj-1", "user-1", "owner", None)
+            .await
+            .expect("add member");
 
         assert_eq!(member.project_id, "proj-1");
         assert_eq!(member.user_id, "user-1");

@@ -9,17 +9,17 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use thiserror::Error;
 use tokio::sync::watch;
 use tracing::{debug, info, warn};
 
+use super::UpdateChecker;
 use super::downloader::{BinaryDownloader, DownloadError};
 use super::task_state::{ServerState, TaskCheckpointer, TaskState, TaskStateError};
-use super::UpdateChecker;
 
 /// Errors that can occur during graceful shutdown.
 #[derive(Error, Debug)]
@@ -377,9 +377,7 @@ pub fn exec_replace(binary_path: &Path) -> Result<(), ShutdownError> {
 
         info!(binary = ?binary_path, "Executing new binary via exec (Unix)");
 
-        let err = Command::new(binary_path)
-            .arg("--resume-tasks")
-            .exec();
+        let err = Command::new(binary_path).arg("--resume-tasks").exec();
 
         // exec() only returns if it fails
         Err(ShutdownError::ExecFailed {
@@ -637,14 +635,8 @@ mod tests {
         let temp_dir = TempDir::new().expect("temp dir");
         let coordinator = make_test_coordinator(temp_dir.path());
 
-        let task_provider: TaskProvider = Box::new(|| {
-            vec![TaskState::new(
-                "task-1",
-                "project-1",
-                "coder",
-                "Test task",
-            )]
-        });
+        let task_provider: TaskProvider =
+            Box::new(|| vec![TaskState::new("task-1", "project-1", "coder", "Test task")]);
 
         let result = coordinator.checkpoint_and_shutdown(&task_provider);
         assert!(result.is_ok());
@@ -687,14 +679,8 @@ mod tests {
             pause_called_clone.store(true, Ordering::SeqCst);
         });
 
-        let task_provider: TaskProvider = Box::new(|| {
-            vec![TaskState::new(
-                "task-1",
-                "project-1",
-                "coder",
-                "Test task",
-            )]
-        });
+        let task_provider: TaskProvider =
+            Box::new(|| vec![TaskState::new("task-1", "project-1", "coder", "Test task")]);
 
         let drain_count = Arc::new(AtomicUsize::new(0));
         let drain_count_clone = drain_count.clone();

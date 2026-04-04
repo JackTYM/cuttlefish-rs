@@ -288,7 +288,10 @@ impl ApiClient {
     /// Create a new project.
     ///
     /// POST /api/projects
-    pub async fn create_project(&self, request: CreateProjectRequest) -> Result<ProjectResponse, ApiError> {
+    pub async fn create_project(
+        &self,
+        request: CreateProjectRequest,
+    ) -> Result<ProjectResponse, ApiError> {
         let response = self
             .request(reqwest::Method::POST, "/api/projects")
             .json(&request)
@@ -322,10 +325,13 @@ impl ApiClient {
 
         // API returns a list, we take the first match
         let projects: Vec<ProjectStatus> = Self::handle_response(response).await?;
-        projects.into_iter().next().ok_or_else(|| ApiError::ApiResponse {
-            status: 404,
-            message: format!("Project not found: {name}"),
-        })
+        projects
+            .into_iter()
+            .next()
+            .ok_or_else(|| ApiError::ApiResponse {
+                status: 404,
+                message: format!("Project not found: {name}"),
+            })
     }
 
     /// List all projects.
@@ -456,9 +462,7 @@ static API_CLIENT: std::sync::OnceLock<Result<ApiClient, String>> = std::sync::O
 ///
 /// Initializes from environment variables on first call.
 pub fn get_api_client() -> Result<&'static ApiClient, ApiError> {
-    let result = API_CLIENT.get_or_init(|| {
-        ApiClient::from_env().map_err(|e| e.to_string())
-    });
+    let result = API_CLIENT.get_or_init(|| ApiClient::from_env().map_err(|e| e.to_string()));
 
     match result {
         Ok(client) => Ok(client),
@@ -514,7 +518,8 @@ mod tests {
 
     #[test]
     fn test_project_response_deserializes() {
-        let json = r#"{"id": "abc123", "name": "my-project", "status": "active", "template": null}"#;
+        let json =
+            r#"{"id": "abc123", "name": "my-project", "status": "active", "template": null}"#;
         let resp: ProjectResponse = serde_json::from_str(json).expect("should deserialize");
         assert_eq!(resp.id, "abc123");
         assert_eq!(resp.name, "my-project");
@@ -539,7 +544,8 @@ mod tests {
 
     #[test]
     fn test_log_entry_deserializes() {
-        let json = r#"{"timestamp": "2024-01-15T14:30:00Z", "agent": "Coder", "message": "Started task"}"#;
+        let json =
+            r#"{"timestamp": "2024-01-15T14:30:00Z", "agent": "Coder", "message": "Started task"}"#;
         let entry: LogEntry = serde_json::from_str(json).expect("should deserialize");
         assert_eq!(entry.agent, "Coder");
         assert_eq!(entry.level, "info"); // default

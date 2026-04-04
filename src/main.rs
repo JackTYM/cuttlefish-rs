@@ -2,9 +2,9 @@
 //!
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
-use cuttlefish_api::{build_app, build_app_with_webui, routes::AppState, WebUiConfig};
-use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
+use cuttlefish_api::{WebUiConfig, build_app, build_app_with_webui, routes::AppState};
 use cuttlefish_core::config::CuttlefishConfig;
+use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_tunnel::client::{TunnelClient, TunnelClientConfig};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let mut config_path: Option<PathBuf> = None;
     let mut i = 1;
-    
+
     while i < args.len() {
         match args[i].as_str() {
             "--config" | "-c" => {
@@ -151,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
         api_key,
         template_registry,
     };
-    
+
     // Configure WebUI static file serving
     let webui_config = if let Some(ref webui) = config.webui {
         if webui.enabled {
@@ -172,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
             .map(WebUiConfig::new)
             .unwrap_or_else(WebUiConfig::disabled)
     };
-    
+
     let app = if webui_config.enabled && webui_config.is_valid() {
         info!("WebUI enabled: {}", webui_config.static_dir.display());
         build_app_with_webui(state, webui_config)
@@ -462,7 +462,10 @@ async fn get_db_pool(config_path: &Option<PathBuf>) -> anyhow::Result<SqlitePool
         }),
     };
 
-    let db_url = format!("sqlite://{}?mode=rwc", config.database.path.to_string_lossy());
+    let db_url = format!(
+        "sqlite://{}?mode=rwc",
+        config.database.path.to_string_lossy()
+    );
     let pool = SqlitePool::connect(&db_url).await?;
     cuttlefish_db::usage::run_usage_migrations(&pool).await?;
     Ok(pool)
@@ -534,7 +537,10 @@ async fn usage_command(args: &[String], config_path: &Option<PathBuf>) -> anyhow
         } else {
             println!("Daily Usage Breakdown");
             println!("{:-<60}", "");
-            println!("{:<12} {:>15} {:>15} {:>10}", "Date", "Input Tokens", "Output Tokens", "Requests");
+            println!(
+                "{:<12} {:>15} {:>15} {:>10}",
+                "Date", "Input Tokens", "Output Tokens", "Requests"
+            );
             println!("{:-<60}", "");
             for day in &daily {
                 println!(
@@ -549,15 +555,18 @@ async fn usage_command(args: &[String], config_path: &Option<PathBuf>) -> anyhow
     if let Some(pid) = project_id {
         let summary = stats.project_summary(&pid, period).await?;
         if json_output {
-            println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                "project_id": summary.project_id,
-                "period": format!("{:?}", summary.period),
-                "total_requests": summary.total_requests,
-                "total_input_tokens": summary.total_input_tokens,
-                "total_output_tokens": summary.total_output_tokens,
-                "total_cost_usd": summary.total_cost_usd,
-                "by_provider": summary.by_provider,
-            }))?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "project_id": summary.project_id,
+                    "period": format!("{:?}", summary.period),
+                    "total_requests": summary.total_requests,
+                    "total_input_tokens": summary.total_input_tokens,
+                    "total_output_tokens": summary.total_output_tokens,
+                    "total_cost_usd": summary.total_cost_usd,
+                    "by_provider": summary.by_provider,
+                }))?
+            );
         } else {
             print_project_summary(&summary);
         }
@@ -568,14 +577,22 @@ async fn usage_command(args: &[String], config_path: &Option<PathBuf>) -> anyhow
         } else {
             println!("Usage Summary ({:?})", period);
             println!("{:-<70}", "");
-            println!("{:<15} {:>15} {:>15} {:>10} {:>12}", "Provider", "Input Tokens", "Output Tokens", "Requests", "Est. Cost");
+            println!(
+                "{:<15} {:>15} {:>15} {:>10} {:>12}",
+                "Provider", "Input Tokens", "Output Tokens", "Requests", "Est. Cost"
+            );
             println!("{:-<70}", "");
-            
+
             let pricing = PricingConfig::with_defaults();
             let mut total_cost = 0.0;
-            
+
             for p in &providers {
-                let cost = estimate_provider_cost(&pricing, &p.provider, p.input_tokens as u64, p.output_tokens as u64);
+                let cost = estimate_provider_cost(
+                    &pricing,
+                    &p.provider,
+                    p.input_tokens as u64,
+                    p.output_tokens as u64,
+                );
                 total_cost += cost;
                 println!(
                     "{:<15} {:>15} {:>15} {:>10} ${:>10.4}",
@@ -583,7 +600,10 @@ async fn usage_command(args: &[String], config_path: &Option<PathBuf>) -> anyhow
                 );
             }
             println!("{:-<70}", "");
-            println!("{:<15} {:>15} {:>15} {:>10} ${:>10.4}", "TOTAL", "", "", "", total_cost);
+            println!(
+                "{:<15} {:>15} {:>15} {:>10} ${:>10.4}",
+                "TOTAL", "", "", "", total_cost
+            );
         }
     }
 
@@ -614,7 +634,7 @@ fn estimate_provider_cost(pricing: &PricingConfig, provider: &str, input: u64, o
         "google" => vec!["gemini-2.0-flash", "gemini-1.5-pro"],
         _ => vec![],
     };
-    
+
     for model in models {
         if let Some(cost) = pricing.calculate_cost(provider, model, input, output) {
             return cost;
@@ -626,16 +646,18 @@ fn estimate_provider_cost(pricing: &PricingConfig, provider: &str, input: u64, o
 async fn export_usage_csv(pool: &SqlitePool, path: &PathBuf) -> anyhow::Result<()> {
     let (from, to) = TimePeriod::Monthly.range();
     let records = cuttlefish_db::usage::get_all_usage(pool, &from, &to).await?;
-    
-    let mut csv = String::from("id,project_id,session_id,user_id,provider,model,input_tokens,output_tokens,request_type,latency_ms,success,error_type,created_at\n");
-    
+
+    let mut csv = String::from(
+        "id,project_id,session_id,user_id,provider,model,input_tokens,output_tokens,request_type,latency_ms,success,error_type,created_at\n",
+    );
+
     for r in records {
         let project_id = r.project_id.as_deref().unwrap_or("");
         let session_id = r.session_id.as_deref().unwrap_or("");
         let user_id = r.user_id.as_deref().unwrap_or("");
         let latency = r.latency_ms.map(|l| l.to_string()).unwrap_or_default();
         let error_type = r.error_type.as_deref().unwrap_or("");
-        
+
         csv.push_str(&format!(
             "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{},\"{}\",{},{},\"{}\",\"{}\"\n",
             escape_csv(&r.id),
@@ -653,7 +675,7 @@ async fn export_usage_csv(pool: &SqlitePool, path: &PathBuf) -> anyhow::Result<(
             escape_csv(&r.created_at),
         ));
     }
-    
+
     std::fs::write(path, csv)?;
     println!("✓ Exported usage data to {}", path.display());
     Ok(())
@@ -668,9 +690,12 @@ async fn pricing_command(args: &[String], config_path: &Option<PathBuf>) -> anyh
         let pricing = PricingConfig::with_defaults();
         println!("Current Pricing (USD per million tokens)");
         println!("{:-<65}", "");
-        println!("{:<15} {:<25} {:>10} {:>12}", "Provider", "Model", "Input", "Output");
+        println!(
+            "{:<15} {:<25} {:>10} {:>12}",
+            "Provider", "Model", "Input", "Output"
+        );
         println!("{:-<65}", "");
-        
+
         for provider in pricing.providers() {
             if let Some(models) = pricing.models(provider) {
                 for model in models {
@@ -692,12 +717,16 @@ async fn pricing_command(args: &[String], config_path: &Option<PathBuf>) -> anyh
             eprintln!("  INPUT and OUTPUT are prices in USD per million tokens");
             std::process::exit(1);
         }
-        
+
         let provider = &args[1];
         let model = &args[2];
-        let input: f64 = args[3].parse().map_err(|_| anyhow::anyhow!("Invalid input price"))?;
-        let output: f64 = args[4].parse().map_err(|_| anyhow::anyhow!("Invalid output price"))?;
-        
+        let input: f64 = args[3]
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid input price"))?;
+        let output: f64 = args[4]
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid output price"))?;
+
         let pool = get_db_pool(config_path).await?;
         let pricing = cuttlefish_db::usage::ModelPricing {
             id: uuid::Uuid::new_v4().to_string(),
@@ -708,7 +737,7 @@ async fn pricing_command(args: &[String], config_path: &Option<PathBuf>) -> anyh
             effective_from: chrono::Utc::now().to_rfc3339(),
             created_at: chrono::Utc::now().to_rfc3339(),
         };
-        
+
         cuttlefish_db::usage::upsert_pricing(&pool, &pricing).await?;
         println!("✓ Set pricing for {}/{}:", provider, model);
         println!("  Input:  ${:.2} per million tokens", input);
@@ -723,7 +752,7 @@ async fn pricing_command(args: &[String], config_path: &Option<PathBuf>) -> anyh
 
 async fn memory_command(project: Option<&str>) -> anyhow::Result<()> {
     use cuttlefish_agents::memory::ProjectMemory;
-    
+
     let project_path = match project {
         Some(p) => PathBuf::from(p),
         None => std::env::current_dir()?,
@@ -737,27 +766,30 @@ async fn memory_command(project: Option<&str>) -> anyhow::Result<()> {
     }
 
     let memory = ProjectMemory::load(&memory_path)?;
-    
+
     println!("# Project Memory: {}", memory.project_name);
     println!();
-    
+
     if !memory.summary.is_empty() {
         println!("## Summary");
         println!("{}", memory.summary);
         println!();
     }
-    
+
     if !memory.key_decisions.is_empty() {
         println!("## Key Decisions ({} total)", memory.key_decisions.len());
         for decision in memory.key_decisions.iter().take(5) {
-            println!("  - [{}] {} — {}", decision.date, decision.decision, decision.rationale);
+            println!(
+                "  - [{}] {} — {}",
+                decision.date, decision.decision, decision.rationale
+            );
         }
         if memory.key_decisions.len() > 5 {
             println!("  ... and {} more", memory.key_decisions.len() - 5);
         }
         println!();
     }
-    
+
     if !memory.architecture.is_empty() {
         println!("## Architecture ({} components)", memory.architecture.len());
         for item in memory.architecture.iter().take(5) {
@@ -768,7 +800,7 @@ async fn memory_command(project: Option<&str>) -> anyhow::Result<()> {
         }
         println!();
     }
-    
+
     if !memory.gotchas.is_empty() {
         println!("## Gotchas ({} total)", memory.gotchas.len());
         for item in memory.gotchas.iter().take(3) {
@@ -779,7 +811,7 @@ async fn memory_command(project: Option<&str>) -> anyhow::Result<()> {
         }
         println!();
     }
-    
+
     if let Some(ref task) = memory.active_context.current_task {
         println!("## Active Context");
         println!("  Currently working on: {}", task);
@@ -796,46 +828,46 @@ async fn memory_command(project: Option<&str>) -> anyhow::Result<()> {
 
 async fn why_command(file: &str) -> anyhow::Result<()> {
     use cuttlefish_agents::memory::{DecisionIndex, DecisionLog, WhyTarget, why};
-    
+
     let project_path = std::env::current_dir()?;
     let log_path = DecisionLog::default_path(&project_path);
-    
+
     if !log_path.exists() {
         println!("No decision log found. Memory system may not be initialized.");
         return Ok(());
     }
-    
+
     let log = DecisionLog::new(&log_path);
     let index = DecisionIndex::from_log(&log)?;
-    
+
     let target = WhyTarget::parse(file);
     let explanation = why(&index, target);
-    
+
     println!("{}", explanation.to_markdown());
-    
+
     Ok(())
 }
 
 async fn branch_command(args: &[String]) -> anyhow::Result<()> {
     use cuttlefish_agents::memory::BranchStore;
-    
+
     if args.is_empty() {
         eprintln!("Usage: cuttlefish branch <list|create|restore|delete> [args]");
         std::process::exit(1);
     }
-    
+
     let project_path = std::env::current_dir()?;
     let project_id = project_path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
-    
+
     match args[0].as_str() {
         "list" => {
             let mut store = BranchStore::new(&project_path);
             store.load()?;
-            
+
             let branches = store.list_branches(&project_id);
             if branches.is_empty() {
                 println!("No branches found for this project.");
@@ -860,27 +892,34 @@ async fn branch_command(args: &[String]) -> anyhow::Result<()> {
                 eprintln!("Usage: cuttlefish branch create <name>");
                 anyhow::anyhow!("branch name required")
             })?;
-            
+
             let description = args.get(2).map(|s| s.as_str());
-            
+
             let mut store = BranchStore::new(&project_path);
             store.load()?;
-            
+
             let branch = store.create_branch(&project_id, name, description, "HEAD")?;
-            println!("✓ Created branch '{}' at {}", branch.name, branch.created_at.format("%Y-%m-%d %H:%M"));
-            println!("  Memory and decisions backed up to .cuttlefish/branches/{}/", name);
+            println!(
+                "✓ Created branch '{}' at {}",
+                branch.name,
+                branch.created_at.format("%Y-%m-%d %H:%M")
+            );
+            println!(
+                "  Memory and decisions backed up to .cuttlefish/branches/{}/",
+                name
+            );
         }
         "restore" => {
             let name = args.get(1).ok_or_else(|| {
                 eprintln!("Usage: cuttlefish branch restore <name>");
                 anyhow::anyhow!("branch name required")
             })?;
-            
+
             let create_backup = args.get(2).is_some_and(|s| s == "--backup");
-            
+
             let mut store = BranchStore::new(&project_path);
             store.load()?;
-            
+
             let branch = store.restore_branch(&project_id, name, create_backup)?;
             println!("✓ Restored branch '{}'", branch.name);
             if create_backup {
@@ -894,10 +933,10 @@ async fn branch_command(args: &[String]) -> anyhow::Result<()> {
                 eprintln!("Usage: cuttlefish branch delete <name>");
                 anyhow::anyhow!("branch name required")
             })?;
-            
+
             let mut store = BranchStore::new(&project_path);
             store.load()?;
-            
+
             store.delete_branch(name)?;
             println!("✓ Deleted branch '{}'", name);
         }
@@ -907,7 +946,7 @@ async fn branch_command(args: &[String]) -> anyhow::Result<()> {
             std::process::exit(1);
         }
     }
-    
+
     Ok(())
 }
 
@@ -951,10 +990,7 @@ async fn checkpoint_command(args: &[String]) -> anyhow::Result<()> {
         } else {
             println!("Checkpoints for project '{}':", project_id);
             println!("{:-<80}", "");
-            println!(
-                "{:<36} {:<20} {}",
-                "ID", "Created", "Description"
-            );
+            println!("{:<36} {:<20} {}", "ID", "Created", "Description");
             println!("{:-<80}", "");
             for cp in checkpoints {
                 println!(
@@ -970,7 +1006,10 @@ async fn checkpoint_command(args: &[String]) -> anyhow::Result<()> {
 
     match args[0].as_str() {
         "create" => {
-            let description = args.get(1).map(|s| s.as_str()).unwrap_or("Manual checkpoint");
+            let description = args
+                .get(1)
+                .map(|s| s.as_str())
+                .unwrap_or("Manual checkpoint");
 
             let git_ref = std::process::Command::new("git")
                 .args(["rev-parse", "HEAD"])
@@ -1010,7 +1049,10 @@ async fn checkpoint_command(args: &[String]) -> anyhow::Result<()> {
             println!("✓ Created checkpoint: {}", checkpoint.id);
             println!("  Description: {}", checkpoint.description);
             println!("  Git ref: {}", checkpoint.components.git_ref);
-            println!("  Created at: {}", checkpoint.created_at.format("%Y-%m-%d %H:%M:%S UTC"));
+            println!(
+                "  Created at: {}",
+                checkpoint.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+            );
         }
         "list" => {}
         _ => {
@@ -1079,7 +1121,10 @@ async fn rollback_command(args: &[String]) -> anyhow::Result<()> {
     let target = if use_latest {
         checkpoints.first().cloned()
     } else if let Some(id) = checkpoint_id {
-        checkpoints.iter().find(|c| c.id.as_str() == id || c.id.as_str().starts_with(&id)).cloned()
+        checkpoints
+            .iter()
+            .find(|c| c.id.as_str() == id || c.id.as_str().starts_with(&id))
+            .cloned()
     } else {
         eprintln!("Usage: cuttlefish rollback <checkpoint-id> [--yes]");
         eprintln!("       cuttlefish rollback --latest [--yes]");
@@ -1094,7 +1139,10 @@ async fn rollback_command(args: &[String]) -> anyhow::Result<()> {
     println!("Rollback to checkpoint:");
     println!("  ID: {}", target.id);
     println!("  Description: {}", target.description);
-    println!("  Created: {}", target.created_at.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "  Created: {}",
+        target.created_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
     println!("  Git ref: {}", target.components.git_ref);
     println!();
 
@@ -1215,7 +1263,11 @@ async fn safety_command(args: &[String]) -> anyhow::Result<()> {
     };
 
     if args.is_empty() || args[0] == "config" {
-        let mut i = if args.first().is_some_and(|s| s == "config") { 1 } else { 0 };
+        let mut i = if args.first().is_some_and(|s| s == "config") {
+            1
+        } else {
+            0
+        };
         let mut updated = false;
 
         while i < args.len() {
@@ -1261,12 +1313,24 @@ async fn safety_command(args: &[String]) -> anyhow::Result<()> {
 
         println!("Safety Gate Configuration:");
         println!("{:-<50}", "");
-        println!("  Auto-approve threshold: {:.2}", config.auto_approve_threshold);
+        println!(
+            "  Auto-approve threshold: {:.2}",
+            config.auto_approve_threshold
+        );
         println!("  Prompt threshold:       {:.2}", config.prompt_threshold);
         println!();
-        println!("Actions with confidence >= {:.2} are auto-approved.", config.auto_approve_threshold);
-        println!("Actions with confidence >= {:.2} but < {:.2} prompt for approval.", config.prompt_threshold, config.auto_approve_threshold);
-        println!("Actions with confidence < {:.2} are blocked.", config.prompt_threshold);
+        println!(
+            "Actions with confidence >= {:.2} are auto-approved.",
+            config.auto_approve_threshold
+        );
+        println!(
+            "Actions with confidence >= {:.2} but < {:.2} prompt for approval.",
+            config.prompt_threshold, config.auto_approve_threshold
+        );
+        println!(
+            "Actions with confidence < {:.2} are blocked.",
+            config.prompt_threshold
+        );
 
         return Ok(());
     }

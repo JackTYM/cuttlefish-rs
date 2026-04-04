@@ -16,14 +16,14 @@ mod log;
 mod why;
 
 pub use branch::{
-    BranchDiff, BranchError, BranchId, BranchStore, GitDiffSummary, StateBranch,
-    MAX_BRANCHES_PER_PROJECT,
+    BranchDiff, BranchError, BranchId, BranchStore, GitDiffSummary, MAX_BRANCHES_PER_PROJECT,
+    StateBranch,
 };
 pub use file::{MemorySection, ProjectMemory};
 pub use hooks::{MemoryHooks, MemoryTrigger, UpdateEvent};
 pub use index::DecisionIndex;
 pub use log::{ChangeType, DecisionEntry, DecisionLog};
 pub use why::{
-    get_conversation_excerpt, get_excerpts_for_decisions, redact_sensitive, why,
-    ConversationExcerpt, ExcerptMessage, WhyExplanation, WhyTarget,
+    ConversationExcerpt, ExcerptMessage, WhyExplanation, WhyTarget, get_conversation_excerpt,
+    get_excerpts_for_decisions, redact_sensitive, why,
 };

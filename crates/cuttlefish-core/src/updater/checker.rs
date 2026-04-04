@@ -87,10 +87,7 @@ impl UpdateChecker {
     /// Creates a new update checker with the given configuration.
     pub fn new(config: UpdateConfig) -> Self {
         let client = reqwest::Client::builder()
-            .user_agent(format!(
-                "cuttlefish-rs/{}",
-                env!("CARGO_PKG_VERSION")
-            ))
+            .user_agent(format!("cuttlefish-rs/{}", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(30))
             .build()
             .expect("failed to build HTTP client - this is a bug");
@@ -320,7 +317,10 @@ mod tests {
         ];
 
         let (download, checksum) = checker.find_asset_urls(&assets);
-        assert_eq!(download, Some("https://example.com/binary.tar.gz".to_string()));
+        assert_eq!(
+            download,
+            Some("https://example.com/binary.tar.gz".to_string())
+        );
         assert_eq!(
             checksum,
             Some("https://example.com/binary.tar.gz.sha256".to_string())
@@ -335,11 +335,10 @@ mod tests {
         };
         assert_eq!(err.to_string(), "No release found for test/repo");
 
-        let err = UpdateError::RateLimited { retry_after_secs: 60 };
-        assert_eq!(
-            err.to_string(),
-            "GitHub API rate limited, retry after 60s"
-        );
+        let err = UpdateError::RateLimited {
+            retry_after_secs: 60,
+        };
+        assert_eq!(err.to_string(), "GitHub API rate limited, retry after 60s");
 
         let err = UpdateError::Parse("invalid json".to_string());
         assert_eq!(err.to_string(), "Failed to parse release: invalid json");

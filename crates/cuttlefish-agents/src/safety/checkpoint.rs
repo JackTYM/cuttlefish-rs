@@ -316,7 +316,10 @@ pub trait CheckpointStore: Send + Sync {
     async fn count_for_project(&self, project_id: &str) -> CheckpointResult<usize>;
 
     /// Get the oldest checkpoint for a project.
-    async fn get_oldest_for_project(&self, project_id: &str) -> CheckpointResult<Option<Checkpoint>>;
+    async fn get_oldest_for_project(
+        &self,
+        project_id: &str,
+    ) -> CheckpointResult<Option<Checkpoint>>;
 }
 
 /// Configuration for the checkpoint manager.
@@ -626,12 +629,12 @@ impl InMemoryCheckpointStore {
 #[async_trait]
 impl CheckpointStore for InMemoryCheckpointStore {
     async fn save(&self, checkpoint: &Checkpoint) -> CheckpointResult<()> {
-        let mut checkpoints = self
-            .checkpoints
-            .write()
-            .map_err(|e| CheckpointError::StorageError {
-                reason: format!("Lock poisoned: {e}"),
-            })?;
+        let mut checkpoints =
+            self.checkpoints
+                .write()
+                .map_err(|e| CheckpointError::StorageError {
+                    reason: format!("Lock poisoned: {e}"),
+                })?;
         checkpoints.insert(checkpoint.id.clone(), checkpoint.clone());
         Ok(())
     }
@@ -650,12 +653,12 @@ impl CheckpointStore for InMemoryCheckpointStore {
     }
 
     async fn delete(&self, id: &CheckpointId) -> CheckpointResult<()> {
-        let mut checkpoints = self
-            .checkpoints
-            .write()
-            .map_err(|e| CheckpointError::StorageError {
-                reason: format!("Lock poisoned: {e}"),
-            })?;
+        let mut checkpoints =
+            self.checkpoints
+                .write()
+                .map_err(|e| CheckpointError::StorageError {
+                    reason: format!("Lock poisoned: {e}"),
+                })?;
         checkpoints.remove(id);
         Ok(())
     }
@@ -690,7 +693,10 @@ impl CheckpointStore for InMemoryCheckpointStore {
             .count())
     }
 
-    async fn get_oldest_for_project(&self, project_id: &str) -> CheckpointResult<Option<Checkpoint>> {
+    async fn get_oldest_for_project(
+        &self,
+        project_id: &str,
+    ) -> CheckpointResult<Option<Checkpoint>> {
         let checkpoints = self
             .checkpoints
             .read()
@@ -765,7 +771,10 @@ mod tests {
         let components = CheckpointComponents::new("feature-branch", "snap-456", "/data/mem.json");
         assert_eq!(components.git_ref, "feature-branch");
         assert_eq!(components.container_snapshot_id, "snap-456");
-        assert_eq!(components.memory_backup_path, PathBuf::from("/data/mem.json"));
+        assert_eq!(
+            components.memory_backup_path,
+            PathBuf::from("/data/mem.json")
+        );
         assert!(components.env_snapshot.is_empty());
     }
 
@@ -801,8 +810,13 @@ mod tests {
         let id = CheckpointId::from_string("custom-id");
         let components = make_components();
         let trigger = CheckpointTrigger::Scheduled;
-        let checkpoint =
-            Checkpoint::with_id(id.clone(), "project-2", "Custom ID checkpoint", trigger, components);
+        let checkpoint = Checkpoint::with_id(
+            id.clone(),
+            "project-2",
+            "Custom ID checkpoint",
+            trigger,
+            components,
+        );
 
         assert_eq!(checkpoint.id, id);
         assert_eq!(checkpoint.project_id, "project-2");
@@ -822,7 +836,10 @@ mod tests {
     #[test]
     fn test_checkpoint_config_defaults() {
         let config = CheckpointConfig::default();
-        assert_eq!(config.max_checkpoints_per_project, MAX_CHECKPOINTS_PER_PROJECT);
+        assert_eq!(
+            config.max_checkpoints_per_project,
+            MAX_CHECKPOINTS_PER_PROJECT
+        );
         assert_eq!(
             config.operation_timeout,
             Duration::from_secs(DEFAULT_CHECKPOINT_TIMEOUT_SECS)
@@ -840,7 +857,11 @@ mod tests {
         assert_eq!(config.max_checkpoints_per_project, 10);
         assert_eq!(config.operation_timeout, Duration::from_secs(60));
         assert_eq!(config.checkpoint_dir, PathBuf::from("/custom/path"));
-        assert!(config.auto_checkpoint_triggers.contains(&"npm uninstall".to_string()));
+        assert!(
+            config
+                .auto_checkpoint_triggers
+                .contains(&"npm uninstall".to_string())
+        );
     }
 
     #[test]
@@ -879,12 +900,7 @@ mod tests {
     #[test]
     fn test_rollback_result_fully_restored() {
         let components = make_components();
-        let checkpoint = Checkpoint::new(
-            "proj",
-            "test",
-            CheckpointTrigger::Scheduled,
-            components,
-        );
+        let checkpoint = Checkpoint::new("proj", "test", CheckpointTrigger::Scheduled, components);
 
         let result = RollbackResult {
             restored_checkpoint: checkpoint,
@@ -918,7 +934,10 @@ mod tests {
 
         store.save(&checkpoint).await.expect("save should succeed");
 
-        let loaded = store.load(&checkpoint.id).await.expect("load should succeed");
+        let loaded = store
+            .load(&checkpoint.id)
+            .await
+            .expect("load should succeed");
         assert_eq!(loaded.id, checkpoint.id);
         assert_eq!(loaded.project_id, checkpoint.project_id);
         assert_eq!(loaded.description, checkpoint.description);
@@ -936,7 +955,10 @@ mod tests {
         );
 
         store.save(&checkpoint).await.expect("save should succeed");
-        store.delete(&checkpoint.id).await.expect("delete should succeed");
+        store
+            .delete(&checkpoint.id)
+            .await
+            .expect("delete should succeed");
 
         let result = store.load(&checkpoint.id).await;
         assert!(matches!(result, Err(CheckpointError::NotFound { .. })));
@@ -969,13 +991,22 @@ mod tests {
             store.save(&checkpoint).await.expect("save should succeed");
         }
 
-        let project1_checkpoints = store.list_for_project("project-1").await.expect("list should succeed");
+        let project1_checkpoints = store
+            .list_for_project("project-1")
+            .await
+            .expect("list should succeed");
         assert_eq!(project1_checkpoints.len(), 3);
 
-        let project2_checkpoints = store.list_for_project("project-2").await.expect("list should succeed");
+        let project2_checkpoints = store
+            .list_for_project("project-2")
+            .await
+            .expect("list should succeed");
         assert_eq!(project2_checkpoints.len(), 2);
 
-        let project3_checkpoints = store.list_for_project("project-3").await.expect("list should succeed");
+        let project3_checkpoints = store
+            .list_for_project("project-3")
+            .await
+            .expect("list should succeed");
         assert!(project3_checkpoints.is_empty());
     }
 
@@ -994,10 +1025,16 @@ mod tests {
             store.save(&checkpoint).await.expect("save should succeed");
         }
 
-        let count = store.count_for_project("project-1").await.expect("count should succeed");
+        let count = store
+            .count_for_project("project-1")
+            .await
+            .expect("count should succeed");
         assert_eq!(count, 5);
 
-        let count = store.count_for_project("nonexistent").await.expect("count should succeed");
+        let count = store
+            .count_for_project("nonexistent")
+            .await
+            .expect("count should succeed");
         assert_eq!(count, 0);
     }
 

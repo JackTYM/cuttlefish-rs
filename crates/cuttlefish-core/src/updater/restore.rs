@@ -27,8 +27,8 @@ use std::path::PathBuf;
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
-use super::task_state::{ServerState, TaskCheckpointer, TaskState, TaskStateStatus};
 use super::DEFAULT_CHECKPOINT_DIR;
+use super::task_state::{ServerState, TaskCheckpointer, TaskState, TaskStateStatus};
 
 /// Errors that can occur during task restoration.
 #[derive(Error, Debug)]
@@ -41,9 +41,7 @@ pub enum RestoreError {
     },
 
     /// The checkpoint was created by a different version and version mismatch is not allowed.
-    #[error(
-        "Version mismatch: checkpoint from {checkpoint_version}, current is {current_version}"
-    )]
+    #[error("Version mismatch: checkpoint from {checkpoint_version}, current is {current_version}")]
     VersionMismatch {
         /// Version that created the checkpoint.
         checkpoint_version: String,

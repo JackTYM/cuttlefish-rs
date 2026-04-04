@@ -30,9 +30,11 @@ pub async fn create_sessions_table(pool: &SqlitePool) -> Result<(), sqlx::Error>
         .execute(pool)
         .await?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(refresh_token_hash)")
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(refresh_token_hash)",
+    )
+    .execute(pool)
+    .await?;
 
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
         .execute(pool)
@@ -70,7 +72,10 @@ pub async fn create_session(
 }
 
 /// Get a session by ID.
-pub async fn get_session_by_id(pool: &SqlitePool, id: &str) -> Result<Option<Session>, sqlx::Error> {
+pub async fn get_session_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
@@ -93,25 +98,28 @@ pub async fn get_session_by_token_hash(
 /// Revoke a session by ID.
 pub async fn revoke_session(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query("UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL")
-        .bind(&now)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    let result =
+        sqlx::query("UPDATE sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL")
+            .bind(&now)
+            .bind(id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }
 
 /// Revoke all sessions for a user.
-pub async fn revoke_all_user_sessions(pool: &SqlitePool, user_id: &str) -> Result<u64, sqlx::Error> {
+pub async fn revoke_all_user_sessions(
+    pool: &SqlitePool,
+    user_id: &str,
+) -> Result<u64, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-    )
-    .bind(&now)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+            .bind(&now)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected())
 }
@@ -146,7 +154,10 @@ pub async fn count_user_sessions(pool: &SqlitePool, user_id: &str) -> Result<i64
 }
 
 /// Get all active sessions for a user.
-pub async fn get_user_sessions(pool: &SqlitePool, user_id: &str) -> Result<Vec<Session>, sqlx::Error> {
+pub async fn get_user_sessions(
+    pool: &SqlitePool,
+    user_id: &str,
+) -> Result<Vec<Session>, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
     sqlx::query_as::<_, Session>(
         "SELECT * FROM sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC",
@@ -221,15 +232,17 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", db_path.to_string_lossy());
         let pool = SqlitePool::connect(&url).await.expect("connect");
         create_users_table(&pool).await.expect("create users table");
-        create_sessions_table(&pool).await.expect("create sessions table");
-        
+        create_sessions_table(&pool)
+            .await
+            .expect("create sessions table");
+
         sqlx::query(
             "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ('user-1', 'test@example.com', 'hash', datetime('now'), datetime('now'))",
         )
         .execute(&pool)
         .await
         .expect("create test user");
-        
+
         (pool, dir)
     }
 
@@ -307,12 +320,21 @@ mod tests {
         let (pool, _dir) = test_pool().await;
 
         for i in 0..3 {
-            create_session(&pool, &format!("session-{i}"), "user-1", &format!("hash-{i}"), None, None)
-                .await
-                .expect("create");
+            create_session(
+                &pool,
+                &format!("session-{i}"),
+                "user-1",
+                &format!("hash-{i}"),
+                None,
+                None,
+            )
+            .await
+            .expect("create");
         }
 
-        let count = revoke_all_user_sessions(&pool, "user-1").await.expect("revoke all");
+        let count = revoke_all_user_sessions(&pool, "user-1")
+            .await
+            .expect("revoke all");
         assert_eq!(count, 3);
 
         let sessions = get_user_sessions(&pool, "user-1").await.expect("get");
@@ -344,15 +366,24 @@ mod tests {
         let (pool, _dir) = test_pool().await;
 
         for i in 0..5 {
-            create_session(&pool, &format!("limit-{i}"), "user-1", &format!("hash-{i}"), None, None)
-                .await
-                .expect("create");
+            create_session(
+                &pool,
+                &format!("limit-{i}"),
+                "user-1",
+                &format!("hash-{i}"),
+                None,
+                None,
+            )
+            .await
+            .expect("create");
         }
 
         let count = count_user_sessions(&pool, "user-1").await.expect("count");
         assert_eq!(count, 5);
 
-        delete_oldest_session(&pool, "user-1").await.expect("delete oldest");
+        delete_oldest_session(&pool, "user-1")
+            .await
+            .expect("delete oldest");
 
         let count = count_user_sessions(&pool, "user-1").await.expect("count");
         assert_eq!(count, 4);

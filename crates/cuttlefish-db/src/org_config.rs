@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-use crate::organization::{get_organization, OrgError, OrgRole};
+use crate::organization::{OrgError, OrgRole, get_organization};
 
 /// Model configuration for an organization.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -130,31 +130,26 @@ pub async fn create_org_configs_table(pool: &SqlitePool) -> Result<(), sqlx::Err
 }
 
 /// Get organization configuration.
-pub async fn get_org_config(
-    pool: &SqlitePool,
-    org_id: &str,
-) -> Result<OrgConfig, OrgError> {
-    let org = get_organization(pool, org_id).await?.ok_or(OrgError::NotFound)?;
+pub async fn get_org_config(pool: &SqlitePool, org_id: &str) -> Result<OrgConfig, OrgError> {
+    let org = get_organization(pool, org_id)
+        .await?
+        .ok_or(OrgError::NotFound)?;
 
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT config FROM org_configs WHERE org_id = ?",
-    )
-    .bind(org_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(OrgError::from)?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT config FROM org_configs WHERE org_id = ?")
+        .bind(org_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(OrgError::from)?;
 
     match row {
         Some((config_json,)) => Ok(OrgConfig::from_json(&config_json)),
-        None => {
-            Ok(OrgConfig {
-                allowed_providers: org.settings().allowed_providers,
-                max_projects: org.settings().max_projects,
-                shared_templates: org.settings().shared_templates,
-                allow_project_overrides: true,
-                ..Default::default()
-            })
-        }
+        None => Ok(OrgConfig {
+            allowed_providers: org.settings().allowed_providers,
+            max_projects: org.settings().max_projects,
+            shared_templates: org.settings().shared_templates,
+            allow_project_overrides: true,
+            ..Default::default()
+        }),
     }
 }
 
@@ -167,7 +162,7 @@ pub async fn update_org_config(
     config: &OrgConfig,
     actor_id: &str,
 ) -> Result<bool, OrgError> {
-    use crate::organization::{can_user_access_org};
+    use crate::organization::can_user_access_org;
 
     let can_update = can_user_access_org(pool, actor_id, org_id, OrgRole::Admin)
         .await
@@ -209,11 +204,20 @@ pub fn merge_configs(org_config: &OrgConfig, project_config: &OrgConfig) -> OrgC
     }
 
     OrgConfig {
-        model_config: project_config.model_config.clone().or(org_config.model_config.clone()),
+        model_config: project_config
+            .model_config
+            .clone()
+            .or(org_config.model_config.clone()),
         allowed_providers: org_config.allowed_providers.clone(),
         allowed_models: org_config.allowed_models.clone(),
-        sandbox_limits: project_config.sandbox_limits.clone().or(org_config.sandbox_limits.clone()),
-        gate_config: project_config.gate_config.clone().or(org_config.gate_config.clone()),
+        sandbox_limits: project_config
+            .sandbox_limits
+            .clone()
+            .or(org_config.sandbox_limits.clone()),
+        gate_config: project_config
+            .gate_config
+            .clone()
+            .or(org_config.gate_config.clone()),
         max_projects: org_config.max_projects,
         max_members: org_config.max_members,
         shared_templates: {
@@ -224,7 +228,10 @@ pub fn merge_configs(org_config: &OrgConfig, project_config: &OrgConfig) -> OrgC
             templates
         },
         allow_project_overrides: org_config.allow_project_overrides,
-        metadata: project_config.metadata.clone().or(org_config.metadata.clone()),
+        metadata: project_config
+            .metadata
+            .clone()
+            .or(org_config.metadata.clone()),
     }
 }
 
@@ -275,8 +282,12 @@ mod tests {
         let pool = SqlitePool::connect(&url).await.expect("connect");
 
         create_users_table(&pool).await.expect("create users table");
-        create_organizations_tables(&pool).await.expect("create org tables");
-        create_org_configs_table(&pool).await.expect("create config table");
+        create_organizations_tables(&pool)
+            .await
+            .expect("create org tables");
+        create_org_configs_table(&pool)
+            .await
+            .expect("create config table");
 
         sqlx::query(
             "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ('user-alice', 'alice@example.com', 'hash', datetime('now'), datetime('now'))",
@@ -333,7 +344,10 @@ mod tests {
         let loaded = get_org_config(&pool, "org-1").await.expect("get config");
         assert!(loaded.model_config.is_some());
         assert_eq!(
-            loaded.model_config.as_ref().and_then(|m| m.model_id.as_ref()),
+            loaded
+                .model_config
+                .as_ref()
+                .and_then(|m| m.model_id.as_ref()),
             Some(&"claude-sonnet".to_string())
         );
         assert_eq!(loaded.max_projects, Some(10));
@@ -402,10 +416,16 @@ mod tests {
         let merged = merge_configs(&org_config, &project_config);
 
         assert_eq!(
-            merged.model_config.as_ref().and_then(|m| m.model_id.as_ref()),
+            merged
+                .model_config
+                .as_ref()
+                .and_then(|m| m.model_id.as_ref()),
             Some(&"project-model".to_string())
         );
-        assert_eq!(merged.allowed_providers, Some(vec!["anthropic".to_string()]));
+        assert_eq!(
+            merged.allowed_providers,
+            Some(vec!["anthropic".to_string()])
+        );
         assert!(merged.shared_templates.contains(&"org-tmpl".to_string()));
         assert!(merged.shared_templates.contains(&"proj-tmpl".to_string()));
     }
@@ -432,7 +452,10 @@ mod tests {
         let merged = merge_configs(&org_config, &project_config);
 
         assert_eq!(
-            merged.model_config.as_ref().and_then(|m| m.model_id.as_ref()),
+            merged
+                .model_config
+                .as_ref()
+                .and_then(|m| m.model_id.as_ref()),
             Some(&"org-model".to_string())
         );
     }
@@ -492,7 +515,10 @@ mod tests {
         let restored = OrgConfig::from_json(&json);
 
         assert_eq!(
-            restored.model_config.as_ref().and_then(|m| m.model_id.as_ref()),
+            restored
+                .model_config
+                .as_ref()
+                .and_then(|m| m.model_id.as_ref()),
             Some(&"test-model".to_string())
         );
         assert_eq!(
@@ -500,7 +526,10 @@ mod tests {
             Some(4096)
         );
         assert_eq!(
-            restored.gate_config.as_ref().map(|g| g.require_deploy_approval),
+            restored
+                .gate_config
+                .as_ref()
+                .map(|g| g.require_deploy_approval),
             Some(true)
         );
     }

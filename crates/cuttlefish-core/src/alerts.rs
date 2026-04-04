@@ -162,7 +162,7 @@ impl AlertChecker {
 mod tests {
     use super::*;
     use crate::pricing::PricingConfig;
-    use cuttlefish_db::usage::{create_alert, insert_usage, run_usage_migrations, ApiUsage};
+    use cuttlefish_db::usage::{ApiUsage, create_alert, insert_usage, run_usage_migrations};
     use std::sync::atomic::{AtomicU32, Ordering};
     use tempfile::TempDir;
 
@@ -199,13 +199,7 @@ mod tests {
         (Arc::new(pool), dir)
     }
 
-    fn make_usage(
-        user_id: &str,
-        provider: &str,
-        model: &str,
-        input: i64,
-        output: i64,
-    ) -> ApiUsage {
+    fn make_usage(user_id: &str, provider: &str, model: &str, input: i64, output: i64) -> ApiUsage {
         ApiUsage {
             id: uuid::Uuid::new_v4().to_string(),
             project_id: Some("proj-1".to_string()),
@@ -242,7 +236,10 @@ mod tests {
         };
         create_alert(&pool, &alert).await.expect("create alert");
 
-        let stats = Arc::new(UsageStats::new(pool.clone(), PricingConfig::with_defaults()));
+        let stats = Arc::new(UsageStats::new(
+            pool.clone(),
+            PricingConfig::with_defaults(),
+        ));
 
         let checker = AlertChecker::new(pool, stats, Box::new(CountingNotifier::new()));
         let triggered = checker.check_alerts().await.expect("check");
@@ -270,7 +267,10 @@ mod tests {
         };
         create_alert(&pool, &alert).await.expect("create alert");
 
-        let stats = Arc::new(UsageStats::new(pool.clone(), PricingConfig::with_defaults()));
+        let stats = Arc::new(UsageStats::new(
+            pool.clone(),
+            PricingConfig::with_defaults(),
+        ));
         let checker = AlertChecker::new(pool, stats, Box::new(NoopNotifier));
         let triggered = checker.check_alerts().await.expect("check");
 
@@ -296,8 +296,12 @@ mod tests {
         };
         create_alert(&pool, &alert).await.expect("create alert");
 
-        let stats = Arc::new(UsageStats::new(pool.clone(), PricingConfig::with_defaults()));
-        let checker = AlertChecker::new(pool, stats, Box::new(NoopNotifier)).with_cooldown_hours(24);
+        let stats = Arc::new(UsageStats::new(
+            pool.clone(),
+            PricingConfig::with_defaults(),
+        ));
+        let checker =
+            AlertChecker::new(pool, stats, Box::new(NoopNotifier)).with_cooldown_hours(24);
         let triggered = checker.check_alerts().await.expect("check");
 
         assert!(triggered.is_empty());
@@ -322,7 +326,10 @@ mod tests {
         };
         create_alert(&pool, &alert).await.expect("create alert");
 
-        let stats = Arc::new(UsageStats::new(pool.clone(), PricingConfig::with_defaults()));
+        let stats = Arc::new(UsageStats::new(
+            pool.clone(),
+            PricingConfig::with_defaults(),
+        ));
         let checker = AlertChecker::new(pool, stats, Box::new(NoopNotifier));
         let triggered = checker.check_alerts().await.expect("check");
 

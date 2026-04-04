@@ -187,7 +187,7 @@ impl UsageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cuttlefish_db::usage::{insert_usage, run_usage_migrations, ApiUsage};
+    use cuttlefish_db::usage::{ApiUsage, insert_usage, run_usage_migrations};
     use tempfile::TempDir;
 
     async fn test_pool() -> (Arc<SqlitePool>, TempDir) {
@@ -263,14 +263,7 @@ mod tests {
             1000,
             500,
         );
-        let usage2 = make_usage(
-            "user-1",
-            "proj-2",
-            "openai",
-            "gpt-5.4",
-            2000,
-            1000,
-        );
+        let usage2 = make_usage("user-1", "proj-2", "openai", "gpt-5.4", 2000, 1000);
         insert_usage(&pool, &usage1).await.expect("insert");
         insert_usage(&pool, &usage2).await.expect("insert");
 

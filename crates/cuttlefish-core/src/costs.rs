@@ -207,9 +207,11 @@ mod tests {
         breakdown.add("anthropic", "claude-sonnet-4-6", 1000, 500, 0.02);
 
         assert!(breakdown.by_model.contains_key("anthropic/claude-opus-4-6"));
-        assert!(breakdown
-            .by_model
-            .contains_key("anthropic/claude-sonnet-4-6"));
+        assert!(
+            breakdown
+                .by_model
+                .contains_key("anthropic/claude-sonnet-4-6")
+        );
     }
 
     #[test]

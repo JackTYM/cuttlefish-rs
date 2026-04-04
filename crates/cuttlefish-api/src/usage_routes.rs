@@ -7,14 +7,8 @@ use axum::{
     response::Json,
 };
 use chrono::Utc;
-use cuttlefish_core::{
-    PricingConfig, TimePeriod, UsageStats,
-    pricing::ModelPrice,
-};
-use cuttlefish_db::usage::{
-    self, UsageAlert,
-    DailyUsage, ProviderUsage,
-};
+use cuttlefish_core::{PricingConfig, TimePeriod, UsageStats, pricing::ModelPrice};
+use cuttlefish_db::usage::{self, DailyUsage, ProviderUsage, UsageAlert};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -125,7 +119,8 @@ pub struct ProviderUsageResponse {
 #[derive(Debug, Serialize)]
 pub struct PricingResponse {
     /// Pricing by provider and model.
-    pub providers: std::collections::HashMap<String, std::collections::HashMap<String, ModelPriceResponse>>,
+    pub providers:
+        std::collections::HashMap<String, std::collections::HashMap<String, ModelPriceResponse>>,
 }
 
 /// Model price in response.
@@ -207,8 +202,9 @@ pub async fn get_usage_summary(
     Query(query): Query<UsageQuery>,
 ) -> ApiResult<UsageSummaryResponse> {
     let period = query.parse_period();
-    
-    let summary = state.stats
+
+    let summary = state
+        .stats
         .user_summary(&user.user_id, period)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
@@ -232,8 +228,9 @@ pub async fn get_project_usage(
     Query(query): Query<UsageQuery>,
 ) -> ApiResult<ProjectUsageResponse> {
     let period = query.parse_period();
-    
-    let summary = state.stats
+
+    let summary = state
+        .stats
         .project_summary(&project_id, period)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
@@ -257,8 +254,9 @@ pub async fn get_daily_usage(
     Query(query): Query<UsageQuery>,
 ) -> ApiResult<DailyUsageResponse> {
     let period = query.parse_period();
-    
-    let days = state.stats
+
+    let days = state
+        .stats
         .daily_usage(query.project_id.as_deref(), period)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
@@ -273,8 +271,9 @@ pub async fn get_provider_usage(
     Query(query): Query<UsageQuery>,
 ) -> ApiResult<ProviderUsageResponse> {
     let period = query.parse_period();
-    
-    let providers = state.stats
+
+    let providers = state
+        .stats
         .provider_usage(query.project_id.as_deref(), period)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
@@ -287,16 +286,25 @@ pub async fn export_usage_csv(
     State(state): State<UsageState>,
     Extension(user): Extension<AuthenticatedUser>,
     Query(query): Query<UsageQuery>,
-) -> Result<(StatusCode, [(axum::http::header::HeaderName, &'static str); 2], String), (StatusCode, Json<serde_json::Value>)> {
+) -> Result<
+    (
+        StatusCode,
+        [(axum::http::header::HeaderName, &'static str); 2],
+        String,
+    ),
+    (StatusCode, Json<serde_json::Value>),
+> {
     let period = query.parse_period();
     let (from, to) = period.range();
-    
+
     let records = usage::get_usage_by_user(&state.pool, &user.user_id, &from, &to)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
 
-    let mut csv = String::from("id,project_id,provider,model,input_tokens,output_tokens,request_type,latency_ms,success,created_at\n");
-    
+    let mut csv = String::from(
+        "id,project_id,provider,model,input_tokens,output_tokens,request_type,latency_ms,success,created_at\n",
+    );
+
     for r in records {
         csv.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{}\n",
@@ -317,28 +325,32 @@ pub async fn export_usage_csv(
         StatusCode::OK,
         [
             (axum::http::header::CONTENT_TYPE, "text/csv"),
-            (axum::http::header::CONTENT_DISPOSITION, "attachment; filename=\"usage.csv\""),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                "attachment; filename=\"usage.csv\"",
+            ),
         ],
         csv,
     ))
 }
 
 /// GET /api/pricing - Current pricing table.
-pub async fn get_pricing(
-    State(state): State<UsageState>,
-) -> ApiResult<PricingResponse> {
+pub async fn get_pricing(State(state): State<UsageState>) -> ApiResult<PricingResponse> {
     let pricing = state.pricing.read().await;
-    
+
     let mut providers = std::collections::HashMap::new();
     for provider_name in pricing.providers() {
         if let Some(models) = pricing.models(provider_name) {
             let mut model_prices = std::collections::HashMap::new();
             for model_name in models {
                 if let Some(price) = pricing.get_price(provider_name, model_name) {
-                    model_prices.insert(model_name.to_string(), ModelPriceResponse {
-                        input_per_million: price.input_per_million,
-                        output_per_million: price.output_per_million,
-                    });
+                    model_prices.insert(
+                        model_name.to_string(),
+                        ModelPriceResponse {
+                            input_per_million: price.input_per_million,
+                            output_per_million: price.output_per_million,
+                        },
+                    );
                 }
             }
             providers.insert(provider_name.to_string(), model_prices);
@@ -387,11 +399,17 @@ pub async fn create_alert(
     Json(req): Json<CreateAlertRequest>,
 ) -> ApiResult<AlertResponse> {
     if !["daily", "weekly", "monthly"].contains(&req.period.as_str()) {
-        return Err(api_error(StatusCode::BAD_REQUEST, "Invalid period. Use: daily, weekly, monthly"));
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid period. Use: daily, weekly, monthly",
+        ));
     }
 
     if req.threshold_usd <= 0.0 {
-        return Err(api_error(StatusCode::BAD_REQUEST, "Threshold must be positive"));
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "Threshold must be positive",
+        ));
     }
 
     let alert = UsageAlert {
@@ -424,7 +442,10 @@ pub async fn delete_alert(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "Alert not found"))?;
 
     if alert.user_id != user.user_id {
-        return Err(api_error(StatusCode::FORBIDDEN, "Cannot delete another user's alert"));
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "Cannot delete another user's alert",
+        ));
     }
 
     usage::delete_alert(&state.pool, &alert_id)
@@ -437,7 +458,7 @@ pub async fn delete_alert(
 /// Build the usage router.
 pub fn usage_router() -> axum::Router<UsageState> {
     use axum::routing::{delete, get, post, put};
-    
+
     axum::Router::new()
         .route("/api/usage", get(get_usage_summary))
         .route("/api/usage/projects/{id}", get(get_project_usage))

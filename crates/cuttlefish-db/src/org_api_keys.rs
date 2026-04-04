@@ -7,7 +7,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-use crate::organization::{can_user_access_org, get_organization, OrgError, OrgRole};
+use crate::organization::{OrgError, OrgRole, can_user_access_org, get_organization};
 
 /// An organization API key record.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -274,13 +274,11 @@ async fn get_org_api_key_by_provider(
     org_id: &str,
     provider: &str,
 ) -> Result<Option<OrgApiKey>, sqlx::Error> {
-    sqlx::query_as::<_, OrgApiKey>(
-        "SELECT * FROM org_api_keys WHERE org_id = ? AND provider = ?",
-    )
-    .bind(org_id)
-    .bind(provider)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, OrgApiKey>("SELECT * FROM org_api_keys WHERE org_id = ? AND provider = ?")
+        .bind(org_id)
+        .bind(provider)
+        .fetch_optional(pool)
+        .await
 }
 
 /// Get a decrypted API key for a provider.
@@ -478,7 +476,11 @@ pub async fn update_org_api_key(
 
     if let Some(limit) = usage_limit {
         updates.push("usage_limit_monthly = ?");
-        bindings.push(limit.map(|l| l.to_string()).unwrap_or_else(|| "NULL".to_string()));
+        bindings.push(
+            limit
+                .map(|l| l.to_string())
+                .unwrap_or_else(|| "NULL".to_string()),
+        );
     }
 
     if updates.is_empty() {
@@ -508,7 +510,9 @@ pub async fn update_org_api_key(
 mod tests {
     use super::*;
     use crate::auth::create_users_table;
-    use crate::organization::{add_member, create_organization, create_organizations_tables, OrgRole as OrgMemberRole};
+    use crate::organization::{
+        OrgRole as OrgMemberRole, add_member, create_organization, create_organizations_tables,
+    };
     use tempfile::TempDir;
 
     async fn test_pool() -> (SqlitePool, TempDir) {
@@ -518,8 +522,12 @@ mod tests {
         let pool = SqlitePool::connect(&url).await.expect("connect");
 
         create_users_table(&pool).await.expect("create users table");
-        create_organizations_tables(&pool).await.expect("create org tables");
-        create_org_api_keys_table(&pool).await.expect("create api keys table");
+        create_organizations_tables(&pool)
+            .await
+            .expect("create org tables");
+        create_org_api_keys_table(&pool)
+            .await
+            .expect("create api keys table");
 
         for (id, email) in [
             ("user-alice", "alice@example.com"),
@@ -540,9 +548,16 @@ mod tests {
             .await
             .expect("create org");
 
-        add_member(&pool, "member-1", "org-1", "user-bob", OrgMemberRole::Member, "user-alice")
-            .await
-            .expect("add member");
+        add_member(
+            &pool,
+            "member-1",
+            "org-1",
+            "user-bob",
+            OrgMemberRole::Member,
+            "user-alice",
+        )
+        .await
+        .expect("add member");
 
         (pool, dir)
     }
@@ -619,7 +634,10 @@ mod tests {
         )
         .await;
 
-        assert!(matches!(result, Err(OrgApiKeyError::InsufficientPermissions)));
+        assert!(matches!(
+            result,
+            Err(OrgApiKeyError::InsufficientPermissions)
+        ));
     }
 
     #[tokio::test]
@@ -691,17 +709,40 @@ mod tests {
         .expect("add");
 
         let result = get_org_api_key(&pool, "org-1", "anthropic", "user-charlie").await;
-        assert!(matches!(result, Err(OrgApiKeyError::InsufficientPermissions)));
+        assert!(matches!(
+            result,
+            Err(OrgApiKeyError::InsufficientPermissions)
+        ));
     }
 
     #[tokio::test]
     async fn test_get_org_api_keys() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Anthropic", "sk-ant", "user-alice", None)
-            .await.expect("add");
-        add_org_api_key(&pool, "key-2", "org-1", "openai", "OpenAI", "sk-openai", "user-alice", None)
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Anthropic",
+            "sk-ant",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
+        add_org_api_key(
+            &pool,
+            "key-2",
+            "org-1",
+            "openai",
+            "OpenAI",
+            "sk-openai",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
 
         let keys = get_org_api_keys(&pool, "org-1", "user-alice")
             .await
@@ -715,8 +756,18 @@ mod tests {
     async fn test_delete_org_api_key() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", None)
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
 
         let deleted = delete_org_api_key(&pool, "org-1", "key-1", "user-alice")
             .await
@@ -733,19 +784,42 @@ mod tests {
     async fn test_delete_key_insufficient_permissions() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", None)
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
 
         let result = delete_org_api_key(&pool, "org-1", "key-1", "user-bob").await;
-        assert!(matches!(result, Err(OrgApiKeyError::InsufficientPermissions)));
+        assert!(matches!(
+            result,
+            Err(OrgApiKeyError::InsufficientPermissions)
+        ));
     }
 
     #[tokio::test]
     async fn test_update_key_last_used() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", None)
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
 
         update_key_last_used(&pool, "org-1", "anthropic")
             .await
@@ -761,8 +835,18 @@ mod tests {
     async fn test_increment_key_usage() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", Some(100.0))
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            Some(100.0),
+        )
+        .await
+        .expect("add");
 
         increment_key_usage(&pool, "org-1", "anthropic", 25.0)
             .await
@@ -781,8 +865,18 @@ mod tests {
     async fn test_is_key_over_limit() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", Some(50.0))
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            Some(50.0),
+        )
+        .await
+        .expect("add");
 
         let over = is_key_over_limit(&pool, "org-1", "anthropic")
             .await
@@ -803,8 +897,18 @@ mod tests {
     async fn test_reset_monthly_usage() {
         let (pool, _dir) = test_pool().await;
 
-        add_org_api_key(&pool, "key-1", "org-1", "anthropic", "Key", "sk-ant", "user-alice", None)
-            .await.expect("add");
+        add_org_api_key(
+            &pool,
+            "key-1",
+            "org-1",
+            "anthropic",
+            "Key",
+            "sk-ant",
+            "user-alice",
+            None,
+        )
+        .await
+        .expect("add");
 
         increment_key_usage(&pool, "org-1", "anthropic", 100.0)
             .await

@@ -107,20 +107,21 @@ pub async fn require_auth(
     next: Next,
 ) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
     let path = request.uri().path();
-    
-    if path == "/health" || path.starts_with("/api/auth/login") || path.starts_with("/api/auth/register") || path.starts_with("/api/auth/refresh") || path.starts_with("/api/auth/reset") {
+
+    if path == "/health"
+        || path.starts_with("/api/auth/login")
+        || path.starts_with("/api/auth/register")
+        || path.starts_with("/api/auth/refresh")
+        || path.starts_with("/api/auth/reset")
+    {
         return Ok(next.run(request).await);
     }
 
     let auth = extract_auth(request.headers());
 
     let authenticated_user = match auth {
-        Some(ExtractedAuth::Bearer(token)) => {
-            validate_jwt_token(&token, &config.jwt_secret)?
-        }
-        Some(ExtractedAuth::ApiKey(key)) => {
-            validate_api_key_async(&key, &config).await?
-        }
+        Some(ExtractedAuth::Bearer(token)) => validate_jwt_token(&token, &config.jwt_secret)?,
+        Some(ExtractedAuth::ApiKey(key)) => validate_api_key_async(&key, &config).await?,
         None => {
             return Err((
                 StatusCode::UNAUTHORIZED,
@@ -146,12 +147,8 @@ pub async fn optional_auth(
 
     if let Some(extracted) = auth {
         let authenticated_user = match extracted {
-            ExtractedAuth::Bearer(token) => {
-                validate_jwt_token(&token, &config.jwt_secret).ok()
-            }
-            ExtractedAuth::ApiKey(key) => {
-                validate_api_key_async(&key, &config).await.ok()
-            }
+            ExtractedAuth::Bearer(token) => validate_jwt_token(&token, &config.jwt_secret).ok(),
+            ExtractedAuth::ApiKey(key) => validate_api_key_async(&key, &config).await.ok(),
         };
 
         if let Some(user) = authenticated_user {
@@ -263,10 +260,7 @@ mod tests {
     #[test]
     fn test_extract_auth_api_key() {
         let mut headers = HeaderMap::new();
-        headers.insert(
-            X_API_KEY_HEADER,
-            HeaderValue::from_static("my-api-key"),
-        );
+        headers.insert(X_API_KEY_HEADER, HeaderValue::from_static("my-api-key"));
 
         let auth = extract_auth(&headers);
         assert!(matches!(auth, Some(ExtractedAuth::ApiKey(k)) if k == "my-api-key"));
@@ -275,14 +269,8 @@ mod tests {
     #[test]
     fn test_extract_auth_bearer_takes_precedence() {
         let mut headers = HeaderMap::new();
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_static("Bearer my-token"),
-        );
-        headers.insert(
-            X_API_KEY_HEADER,
-            HeaderValue::from_static("my-api-key"),
-        );
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer my-token"));
+        headers.insert(X_API_KEY_HEADER, HeaderValue::from_static("my-api-key"));
 
         let auth = extract_auth(&headers);
         assert!(matches!(auth, Some(ExtractedAuth::Bearer(_))));
@@ -308,7 +296,7 @@ mod tests {
     fn test_validate_jwt_token_success() {
         let token = generate_access_token("user-123", TEST_SECRET).expect("generate");
         let result = validate_jwt_token(&token, TEST_SECRET);
-        
+
         assert!(result.is_ok());
         let user = result.expect("user");
         assert_eq!(user.user_id, "user-123");
@@ -323,8 +311,8 @@ mod tests {
 
     #[test]
     fn test_validate_api_key_legacy() {
-        let config = AuthConfig::new(TEST_SECRET.to_vec())
-            .with_legacy_api_key("legacy-key-123".to_string());
+        let config =
+            AuthConfig::new(TEST_SECRET.to_vec()).with_legacy_api_key("legacy-key-123".to_string());
 
         let result = validate_api_key("legacy-key-123", &config);
         assert!(result.is_ok());
@@ -342,8 +330,7 @@ mod tests {
 
     #[test]
     fn test_auth_config_builder() {
-        let config = AuthConfig::new(vec![1, 2, 3])
-            .with_legacy_api_key("test-key".to_string());
+        let config = AuthConfig::new(vec![1, 2, 3]).with_legacy_api_key("test-key".to_string());
 
         assert_eq!(*config.jwt_secret, vec![1, 2, 3]);
         assert_eq!(config.legacy_api_key, Some("test-key".to_string()));

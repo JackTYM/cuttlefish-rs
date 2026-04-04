@@ -68,7 +68,10 @@ pub async fn get_user_by_id(pool: &SqlitePool, id: &str) -> Result<Option<User>,
 }
 
 /// Get a user by email.
-pub async fn get_user_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, sqlx::Error> {
+pub async fn get_user_by_email(
+    pool: &SqlitePool,
+    email: &str,
+) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = ?")
         .bind(email)
         .fetch_optional(pool)
@@ -82,14 +85,12 @@ pub async fn update_user_display_name(
     display_name: Option<&str>,
 ) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?",
-    )
-    .bind(display_name)
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?")
+        .bind(display_name)
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -101,14 +102,12 @@ pub async fn update_user_password(
     password_hash: &str,
 ) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
-    )
-    .bind(password_hash)
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
+        .bind(password_hash)
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -116,14 +115,12 @@ pub async fn update_user_password(
 /// Mark a user's email as verified.
 pub async fn verify_user_email(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?",
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -131,14 +128,12 @@ pub async fn verify_user_email(pool: &SqlitePool, id: &str) -> Result<bool, sqlx
 /// Update a user's last login timestamp.
 pub async fn update_last_login(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?",
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -146,13 +141,11 @@ pub async fn update_last_login(pool: &SqlitePool, id: &str) -> Result<bool, sqlx
 /// Deactivate a user account.
 pub async fn deactivate_user(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?",
-    )
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -160,13 +153,11 @@ pub async fn deactivate_user(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::
 /// Reactivate a user account.
 pub async fn reactivate_user(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
     let now = Utc::now().to_rfc3339();
-    let result = sqlx::query(
-        "UPDATE users SET is_active = 1, updated_at = ? WHERE id = ?",
-    )
-    .bind(&now)
-    .bind(id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE users SET is_active = 1, updated_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -183,21 +174,17 @@ pub async fn delete_user(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Erro
 
 /// List all active users.
 pub async fn list_active_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> {
-    sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE is_active = 1 ORDER BY created_at DESC",
-    )
-    .fetch_all(pool)
-    .await
+    sqlx::query_as::<_, User>("SELECT * FROM users WHERE is_active = 1 ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await
 }
 
 /// Check if an email is already registered.
 pub async fn email_exists(pool: &SqlitePool, email: &str) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM users WHERE email = ?",
-    )
-    .bind(email)
-    .fetch_one(pool)
-    .await?;
+    let result = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE email = ?")
+        .bind(email)
+        .fetch_one(pool)
+        .await?;
 
     Ok(result > 0)
 }
@@ -302,7 +289,9 @@ mod tests {
             .await
             .expect("create");
 
-        deactivate_user(&pool, "user-active").await.expect("deactivate");
+        deactivate_user(&pool, "user-active")
+            .await
+            .expect("deactivate");
 
         let user = get_user_by_id(&pool, "user-active")
             .await
@@ -310,7 +299,9 @@ mod tests {
             .expect("exists");
         assert!(!user.is_active());
 
-        reactivate_user(&pool, "user-active").await.expect("reactivate");
+        reactivate_user(&pool, "user-active")
+            .await
+            .expect("reactivate");
 
         let user = get_user_by_id(&pool, "user-active")
             .await
@@ -361,7 +352,9 @@ mod tests {
             .expect("exists");
         assert!(user.email_verified_at.is_none());
 
-        verify_user_email(&pool, "user-verify").await.expect("verify");
+        verify_user_email(&pool, "user-verify")
+            .await
+            .expect("verify");
 
         let user = get_user_by_id(&pool, "user-verify")
             .await
@@ -384,7 +377,9 @@ mod tests {
             .expect("exists");
         assert!(user.last_login_at.is_none());
 
-        update_last_login(&pool, "user-login").await.expect("update");
+        update_last_login(&pool, "user-login")
+            .await
+            .expect("update");
 
         let user = get_user_by_id(&pool, "user-login")
             .await

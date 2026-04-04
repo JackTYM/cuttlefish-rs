@@ -136,11 +136,9 @@ pub async fn run_usage_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> 
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_pricing_lookup ON model_pricing(provider, model)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_pricing_lookup ON model_pricing(provider, model)")
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         r#"CREATE TABLE IF NOT EXISTS usage_alerts (

@@ -7,10 +7,10 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use bollard::Docker;
 use bollard::image::{
     BuildImageOptions, CreateImageOptions, ListImagesOptions, RemoveImageOptions,
 };
-use bollard::Docker;
 use chrono::{TimeZone, Utc};
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{
@@ -276,7 +276,9 @@ impl ImageRegistry for DockerImageRegistry {
 
         let tar_body = Self::create_build_context(&options)?;
 
-        let mut stream = self.docker.build_image(build_options, None, Some(tar_body.into()));
+        let mut stream = self
+            .docker
+            .build_image(build_options, None, Some(tar_body.into()));
 
         while let Some(result) = stream.next().await {
             match result {
@@ -502,30 +504,78 @@ mod tests {
             docker: Docker::connect_with_socket_defaults().expect("docker"),
             image_prefix: "cuttlefish/".to_string(),
         };
-        assert_eq!(registry.language_to_image(Language::Node), "cuttlefish/node:latest");
-        assert_eq!(registry.language_to_image(Language::Python), "cuttlefish/python:latest");
-        assert_eq!(registry.language_to_image(Language::Rust), "cuttlefish/rust:latest");
-        assert_eq!(registry.language_to_image(Language::Go), "cuttlefish/go:latest");
-        assert_eq!(registry.language_to_image(Language::Ruby), "cuttlefish/ruby:latest");
-        assert_eq!(registry.language_to_image(Language::Generic), "cuttlefish/generic:latest");
+        assert_eq!(
+            registry.language_to_image(Language::Node),
+            "cuttlefish/node:latest"
+        );
+        assert_eq!(
+            registry.language_to_image(Language::Python),
+            "cuttlefish/python:latest"
+        );
+        assert_eq!(
+            registry.language_to_image(Language::Rust),
+            "cuttlefish/rust:latest"
+        );
+        assert_eq!(
+            registry.language_to_image(Language::Go),
+            "cuttlefish/go:latest"
+        );
+        assert_eq!(
+            registry.language_to_image(Language::Ruby),
+            "cuttlefish/ruby:latest"
+        );
+        assert_eq!(
+            registry.language_to_image(Language::Generic),
+            "cuttlefish/generic:latest"
+        );
     }
 
     #[test]
     fn test_parse_image_ref() {
-        assert_eq!(DockerImageRegistry::parse_image_ref("nginx:latest"), ("nginx", "latest"));
-        assert_eq!(DockerImageRegistry::parse_image_ref("cuttlefish/node:v1"), ("cuttlefish/node", "v1"));
-        assert_eq!(DockerImageRegistry::parse_image_ref("ubuntu"), ("ubuntu", "latest"));
-        assert_eq!(DockerImageRegistry::parse_image_ref("registry.io/image:tag"), ("registry.io/image", "tag"));
+        assert_eq!(
+            DockerImageRegistry::parse_image_ref("nginx:latest"),
+            ("nginx", "latest")
+        );
+        assert_eq!(
+            DockerImageRegistry::parse_image_ref("cuttlefish/node:v1"),
+            ("cuttlefish/node", "v1")
+        );
+        assert_eq!(
+            DockerImageRegistry::parse_image_ref("ubuntu"),
+            ("ubuntu", "latest")
+        );
+        assert_eq!(
+            DockerImageRegistry::parse_image_ref("registry.io/image:tag"),
+            ("registry.io/image", "tag")
+        );
     }
 
     #[test]
     fn test_infer_language_from_name() {
-        assert_eq!(DockerImageRegistry::infer_language_from_name("cuttlefish/node"), Language::Node);
-        assert_eq!(DockerImageRegistry::infer_language_from_name("python-base"), Language::Python);
-        assert_eq!(DockerImageRegistry::infer_language_from_name("rust-builder"), Language::Rust);
-        assert_eq!(DockerImageRegistry::infer_language_from_name("golang-alpine"), Language::Go);
-        assert_eq!(DockerImageRegistry::infer_language_from_name("ruby-slim"), Language::Ruby);
-        assert_eq!(DockerImageRegistry::infer_language_from_name("ubuntu"), Language::Generic);
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("cuttlefish/node"),
+            Language::Node
+        );
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("python-base"),
+            Language::Python
+        );
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("rust-builder"),
+            Language::Rust
+        );
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("golang-alpine"),
+            Language::Go
+        );
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("ruby-slim"),
+            Language::Ruby
+        );
+        assert_eq!(
+            DockerImageRegistry::infer_language_from_name("ubuntu"),
+            Language::Generic
+        );
     }
 
     #[tokio::test]
@@ -534,7 +584,10 @@ mod tests {
             docker: Docker::connect_with_socket_defaults().expect("docker"),
             image_prefix: "cuttlefish/".to_string(),
         };
-        let spec = registry.get_language_image(Language::Node).await.expect("spec");
+        let spec = registry
+            .get_language_image(Language::Node)
+            .await
+            .expect("spec");
         assert_eq!(spec.name, "cuttlefish/node");
         assert_eq!(spec.tag, "latest");
         assert_eq!(spec.language, Language::Node);
@@ -564,14 +617,20 @@ mod tests {
         }]);
 
         assert_eq!(registry.list_images().await.expect("list").len(), 1);
-        registry.remove_image("test/image", "v1").await.expect("remove");
+        registry
+            .remove_image("test/image", "v1")
+            .await
+            .expect("remove");
         assert!(registry.list_images().await.expect("list").is_empty());
     }
 
     #[tokio::test]
     async fn test_mock_registry_get_language_image() {
         let registry = MockImageRegistry::new();
-        let spec = registry.get_language_image(Language::Python).await.expect("spec");
+        let spec = registry
+            .get_language_image(Language::Python)
+            .await
+            .expect("spec");
         assert_eq!(spec.name, "mock/python");
         assert_eq!(spec.language, Language::Python);
     }

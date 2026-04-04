@@ -24,10 +24,10 @@ pub mod planner;
 pub mod prompt_registry;
 /// Agent execution runner with tool calling and timeout enforcement.
 pub mod runner;
-/// Tool registry and built-in tool definitions.
-pub mod tools;
 /// Safety system: confidence scoring, action gates, and diff generation.
 pub mod safety;
+/// Tool registry and built-in tool definitions.
+pub mod tools;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
 pub mod workflow;
 
@@ -38,11 +38,11 @@ pub use devops::DevOpsAgent;
 pub use explorer::ExplorerAgent;
 pub use librarian::LibrarianAgent;
 pub use memory::{
-    get_conversation_excerpt, get_excerpts_for_decisions, redact_sensitive, why, 
-    BranchDiff, BranchError, BranchId, BranchStore, ChangeType, ConversationExcerpt,
-    DecisionEntry, DecisionIndex, DecisionLog, ExcerptMessage, GitDiffSummary,
+    BranchDiff, BranchError, BranchId, BranchStore, ChangeType, ConversationExcerpt, DecisionEntry,
+    DecisionIndex, DecisionLog, ExcerptMessage, GitDiffSummary, MAX_BRANCHES_PER_PROJECT,
     MemoryHooks, MemorySection, MemoryTrigger, ProjectMemory, StateBranch, UpdateEvent,
-    WhyExplanation, WhyTarget, MAX_BRANCHES_PER_PROJECT,
+    WhyExplanation, WhyTarget, get_conversation_excerpt, get_excerpts_for_decisions,
+    redact_sensitive, why,
 };
 pub use orchestrator::OrchestratorAgent;
 pub use planner::PlannerAgent;
@@ -51,13 +51,13 @@ pub use runner::{
     AgentRunner, DEFAULT_TIMEOUT_SECS, MAX_ITERATIONS, RunnerConfig, ToolExecutionResult,
     ToolExecutor,
 };
+pub use safety::{
+    ActionGate, ActionPreview, ActionType, ConfidenceCalculator, ConfidenceFactor, ConfidenceScore,
+    DiffHunk, DiffLine, DiffStats, FileDiff, GateConfig, GateDecision, MAX_DIFF_FILE_SIZE,
+    QuickDecision, RiskFactor, ThresholdOverride, detect_language,
+};
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowConfig, WorkflowEngine, WorkflowResult};
-pub use safety::{
-    ActionGate, ActionPreview, ActionType, ConfidenceCalculator, ConfidenceFactor,
-    ConfidenceScore, DiffHunk, DiffLine, DiffStats, FileDiff, GateConfig, GateDecision,
-    QuickDecision, RiskFactor, ThresholdOverride, detect_language, MAX_DIFF_FILE_SIZE,
-};
 
 pub use cuttlefish_core::traits::{
     agent::{Agent, AgentContext, AgentOutput, AgentRole, Category},

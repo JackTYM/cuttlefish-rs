@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use cuttlefish_core::traits::provider::{
     CompletionRequest, CompletionResponse, ModelProvider, ProviderResult, StreamChunk,
 };
-use futures::stream::BoxStream;
 use futures::StreamExt;
+use futures::stream::BoxStream;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::time::Instant;

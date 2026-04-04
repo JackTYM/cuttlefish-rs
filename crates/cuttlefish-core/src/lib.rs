@@ -26,7 +26,9 @@ pub use advanced::{
     AgentRoutingConfig, GithubAppClaims, ModelConfig, ProjectTemplate, ReleaseAsset, ReleaseInfo,
     WorkflowStatus, find_template, is_newer_version, load_templates_from_dir,
 };
-pub use alerts::{AlertChecker, AlertError, AlertNotifier, LogNotifier, NoopNotifier, TriggeredAlert};
+pub use alerts::{
+    AlertChecker, AlertError, AlertNotifier, LogNotifier, NoopNotifier, TriggeredAlert,
+};
 pub use auth::{
     Action, ApiKeyScope, AuthError, CreateUserRequest, GeneratedApiKey, GeneratedResetToken,
     RefreshResult, Role, RoleError, SessionError, SessionInfo, SessionMetadata, TokenClaims,

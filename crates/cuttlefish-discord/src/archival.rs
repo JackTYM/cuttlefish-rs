@@ -362,7 +362,10 @@ mod tests {
 
         assert_eq!(config.inactivity_days, 14);
         assert!(!config.auto_archive);
-        assert_eq!(config.archive_category_name, Some("Old Projects".to_string()));
+        assert_eq!(
+            config.archive_category_name,
+            Some("Old Projects".to_string())
+        );
     }
 
     #[test]
@@ -386,14 +389,8 @@ mod tests {
             ChannelArchival::get_original_name("archived-project-myapp"),
             Some("project-myapp")
         );
-        assert_eq!(
-            ChannelArchival::get_original_name("archived-"),
-            Some("")
-        );
-        assert_eq!(
-            ChannelArchival::get_original_name("project-myapp"),
-            None
-        );
+        assert_eq!(ChannelArchival::get_original_name("archived-"), Some(""));
+        assert_eq!(ChannelArchival::get_original_name("project-myapp"), None);
     }
 
     #[test]

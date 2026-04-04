@@ -6,8 +6,8 @@ use serenity::builder::{
     CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedFooter,
     CreateInteractionResponseMessage,
 };
-use serenity::model::application::CommandOptionType;
 use serenity::model::Colour;
+use serenity::model::application::CommandOptionType;
 
 use super::{get_string_option, names, send_error_response};
 use crate::api_client::{RejectActionRequest, get_api_client};

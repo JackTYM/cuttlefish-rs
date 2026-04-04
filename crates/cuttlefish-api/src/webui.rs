@@ -78,12 +78,9 @@ impl WebUiState {
 /// Tries to serve the requested file from the static directory.
 /// If the file doesn't exist and the request doesn't look like a file (no extension),
 /// serves `index.html` for SPA client-side routing.
-pub async fn webui_handler(
-    State(state): State<WebUiState>,
-    uri: Uri,
-) -> Response {
+pub async fn webui_handler(State(state): State<WebUiState>, uri: Uri) -> Response {
     let path = uri.path();
-    
+
     // Skip API routes - they should be handled by other routers
     if path.starts_with("/api/") || path.starts_with("/ws") || path == "/health" {
         return (StatusCode::NOT_FOUND, "Not found").into_response();
@@ -94,7 +91,7 @@ pub async fn webui_handler(
     }
 
     let static_dir = &state.config.static_dir;
-    
+
     // Try to serve the exact file first
     let file_path = if path == "/" {
         "index.html".to_string()
@@ -103,7 +100,7 @@ pub async fn webui_handler(
     };
 
     let full_path = static_dir.join(&file_path);
-    
+
     debug!(path = %path, full_path = %full_path.display(), "Serving static file");
 
     // If the file exists, serve it
@@ -112,8 +109,12 @@ pub async fn webui_handler(
     }
 
     // Check if this looks like a file request (has extension)
-    let has_extension = path.rsplit('/').next().map(|s| s.contains('.')).unwrap_or(false);
-    
+    let has_extension = path
+        .rsplit('/')
+        .next()
+        .map(|s| s.contains('.'))
+        .unwrap_or(false);
+
     if has_extension {
         // File request but file not found
         debug!(path = %path, "Static file not found");
@@ -134,7 +135,7 @@ pub async fn webui_handler(
 /// Serve a file from the static directory using tower-http's ServeDir.
 async fn serve_file(static_dir: &PathBuf, file_path: &str) -> Response {
     let service = ServeDir::new(static_dir);
-    
+
     let request = Request::builder()
         .uri(format!("/{}", file_path))
         .body(Body::empty())
@@ -151,7 +152,7 @@ async fn serve_file(static_dir: &PathBuf, file_path: &str) -> Response {
 /// This should be used as a fallback router after all API routes.
 pub fn webui_router(config: WebUiConfig) -> axum::Router {
     let state = WebUiState::new(config.clone());
-    
+
     if !config.enabled {
         tracing::info!("WebUI serving disabled");
         return axum::Router::new();
@@ -171,14 +172,13 @@ pub fn webui_router(config: WebUiConfig) -> axum::Router {
     );
 
     // Use ServeDir directly with fallback to index.html for SPA
-    let serve_dir = ServeDir::new(&config.static_dir)
-        .not_found_service(axum::routing::get(move |uri: Uri| {
+    let serve_dir =
+        ServeDir::new(&config.static_dir).not_found_service(axum::routing::get(move |uri: Uri| {
             let state = state.clone();
             async move { webui_handler(State(state), uri).await }
         }));
 
-    axum::Router::new()
-        .fallback_service(serve_dir)
+    axum::Router::new().fallback_service(serve_dir)
 }
 
 #[cfg(test)]
@@ -189,17 +189,19 @@ mod tests {
 
     fn setup_test_static_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("create temp dir");
-        
+
         // Create index.html
-        fs::write(temp_dir.path().join("index.html"), "<!DOCTYPE html><html></html>")
-            .expect("write index.html");
-        
+        fs::write(
+            temp_dir.path().join("index.html"),
+            "<!DOCTYPE html><html></html>",
+        )
+        .expect("write index.html");
+
         // Create _nuxt directory with a JS file
         let nuxt_dir = temp_dir.path().join("_nuxt");
         fs::create_dir(&nuxt_dir).expect("create _nuxt dir");
-        fs::write(nuxt_dir.join("app.js"), "console.log('app');")
-            .expect("write app.js");
-        
+        fs::write(nuxt_dir.join("app.js"), "console.log('app');").expect("write app.js");
+
         temp_dir
     }
 
@@ -207,7 +209,10 @@ mod tests {
     fn test_webui_config_default() {
         let config = WebUiConfig::default();
         assert!(config.enabled);
-        assert_eq!(config.static_dir, PathBuf::from("cuttlefish-web/.output/public"));
+        assert_eq!(
+            config.static_dir,
+            PathBuf::from("cuttlefish-web/.output/public")
+        );
     }
 
     #[test]
@@ -241,10 +246,10 @@ mod tests {
     async fn test_webui_handler_disabled() {
         let config = WebUiConfig::disabled();
         let state = WebUiState::new(config);
-        
+
         let uri: Uri = "/".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
-        
+
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
@@ -253,16 +258,16 @@ mod tests {
         let temp_dir = setup_test_static_dir();
         let config = WebUiConfig::new(temp_dir.path());
         let state = WebUiState::new(config);
-        
+
         // API routes should return 404 (handled by other routers)
         let uri: Uri = "/api/test".parse().expect("valid uri");
         let response = webui_handler(State(state.clone()), uri).await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        
+
         let uri: Uri = "/ws".parse().expect("valid uri");
         let response = webui_handler(State(state.clone()), uri).await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        
+
         let uri: Uri = "/health".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -273,10 +278,10 @@ mod tests {
         let temp_dir = setup_test_static_dir();
         let config = WebUiConfig::new(temp_dir.path());
         let state = WebUiState::new(config);
-        
+
         let uri: Uri = "/".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -285,10 +290,10 @@ mod tests {
         let temp_dir = setup_test_static_dir();
         let config = WebUiConfig::new(temp_dir.path());
         let state = WebUiState::new(config);
-        
+
         let uri: Uri = "/_nuxt/app.js".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -297,11 +302,11 @@ mod tests {
         let temp_dir = setup_test_static_dir();
         let config = WebUiConfig::new(temp_dir.path());
         let state = WebUiState::new(config);
-        
+
         // Route without extension should get index.html (SPA fallback)
         let uri: Uri = "/projects/123".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
-        
+
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -310,11 +315,11 @@ mod tests {
         let temp_dir = setup_test_static_dir();
         let config = WebUiConfig::new(temp_dir.path());
         let state = WebUiState::new(config);
-        
+
         // File with extension that doesn't exist should 404
         let uri: Uri = "/missing.js".parse().expect("valid uri");
         let response = webui_handler(State(state), uri).await;
-        
+
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }

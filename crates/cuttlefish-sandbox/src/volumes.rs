@@ -1,8 +1,8 @@
 //! Docker volume management for Cuttlefish sandboxes.
 
 use async_trait::async_trait;
-use bollard::volume::{CreateVolumeOptions, ListVolumesOptions, RemoveVolumeOptions};
 use bollard::Docker;
+use bollard::volume::{CreateVolumeOptions, ListVolumesOptions, RemoveVolumeOptions};
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{SandboxResult, VolumeHandle, VolumeManager};
 use std::collections::HashMap;
@@ -45,13 +45,11 @@ impl VolumeManager for DockerVolumeManager {
             ..Default::default()
         };
 
-        let volume = self
-            .docker
-            .create_volume(options)
-            .await
-            .map_err(|e| SandboxError::VolumeMountError {
+        let volume = self.docker.create_volume(options).await.map_err(|e| {
+            SandboxError::VolumeMountError {
                 reason: format!("Failed to create volume {full_name}: {e}"),
-            })?;
+            }
+        })?;
 
         info!("Created volume: {}", full_name);
 
@@ -122,13 +120,11 @@ impl VolumeManager for DockerVolumeManager {
 
         let options = ListVolumesOptions { filters };
 
-        let response = self
-            .docker
-            .list_volumes(Some(options))
-            .await
-            .map_err(|e| SandboxError::VolumeMountError {
+        let response = self.docker.list_volumes(Some(options)).await.map_err(|e| {
+            SandboxError::VolumeMountError {
                 reason: format!("Failed to list volumes: {e}"),
-            })?;
+            }
+        })?;
 
         let volumes = response
             .volumes
@@ -164,9 +160,6 @@ mod tests {
             docker: Docker::connect_with_socket_defaults()
                 .expect("Docker connection required for test"),
         };
-        assert_eq!(
-            manager.prefixed_name("cuttlefish-test"),
-            "cuttlefish-test"
-        );
+        assert_eq!(manager.prefixed_name("cuttlefish-test"), "cuttlefish-test");
     }
 }

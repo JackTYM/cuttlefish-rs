@@ -9,12 +9,12 @@
 use std::sync::Arc;
 
 use axum::{
+    Extension, Router,
     extract::{Path, State},
     http::StatusCode,
     middleware::from_fn_with_state,
     response::Json,
     routing::{delete, get, post, put},
-    Extension, Router,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -22,13 +22,13 @@ use uuid::Uuid;
 
 use cuttlefish_db::{
     org_api_keys::{
-        add_org_api_key, delete_org_api_key, get_org_api_keys, OrgApiKeyError, OrgApiKeySummary,
+        OrgApiKeyError, OrgApiKeySummary, add_org_api_key, delete_org_api_key, get_org_api_keys,
     },
-    org_config::{get_org_config, update_org_config, OrgConfig},
+    org_config::{OrgConfig, get_org_config, update_org_config},
     organization::{
-        add_member, can_user_access_org, count_members, create_organization, delete_organization,
-        get_member, get_org_members, get_organization, get_user_orgs, remove_member,
-        update_member_role, update_org_name, OrgError, OrgMember, OrgRole, OrgSummary,
+        OrgError, OrgMember, OrgRole, OrgSummary, add_member, can_user_access_org, count_members,
+        create_organization, delete_organization, get_member, get_org_members, get_organization,
+        get_user_orgs, remove_member, update_member_role, update_org_name,
     },
 };
 
@@ -189,10 +189,14 @@ fn error_response(status: StatusCode, message: &str) -> ApiError {
 fn org_error_to_api(e: OrgError) -> ApiError {
     match e {
         OrgError::NotFound => error_response(StatusCode::NOT_FOUND, "Organization not found"),
-        OrgError::SlugExists => error_response(StatusCode::CONFLICT, "Organization name already taken"),
+        OrgError::SlugExists => {
+            error_response(StatusCode::CONFLICT, "Organization name already taken")
+        }
         OrgError::AlreadyMember => error_response(StatusCode::CONFLICT, "User is already a member"),
         OrgError::NotMember => error_response(StatusCode::NOT_FOUND, "User is not a member"),
-        OrgError::LastOwner => error_response(StatusCode::BAD_REQUEST, "Cannot remove the last owner"),
+        OrgError::LastOwner => {
+            error_response(StatusCode::BAD_REQUEST, "Cannot remove the last owner")
+        }
         OrgError::InsufficientPermissions => {
             error_response(StatusCode::FORBIDDEN, "Insufficient permissions")
         }
@@ -215,9 +219,10 @@ fn api_key_error_to_api(e: OrgApiKeyError) -> ApiError {
         OrgApiKeyError::InsufficientPermissions => {
             error_response(StatusCode::FORBIDDEN, "Insufficient permissions")
         }
-        OrgApiKeyError::ProviderKeyExists => {
-            error_response(StatusCode::CONFLICT, "API key for this provider already exists")
-        }
+        OrgApiKeyError::ProviderKeyExists => error_response(
+            StatusCode::CONFLICT,
+            "API key for this provider already exists",
+        ),
         OrgApiKeyError::EncryptionError(e) => {
             tracing::error!("Encryption error: {}", e);
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Encryption error")
@@ -276,12 +281,10 @@ pub async fn list_orgs_handler(
     State(state): State<OrganizationState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Vec<OrgSummary>>, ApiError> {
-    let orgs = get_user_orgs(&state.db, &user.user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Database error: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
-        })?;
+    let orgs = get_user_orgs(&state.db, &user.user_id).await.map_err(|e| {
+        tracing::error!("Database error: {}", e);
+        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+    })?;
 
     Ok(Json(orgs))
 }
@@ -309,7 +312,10 @@ pub async fn get_org_handler(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
         })?
         .ok_or_else(|| {
-            error_response(StatusCode::FORBIDDEN, "You are not a member of this organization")
+            error_response(
+                StatusCode::FORBIDDEN,
+                "You are not a member of this organization",
+            )
         })?;
 
     let member_count = count_members(&state.db, &org_id).await.map_err(|e| {
@@ -367,7 +373,9 @@ pub async fn update_org_handler(
         tracing::info!(org_id = %org_id, new_name = %name, "Organization name updated");
     }
 
-    Ok(Json(serde_json::json!({ "message": "Organization updated successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Organization updated successfully" }),
+    ))
 }
 
 /// Delete an organization.
@@ -384,7 +392,9 @@ pub async fn delete_org_handler(
 
     tracing::info!(org_id = %org_id, "Organization deleted");
 
-    Ok(Json(serde_json::json!({ "message": "Organization deleted successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Organization deleted successfully" }),
+    ))
 }
 
 /// Add a member to an organization.
@@ -476,7 +486,9 @@ pub async fn remove_member_handler(
         "Member removed from organization"
     );
 
-    Ok(Json(serde_json::json!({ "message": "Member removed successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Member removed successfully" }),
+    ))
 }
 
 /// Update a member's role.
@@ -551,7 +563,9 @@ pub async fn update_config_handler(
 
     tracing::info!(org_id = %org_id, "Organization config updated");
 
-    Ok(Json(serde_json::json!({ "message": "Configuration updated successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Configuration updated successfully" }),
+    ))
 }
 
 /// Add an API key to the organization pool.
@@ -634,7 +648,9 @@ pub async fn delete_api_key_handler(
         "API key deleted from organization"
     );
 
-    Ok(Json(serde_json::json!({ "message": "API key deleted successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "API key deleted successfully" }),
+    ))
 }
 
 /// Build the organization routes router.
@@ -642,7 +658,10 @@ pub fn organization_router(state: OrganizationState) -> Router {
     let auth_config = state.config.clone();
 
     Router::new()
-        .route("/organizations", post(create_org_handler).get(list_orgs_handler))
+        .route(
+            "/organizations",
+            post(create_org_handler).get(list_orgs_handler),
+        )
         .route(
             "/organizations/{id}",
             get(get_org_handler)
@@ -673,7 +692,10 @@ pub fn organization_router(state: OrganizationState) -> Router {
             "/organizations/{id}/api-keys/{key_id}",
             delete(delete_api_key_handler),
         )
-        .layer(from_fn_with_state(auth_config, crate::middleware::require_auth))
+        .layer(from_fn_with_state(
+            auth_config,
+            crate::middleware::require_auth,
+        ))
         .with_state(state)
 }
 

@@ -8,8 +8,8 @@ use serenity::builder::{
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
     CreateInteractionResponseMessage,
 };
-use serenity::model::application::CommandOptionType;
 use serenity::model::Colour;
+use serenity::model::application::CommandOptionType;
 
 use super::{get_string_option, names};
 use crate::api_client::{LogEntry as ApiLogEntry, get_api_client};
@@ -157,7 +157,9 @@ fn get_integer_option(command: &CommandInteraction, name: &str) -> Option<i64> {
     use serenity::model::application::ResolvedValue;
 
     command.data.options().iter().find_map(|opt| {
-        if opt.name == name && let ResolvedValue::Integer(i) = opt.value {
+        if opt.name == name
+            && let ResolvedValue::Integer(i) = opt.value
+        {
             return Some(i);
         }
         None
@@ -211,10 +213,7 @@ fn format_logs_for_discord(logs: &[LogEntry]) -> (String, bool) {
     let mut truncated = false;
 
     for entry in logs {
-        let line = format!(
-            "[{}] {}: {}\n",
-            entry.timestamp, entry.agent, entry.message
-        );
+        let line = format!("[{}] {}: {}\n", entry.timestamp, entry.agent, entry.message);
 
         if output.len() + line.len() + 4 > DISCORD_CONTENT_LIMIT {
             truncated = true;

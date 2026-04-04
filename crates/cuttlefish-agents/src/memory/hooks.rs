@@ -121,7 +121,7 @@ impl MemoryHooks {
         }
 
         let result = self.apply_event(&event, message_id).await;
-        
+
         if result.is_ok() {
             let mut last = self.last_update.lock().await;
             *last = Some(Instant::now());
@@ -320,12 +320,10 @@ mod tests {
 
         hooks.process_event(event, "msg-1").await.expect("process");
 
-        let memory = ProjectMemory::load(ProjectMemory::default_path(temp_dir.path()))
-            .expect("load memory");
+        let memory =
+            ProjectMemory::load(ProjectMemory::default_path(temp_dir.path())).expect("load memory");
         assert_eq!(memory.key_decisions.len(), 1);
-        assert!(memory.key_decisions[0]
-            .decision
-            .contains("markdown"));
+        assert!(memory.key_decisions[0].decision.contains("markdown"));
     }
 
     #[tokio::test]
@@ -340,8 +338,8 @@ mod tests {
 
         hooks.process_event(event, "msg-1").await.expect("process");
 
-        let memory = ProjectMemory::load(ProjectMemory::default_path(temp_dir.path()))
-            .expect("load memory");
+        let memory =
+            ProjectMemory::load(ProjectMemory::default_path(temp_dir.path())).expect("load memory");
         assert_eq!(memory.gotchas.len(), 1);
         assert_eq!(memory.gotchas[0].gotcha, "UTF-8 BOM");
     }
@@ -358,8 +356,8 @@ mod tests {
 
         hooks.process_event(event, "msg-1").await.expect("process");
 
-        let memory = ProjectMemory::load(ProjectMemory::default_path(temp_dir.path()))
-            .expect("load memory");
+        let memory =
+            ProjectMemory::load(ProjectMemory::default_path(temp_dir.path())).expect("load memory");
         assert_eq!(memory.rejected_approaches.len(), 1);
         assert_eq!(memory.rejected_approaches[0].approach, "JSON format");
     }
@@ -377,8 +375,8 @@ mod tests {
 
         hooks.process_event(event, "msg-1").await.expect("process");
 
-        let memory = ProjectMemory::load(ProjectMemory::default_path(temp_dir.path()))
-            .expect("load memory");
+        let memory =
+            ProjectMemory::load(ProjectMemory::default_path(temp_dir.path())).expect("load memory");
         assert_eq!(
             memory.active_context.current_task,
             Some("Implementing memory system".to_string())
@@ -405,8 +403,8 @@ mod tests {
         let result2 = hooks.process_event(event2, "msg-2").await.expect("process");
         assert!(!result2);
 
-        let memory = ProjectMemory::load(ProjectMemory::default_path(temp_dir.path()))
-            .expect("load memory");
+        let memory =
+            ProjectMemory::load(ProjectMemory::default_path(temp_dir.path())).expect("load memory");
         assert_eq!(memory.key_decisions.len(), 1);
     }
 
@@ -434,7 +432,9 @@ mod tests {
     #[test]
     fn test_should_trigger_for_file() {
         assert!(MemoryTrigger::should_trigger_for_file("src/main.rs"));
-        assert!(MemoryTrigger::should_trigger_for_file("crates/foo/src/lib.rs"));
+        assert!(MemoryTrigger::should_trigger_for_file(
+            "crates/foo/src/lib.rs"
+        ));
         assert!(!MemoryTrigger::should_trigger_for_file("README.md"));
         assert!(!MemoryTrigger::should_trigger_for_file("Cargo.toml"));
     }

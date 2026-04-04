@@ -9,12 +9,12 @@
 use std::sync::Arc;
 
 use axum::{
+    Extension, Router,
     extract::{Path, State},
     http::StatusCode,
     middleware::from_fn_with_state,
     response::Json,
     routing::{delete, get, post},
-    Extension, Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,8 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use cuttlefish_core::auth::{
-    generate_api_key, generate_reset_token, hash_password, hash_reset_token,
-    validate_password_strength, verify_password, ApiKeyScope, TokenPair,
+    ApiKeyScope, TokenPair, generate_api_key, generate_reset_token, hash_password,
+    hash_reset_token, validate_password_strength, verify_password,
 };
 use cuttlefish_db::{api_keys, auth, password_reset, sessions};
 
@@ -258,7 +258,10 @@ pub async fn register(
 
     let email = req.email.trim().to_lowercase();
     if !cuttlefish_core::auth::user::validate_email(&email) {
-        return Err(error_response(StatusCode::BAD_REQUEST, "Invalid email format"));
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "Invalid email format",
+        ));
     }
 
     if auth::email_exists(&state.db, &email).await.map_err(|e| {
@@ -272,12 +275,18 @@ pub async fn register(
     }
 
     validate_password_strength(&req.password).map_err(|e| {
-        error_response(StatusCode::BAD_REQUEST, &format!("Password too weak: {}", e))
+        error_response(
+            StatusCode::BAD_REQUEST,
+            &format!("Password too weak: {}", e),
+        )
     })?;
 
     let password_hash = hash_password(&req.password).map_err(|e| {
         tracing::error!("Password hashing failed: {}", e);
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to process password")
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to process password",
+        )
     })?;
 
     let user_id = Uuid::new_v4().to_string();
@@ -354,12 +363,19 @@ pub async fn login(
     let session_id = Uuid::new_v4().to_string();
     let refresh_token_hash =
         cuttlefish_core::auth::session::hash_refresh_token(&tokens.refresh_token);
-    sessions::create_session(&state.db, &session_id, &user.id, &refresh_token_hash, None, None)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to create session: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Session creation failed")
-        })?;
+    sessions::create_session(
+        &state.db,
+        &session_id,
+        &user.id,
+        &refresh_token_hash,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to create session: {}", e);
+        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Session creation failed")
+    })?;
 
     let _ = auth::update_last_login(&state.db, &user.id).await;
 
@@ -467,7 +483,9 @@ pub async fn logout(
         tracing::info!(user_id = %user.user_id, session_id = %session.id, "User logged out");
     }
 
-    Ok(Json(serde_json::json!({ "message": "Logged out successfully" })))
+    Ok(Json(
+        serde_json::json!({ "message": "Logged out successfully" }),
+    ))
 }
 
 /// Logout from all sessions.
@@ -577,19 +595,28 @@ pub async fn change_password(
     }
 
     validate_password_strength(&req.new_password).map_err(|e| {
-        error_response(StatusCode::BAD_REQUEST, &format!("Password too weak: {}", e))
+        error_response(
+            StatusCode::BAD_REQUEST,
+            &format!("Password too weak: {}", e),
+        )
     })?;
 
     let new_hash = hash_password(&req.new_password).map_err(|e| {
         tracing::error!("Password hashing failed: {}", e);
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to process password")
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to process password",
+        )
     })?;
 
     auth::update_user_password(&state.db, &user.user_id, &new_hash)
         .await
         .map_err(|e| {
             tracing::error!("Password update failed: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update password")
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to update password",
+            )
         })?;
 
     sessions::revoke_all_user_sessions(&state.db, &user.user_id)
@@ -682,19 +709,28 @@ pub async fn reset_password(
     }
 
     validate_password_strength(&req.new_password).map_err(|e| {
-        error_response(StatusCode::BAD_REQUEST, &format!("Password too weak: {}", e))
+        error_response(
+            StatusCode::BAD_REQUEST,
+            &format!("Password too weak: {}", e),
+        )
     })?;
 
     let new_hash = hash_password(&req.new_password).map_err(|e| {
         tracing::error!("Password hashing failed: {}", e);
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to process password")
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to process password",
+        )
     })?;
 
     auth::update_user_password(&state.db, &reset_token.user_id, &new_hash)
         .await
         .map_err(|e| {
             tracing::error!("Password update failed: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to update password")
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to update password",
+            )
         })?;
 
     password_reset::mark_reset_token_used(&state.db, &reset_token.id)
@@ -787,7 +823,10 @@ pub async fn create_api_key_handler(
     .await
     .map_err(|e| {
         tracing::error!("API key creation failed: {}", e);
-        error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to create API key")
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to create API key",
+        )
     })?;
 
     tracing::info!(
@@ -843,7 +882,10 @@ pub async fn delete_api_key(
         .await
         .map_err(|e| {
             tracing::error!("API key revocation failed: {}", e);
-            error_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to revoke API key")
+            error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to revoke API key",
+            )
         })?;
 
     tracing::info!(user_id = %user.user_id, key_id = %key_id, "API key revoked");
@@ -872,7 +914,10 @@ pub fn auth_router(state: AuthState) -> Router {
         .route("/password", post(change_password))
         .route("/api-keys", get(list_api_keys).post(create_api_key_handler))
         .route("/api-keys/{id}", delete(delete_api_key))
-        .layer(from_fn_with_state(auth_config, crate::middleware::require_auth));
+        .layer(from_fn_with_state(
+            auth_config,
+            crate::middleware::require_auth,
+        ));
 
     Router::new()
         .merge(public_routes)

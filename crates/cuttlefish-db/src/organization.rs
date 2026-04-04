@@ -230,17 +230,13 @@ pub async fn create_organizations_tables(pool: &SqlitePool) -> Result<(), sqlx::
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_org_members_org ON organization_members(org_id)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_org_members_org ON organization_members(org_id)")
+        .execute(pool)
+        .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_org_members_user ON organization_members(user_id)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_org_members_user ON organization_members(user_id)")
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -344,7 +340,9 @@ pub async fn add_member(
     actor_id: &str,
 ) -> Result<OrgMember, OrgError> {
     // Verify org exists
-    let org = get_organization(pool, org_id).await?.ok_or(OrgError::NotFound)?;
+    let org = get_organization(pool, org_id)
+        .await?
+        .ok_or(OrgError::NotFound)?;
 
     // Verify actor has permission (must be owner or admin)
     let actor_member = get_member(pool, org_id, actor_id).await?;
@@ -398,7 +396,9 @@ pub async fn remove_member(
     actor_id: &str,
 ) -> Result<bool, OrgError> {
     // Verify org exists
-    let org = get_organization(pool, org_id).await?.ok_or(OrgError::NotFound)?;
+    let org = get_organization(pool, org_id)
+        .await?
+        .ok_or(OrgError::NotFound)?;
 
     // Verify actor has permission
     let actor_member = get_member(pool, org_id, actor_id).await?;
@@ -410,7 +410,9 @@ pub async fn remove_member(
     }
 
     // Get target member
-    let target_member = get_member(pool, org_id, user_id).await?.ok_or(OrgError::NotMember)?;
+    let target_member = get_member(pool, org_id, user_id)
+        .await?
+        .ok_or(OrgError::NotMember)?;
     let target_role = target_member.role();
 
     // Cannot remove someone with equal or higher role (unless removing self)
@@ -427,12 +429,11 @@ pub async fn remove_member(
         }
     }
 
-    let result =
-        sqlx::query("DELETE FROM organization_members WHERE org_id = ? AND user_id = ?")
-            .bind(org_id)
-            .bind(user_id)
-            .execute(pool)
-            .await?;
+    let result = sqlx::query("DELETE FROM organization_members WHERE org_id = ? AND user_id = ?")
+        .bind(org_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -459,7 +460,9 @@ pub async fn update_member_role(
     }
 
     // Verify org exists
-    let org = get_organization(pool, org_id).await?.ok_or(OrgError::NotFound)?;
+    let org = get_organization(pool, org_id)
+        .await?
+        .ok_or(OrgError::NotFound)?;
 
     // Verify actor has permission
     let actor_member = get_member(pool, org_id, actor_id).await?;
@@ -470,7 +473,9 @@ pub async fn update_member_role(
     }
 
     // Get target member
-    let target_member = get_member(pool, org_id, user_id).await?.ok_or(OrgError::NotMember)?;
+    let target_member = get_member(pool, org_id, user_id)
+        .await?
+        .ok_or(OrgError::NotMember)?;
     let target_role = target_member.role();
 
     // Cannot modify someone with equal or higher role
@@ -491,14 +496,13 @@ pub async fn update_member_role(
         }
     }
 
-    let result = sqlx::query(
-        "UPDATE organization_members SET role = ? WHERE org_id = ? AND user_id = ?",
-    )
-    .bind(new_role.as_str())
-    .bind(org_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE organization_members SET role = ? WHERE org_id = ? AND user_id = ?")
+            .bind(new_role.as_str())
+            .bind(org_id)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -565,12 +569,10 @@ pub async fn get_user_orgs(
 
 /// Count members in an organization.
 pub async fn count_members(pool: &SqlitePool, org_id: &str) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM organization_members WHERE org_id = ?",
-    )
-    .bind(org_id)
-    .fetch_one(pool)
-    .await
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organization_members WHERE org_id = ?")
+        .bind(org_id)
+        .fetch_one(pool)
+        .await
 }
 
 /// Count members by role in an organization.
@@ -667,7 +669,9 @@ pub async fn delete_organization(
     org_id: &str,
     actor_id: &str,
 ) -> Result<bool, OrgError> {
-    let org = get_organization(pool, org_id).await?.ok_or(OrgError::NotFound)?;
+    let org = get_organization(pool, org_id)
+        .await?
+        .ok_or(OrgError::NotFound)?;
 
     // Only owner can delete
     if org.owner_id != actor_id {
@@ -929,10 +933,9 @@ mod tests {
         .await
         .expect("add");
 
-        let updated =
-            update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
-                .await
-                .expect("update");
+        let updated = update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
+            .await
+            .expect("update");
         assert!(updated);
 
         let member = get_member(&pool, "org-1", "user-bob")
@@ -989,10 +992,9 @@ mod tests {
         .expect("add charlie as owner");
 
         // Alice (original owner) demotes bob to admin - should work
-        let updated =
-            update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
-                .await
-                .expect("demote bob");
+        let updated = update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
+            .await
+            .expect("demote bob");
         assert!(updated);
 
         // Alice demotes charlie to admin - should work (alice is still owner)
@@ -1008,10 +1010,9 @@ mod tests {
         assert!(matches!(result, Err(OrgError::InsufficientPermissions)));
 
         // Promote bob back to owner so we can test last owner protection
-        let updated =
-            update_member_role(&pool, "org-1", "user-bob", OrgRole::Owner, "user-alice")
-                .await
-                .expect("promote bob back");
+        let updated = update_member_role(&pool, "org-1", "user-bob", OrgRole::Owner, "user-alice")
+            .await
+            .expect("promote bob back");
         assert!(updated);
 
         // Bob tries to demote alice (last owner besides bob) - alice is org.owner_id so protected
@@ -1040,10 +1041,9 @@ mod tests {
         .await
         .expect("add bob as owner");
 
-        let updated =
-            update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
-                .await
-                .expect("demote bob");
+        let updated = update_member_role(&pool, "org-1", "user-bob", OrgRole::Admin, "user-alice")
+            .await
+            .expect("demote bob");
         assert!(updated);
 
         let result =
@@ -1109,31 +1109,27 @@ mod tests {
         .expect("add");
 
         // Owner can access as admin
-        let can_admin =
-            can_user_access_org(&pool, "user-alice", "org-1", OrgRole::Admin)
-                .await
-                .expect("check");
+        let can_admin = can_user_access_org(&pool, "user-alice", "org-1", OrgRole::Admin)
+            .await
+            .expect("check");
         assert!(can_admin);
 
         // Member can access as member
-        let can_member =
-            can_user_access_org(&pool, "user-bob", "org-1", OrgRole::Member)
-                .await
-                .expect("check");
+        let can_member = can_user_access_org(&pool, "user-bob", "org-1", OrgRole::Member)
+            .await
+            .expect("check");
         assert!(can_member);
 
         // Member cannot access as admin
-        let cannot_admin =
-            can_user_access_org(&pool, "user-bob", "org-1", OrgRole::Admin)
-                .await
-                .expect("check");
+        let cannot_admin = can_user_access_org(&pool, "user-bob", "org-1", OrgRole::Admin)
+            .await
+            .expect("check");
         assert!(!cannot_admin);
 
         // Non-member cannot access
-        let cannot_access =
-            can_user_access_org(&pool, "user-charlie", "org-1", OrgRole::Member)
-                .await
-                .expect("check");
+        let cannot_access = can_user_access_org(&pool, "user-charlie", "org-1", OrgRole::Member)
+            .await
+            .expect("check");
         assert!(!cannot_access);
     }
 
@@ -1158,7 +1154,10 @@ mod tests {
             .expect("get")
             .expect("exists");
         let loaded_settings = org.settings();
-        assert_eq!(loaded_settings.default_model, Some("claude-sonnet".to_string()));
+        assert_eq!(
+            loaded_settings.default_model,
+            Some("claude-sonnet".to_string())
+        );
         assert_eq!(loaded_settings.max_projects, Some(10));
     }
 

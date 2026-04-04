@@ -238,10 +238,7 @@ impl MemoryState {
 // Helper Functions
 // ============================================================================
 
-fn error_response(
-    status: StatusCode,
-    message: &str,
-) -> (StatusCode, Json<serde_json::Value>) {
+fn error_response(status: StatusCode, message: &str) -> (StatusCode, Json<serde_json::Value>) {
     (status, Json(serde_json::json!({ "error": message })))
 }
 
@@ -397,7 +394,7 @@ pub async fn list_decisions(
 
     let log_path = DecisionLog::default_path(&project_path);
     let log = DecisionLog::new(&log_path);
-    
+
     let all_entries = log.read_all().map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -409,7 +406,7 @@ pub async fn list_decisions(
     let page = pagination.page.max(1);
     let per_page = pagination.per_page.clamp(1, 100);
     let start = (page - 1) * per_page;
-    
+
     let decisions: Vec<DecisionEntryResponse> = all_entries
         .into_iter()
         .skip(start)
@@ -455,7 +452,7 @@ pub async fn get_decision(
 
     let log_path = DecisionLog::default_path(&project_path);
     let log = DecisionLog::new(&log_path);
-    
+
     let all_entries = log.read_all().map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -507,7 +504,7 @@ pub async fn query_why(
 
     let log_path = DecisionLog::default_path(&project_path);
     let log = DecisionLog::new(&log_path);
-    
+
     let index = DecisionIndex::from_log(&log).map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -522,7 +519,7 @@ pub async fn query_why(
             return Err(error_response(
                 StatusCode::BAD_REQUEST,
                 "Invalid target type. Use 'file' or 'decision'",
-            ))
+            ));
         }
     };
 
@@ -620,12 +617,7 @@ pub async fn create_branch(
 
     // Use "HEAD" as git ref for now (actual git operations handled elsewhere)
     let branch = store
-        .create_branch(
-            &project_id,
-            &req.name,
-            req.description.as_deref(),
-            "HEAD",
-        )
+        .create_branch(&project_id, &req.name, req.description.as_deref(), "HEAD")
         .map_err(|e| {
             error_response(
                 StatusCode::BAD_REQUEST,
@@ -733,19 +725,25 @@ pub fn memory_router() -> axum::Router<MemoryState> {
     use axum::routing::{delete, get, post};
 
     axum::Router::new()
-        .route("/api/projects/{id}/memory", get(get_memory).put(update_memory))
+        .route(
+            "/api/projects/{id}/memory",
+            get(get_memory).put(update_memory),
+        )
         .route("/api/projects/{id}/decisions", get(list_decisions))
-        .route("/api/projects/{id}/decisions/{decision_id}", get(get_decision))
+        .route(
+            "/api/projects/{id}/decisions/{decision_id}",
+            get(get_decision),
+        )
         .route("/api/projects/{id}/why", post(query_why))
-        .route("/api/projects/{id}/branches", get(list_branches).post(create_branch))
+        .route(
+            "/api/projects/{id}/branches",
+            get(list_branches).post(create_branch),
+        )
         .route(
             "/api/projects/{id}/branches/{name}/restore",
             post(restore_branch),
         )
-        .route(
-            "/api/projects/{id}/branches/{name}",
-            delete(delete_branch),
-        )
+        .route("/api/projects/{id}/branches/{name}", delete(delete_branch))
 }
 
 #[cfg(test)]

@@ -315,8 +315,7 @@ pub enum HandoffNotification {
 #[allow(async_fn_in_trait)]
 pub trait HandoffNotifier: Send + Sync {
     /// Send a notification to a user.
-    async fn notify(&self, user_id: &str, notification: HandoffNotification)
-        -> Result<(), String>;
+    async fn notify(&self, user_id: &str, notification: HandoffNotification) -> Result<(), String>;
 }
 
 /// Error types for handoff operations.
@@ -383,17 +382,13 @@ pub async fn create_handoffs_table(pool: &SqlitePool) -> Result<(), sqlx::Error>
     .execute(pool)
     .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_handoffs_project ON handoffs(project_id, status)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_handoffs_project ON handoffs(project_id, status)")
+        .execute(pool)
+        .await?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_handoffs_to_user ON handoffs(to_user_id, status)",
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_handoffs_to_user ON handoffs(to_user_id, status)")
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         "CREATE INDEX IF NOT EXISTS idx_handoffs_from_user ON handoffs(from_user_id, created_at DESC)",
@@ -441,10 +436,14 @@ pub async fn create_handoff(
         return Err(HandoffError::SelfHandoff);
     }
 
-    let from_has_access =
-        can_user_access(pool, request.from_user_id, request.project_id, ProjectRole::Member)
-            .await
-            .map_err(HandoffError::from)?;
+    let from_has_access = can_user_access(
+        pool,
+        request.from_user_id,
+        request.project_id,
+        ProjectRole::Member,
+    )
+    .await
+    .map_err(HandoffError::from)?;
     if !from_has_access {
         return Err(HandoffError::NoProjectAccess);
     }
@@ -506,7 +505,9 @@ pub async fn accept_handoff(
     handoff_id: &str,
     user_id: &str,
 ) -> Result<ContextSnapshot, HandoffError> {
-    let handoff = get_handoff(pool, handoff_id).await?.ok_or(HandoffError::NotFound)?;
+    let handoff = get_handoff(pool, handoff_id)
+        .await?
+        .ok_or(HandoffError::NotFound)?;
 
     if !handoff.is_pending() {
         return Err(HandoffError::NotPending);
@@ -568,7 +569,9 @@ pub async fn reject_handoff(
     user_id: &str,
     reason: Option<&str>,
 ) -> Result<(), HandoffError> {
-    let handoff = get_handoff(pool, handoff_id).await?.ok_or(HandoffError::NotFound)?;
+    let handoff = get_handoff(pool, handoff_id)
+        .await?
+        .ok_or(HandoffError::NotFound)?;
 
     if !handoff.is_pending() {
         return Err(HandoffError::NotPending);
@@ -639,7 +642,8 @@ pub async fn get_pending_handoffs(
     .fetch_all(pool)
     .await?;
 
-    let mut summaries: Vec<HandoffSummary> = assigned.into_iter().map(HandoffSummary::from).collect();
+    let mut summaries: Vec<HandoffSummary> =
+        assigned.into_iter().map(HandoffSummary::from).collect();
     summaries.extend(open.into_iter().map(HandoffSummary::from));
 
     // Sort by created_at descending
@@ -701,10 +705,7 @@ pub async fn get_project_handoffs(
 /// Expire old pending handoffs.
 ///
 /// Returns the number of handoffs expired.
-pub async fn expire_old_handoffs(
-    pool: &SqlitePool,
-    max_age_days: i64,
-) -> Result<u64, sqlx::Error> {
+pub async fn expire_old_handoffs(pool: &SqlitePool, max_age_days: i64) -> Result<u64, sqlx::Error> {
     let cutoff = Utc::now() - Duration::days(max_age_days);
     let cutoff_str = cutoff.to_rfc3339();
 
@@ -719,10 +720,7 @@ pub async fn expire_old_handoffs(
 }
 
 /// Count pending handoffs for a user.
-pub async fn count_pending_handoffs(
-    pool: &SqlitePool,
-    user_id: &str,
-) -> Result<i64, sqlx::Error> {
+pub async fn count_pending_handoffs(pool: &SqlitePool, user_id: &str) -> Result<i64, sqlx::Error> {
     // Count directly assigned
     let assigned: i64 = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM handoffs WHERE to_user_id = ? AND status = 'pending'",
@@ -794,9 +792,9 @@ impl From<HandoffActivityAction> for ActivityAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::activity::create_activity_log_table;
     use crate::auth::create_users_table;
     use crate::sharing::{create_project_shares_table, share_project};
-    use crate::activity::create_activity_log_table;
     use tempfile::TempDir;
 
     async fn test_pool() -> (SqlitePool, TempDir) {
@@ -816,9 +814,15 @@ mod tests {
         .expect("create projects table");
 
         create_users_table(&pool).await.expect("create users table");
-        create_project_shares_table(&pool).await.expect("create shares table");
-        create_activity_log_table(&pool).await.expect("create activity table");
-        create_handoffs_table(&pool).await.expect("create handoffs table");
+        create_project_shares_table(&pool)
+            .await
+            .expect("create shares table");
+        create_activity_log_table(&pool)
+            .await
+            .expect("create activity table");
+        create_handoffs_table(&pool)
+            .await
+            .expect("create handoffs table");
 
         // Create test project
         sqlx::query("INSERT INTO projects (id, name) VALUES ('proj-1', 'Test Project')")
@@ -843,12 +847,26 @@ mod tests {
         }
 
         // Give alice and bob access to the project
-        share_project(&pool, "share-1", "proj-1", "user-alice", ProjectRole::Owner, "user-alice")
-            .await
-            .expect("share to alice");
-        share_project(&pool, "share-2", "proj-1", "user-bob", ProjectRole::Member, "user-alice")
-            .await
-            .expect("share to bob");
+        share_project(
+            &pool,
+            "share-1",
+            "proj-1",
+            "user-alice",
+            ProjectRole::Owner,
+            "user-alice",
+        )
+        .await
+        .expect("share to alice");
+        share_project(
+            &pool,
+            "share-2",
+            "proj-1",
+            "user-bob",
+            ProjectRole::Member,
+            "user-alice",
+        )
+        .await
+        .expect("share to bob");
 
         (pool, dir)
     }
@@ -1030,7 +1048,10 @@ mod tests {
         assert_eq!(restored.open_questions.len(), 1);
         assert_eq!(restored.suggested_next_steps.len(), 1);
 
-        let handoff = get_handoff(&pool, "handoff-1").await.expect("get").expect("exists");
+        let handoff = get_handoff(&pool, "handoff-1")
+            .await
+            .expect("get")
+            .expect("exists");
         assert_eq!(handoff.status(), HandoffStatus::Accepted);
         assert_eq!(handoff.accepted_by, Some("user-bob".to_string()));
     }
@@ -1113,7 +1134,10 @@ mod tests {
             .await
             .expect("reject");
 
-        let handoff = get_handoff(&pool, "handoff-1").await.expect("get").expect("exists");
+        let handoff = get_handoff(&pool, "handoff-1")
+            .await
+            .expect("get")
+            .expect("exists");
         assert_eq!(handoff.status(), HandoffStatus::Rejected);
         assert_eq!(handoff.rejection_reason, Some("Too busy".to_string()));
     }
@@ -1198,10 +1222,16 @@ mod tests {
         let expired = expire_old_handoffs(&pool, 7).await.expect("expire");
         assert_eq!(expired, 1);
 
-        let old = get_handoff(&pool, "old-handoff").await.expect("get").expect("exists");
+        let old = get_handoff(&pool, "old-handoff")
+            .await
+            .expect("get")
+            .expect("exists");
         assert_eq!(old.status(), HandoffStatus::Expired);
 
-        let new = get_handoff(&pool, "new-handoff").await.expect("get").expect("exists");
+        let new = get_handoff(&pool, "new-handoff")
+            .await
+            .expect("get")
+            .expect("exists");
         assert_eq!(new.status(), HandoffStatus::Pending);
     }
 
@@ -1235,7 +1265,14 @@ mod tests {
         let summary = &pending[0];
         assert!(summary.context_summary.len() <= 203);
         assert!(summary.context_summary.ends_with("..."));
-        assert!(summary.message_preview.as_ref().map(|m| m.len()).unwrap_or(0) <= 103);
+        assert!(
+            summary
+                .message_preview
+                .as_ref()
+                .map(|m| m.len())
+                .unwrap_or(0)
+                <= 103
+        );
     }
 
     #[tokio::test]
@@ -1244,22 +1281,54 @@ mod tests {
 
         let context = ContextSnapshot::new("Test");
 
-        create_handoff(&pool, make_request("h1", "proj-1", "user-alice", None, "Task 1", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
-        create_handoff(&pool, make_request("h2", "proj-1", "user-alice", None, "Task 2", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h1",
+                "proj-1",
+                "user-alice",
+                None,
+                "Task 1",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h2",
+                "proj-1",
+                "user-alice",
+                None,
+                "Task 2",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
 
-        accept_handoff(&pool, "h1", "user-bob").await.expect("accept");
+        accept_handoff(&pool, "h1", "user-bob")
+            .await
+            .expect("accept");
 
-        let all = get_project_handoffs(&pool, "proj-1", None, None).await.expect("get all");
+        let all = get_project_handoffs(&pool, "proj-1", None, None)
+            .await
+            .expect("get all");
         assert_eq!(all.len(), 2);
 
         let pending = get_project_handoffs(&pool, "proj-1", Some(HandoffStatus::Pending), None)
-            .await.expect("get pending");
+            .await
+            .expect("get pending");
         assert_eq!(pending.len(), 1);
 
         let accepted = get_project_handoffs(&pool, "proj-1", Some(HandoffStatus::Accepted), None)
-            .await.expect("get accepted");
+            .await
+            .expect("get accepted");
         assert_eq!(accepted.len(), 1);
     }
 
@@ -1269,20 +1338,65 @@ mod tests {
 
         let context = ContextSnapshot::new("Test");
 
-        create_handoff(&pool, make_request("h1", "proj-1", "user-alice", Some("user-bob"), "T1", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
-        create_handoff(&pool, make_request("h2", "proj-1", "user-alice", Some("user-bob"), "T2", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h1",
+                "proj-1",
+                "user-alice",
+                Some("user-bob"),
+                "T1",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h2",
+                "proj-1",
+                "user-alice",
+                Some("user-bob"),
+                "T2",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
 
-        create_handoff(&pool, make_request("h3", "proj-1", "user-alice", None, "T3", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h3",
+                "proj-1",
+                "user-alice",
+                None,
+                "T3",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
 
-        let count = count_pending_handoffs(&pool, "user-bob").await.expect("count");
+        let count = count_pending_handoffs(&pool, "user-bob")
+            .await
+            .expect("count");
         assert_eq!(count, 3);
 
-        accept_handoff(&pool, "h1", "user-bob").await.expect("accept");
+        accept_handoff(&pool, "h1", "user-bob")
+            .await
+            .expect("accept");
 
-        let count = count_pending_handoffs(&pool, "user-bob").await.expect("count");
+        let count = count_pending_handoffs(&pool, "user-bob")
+            .await
+            .expect("count");
         assert_eq!(count, 2);
     }
 
@@ -1294,13 +1408,11 @@ mod tests {
         context.open_files = vec!["src/main.rs".to_string()];
         context.open_questions = vec!["Q1".to_string(), "Q2".to_string()];
         context.suggested_next_steps = vec!["Step 1".to_string()];
-        context.recent_messages = vec![
-            MessageSnapshot {
-                role: "user".to_string(),
-                content: "Hello".to_string(),
-                timestamp: "2024-01-01T00:00:00Z".to_string(),
-            },
-        ];
+        context.recent_messages = vec![MessageSnapshot {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+            timestamp: "2024-01-01T00:00:00Z".to_string(),
+        }];
 
         let json = context.to_json();
         let restored = ContextSnapshot::from_json(&json).expect("parse");
@@ -1337,10 +1449,25 @@ mod tests {
         let (pool, _dir) = test_pool().await;
 
         let context = ContextSnapshot::new("Test");
-        create_handoff(&pool, make_request("h1", "proj-1", "user-alice", None, "Task", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h1",
+                "proj-1",
+                "user-alice",
+                None,
+                "Task",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
 
-        accept_handoff(&pool, "h1", "user-bob").await.expect("accept");
+        accept_handoff(&pool, "h1", "user-bob")
+            .await
+            .expect("accept");
 
         let result = accept_handoff(&pool, "h1", "user-bob").await;
         assert!(matches!(result, Err(HandoffError::NotPending)));
@@ -1352,15 +1479,45 @@ mod tests {
 
         let context = ContextSnapshot::new("Test");
 
-        create_handoff(&pool, make_request("h1", "proj-1", "user-alice", None, "T1", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
-        create_handoff(&pool, make_request("h2", "proj-1", "user-alice", None, "T2", None, &context, HandoffPriority::Normal))
-            .await.expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h1",
+                "proj-1",
+                "user-alice",
+                None,
+                "T1",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
+        create_handoff(
+            &pool,
+            make_request(
+                "h2",
+                "proj-1",
+                "user-alice",
+                None,
+                "T2",
+                None,
+                &context,
+                HandoffPriority::Normal,
+            ),
+        )
+        .await
+        .expect("create");
 
-        let created = get_created_handoffs(&pool, "user-alice", None).await.expect("get");
+        let created = get_created_handoffs(&pool, "user-alice", None)
+            .await
+            .expect("get");
         assert_eq!(created.len(), 2);
 
-        let created = get_created_handoffs(&pool, "user-bob", None).await.expect("get");
+        let created = get_created_handoffs(&pool, "user-bob", None)
+            .await
+            .expect("get");
         assert_eq!(created.len(), 0);
     }
 }

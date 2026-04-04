@@ -18,6 +18,6 @@ pub use shutdown::{
     UpdateCoordinator, backup_binary, exec_replace,
 };
 pub use task_state::{
-    ServerState, TaskCheckpointer, TaskProgress, TaskState, TaskStateError, TaskStateResult,
-    TaskStateStatus, DEFAULT_CHECKPOINT_DIR,
+    DEFAULT_CHECKPOINT_DIR, ServerState, TaskCheckpointer, TaskProgress, TaskState, TaskStateError,
+    TaskStateResult, TaskStateStatus,
 };

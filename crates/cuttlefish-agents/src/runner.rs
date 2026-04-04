@@ -418,7 +418,10 @@ impl SafetyGatedExecutor {
     }
 
     /// Execute a tool call with safety gate checks.
-    pub async fn execute(&self, call: &ToolCall) -> Result<ToolExecutionResult, GatedExecutionError> {
+    pub async fn execute(
+        &self,
+        call: &ToolCall,
+    ) -> Result<ToolExecutionResult, GatedExecutionError> {
         if !self.enabled {
             return Ok(self.inner.execute(call).await);
         }
@@ -437,7 +440,9 @@ impl SafetyGatedExecutor {
         let confidence = self.confidence_calculator.calculate_for_tool_call(call);
         let preview = self.create_preview(call, action_type);
 
-        let decision = self.gate.evaluate(action_type, &confidence, preview.clone());
+        let decision = self
+            .gate
+            .evaluate(action_type, &confidence, preview.clone());
 
         match decision {
             GateDecision::AutoApprove => {
@@ -448,7 +453,10 @@ impl SafetyGatedExecutor {
                 );
                 Ok(self.inner.execute(call).await)
             }
-            GateDecision::PromptUser { preview, confidence } => {
+            GateDecision::PromptUser {
+                preview,
+                confidence,
+            } => {
                 let action_id = uuid::Uuid::new_v4().to_string();
                 let pending = PendingAction {
                     id: action_id.clone(),
@@ -486,7 +494,10 @@ impl SafetyGatedExecutor {
     }
 
     /// Approve a pending action and execute it.
-    pub async fn approve_action(&self, action_id: &str) -> Result<ToolExecutionResult, GatedExecutionError> {
+    pub async fn approve_action(
+        &self,
+        action_id: &str,
+    ) -> Result<ToolExecutionResult, GatedExecutionError> {
         let pending = {
             let mut actions = self.pending_actions.write().await;
             if let Some((action, status)) = actions.get_mut(action_id) {
@@ -602,7 +613,10 @@ impl AgentRunner {
     }
 
     /// Create a runner without safety gates.
-    pub fn without_safety_gates(sandbox: Option<Arc<dyn Sandbox>>, sandbox_id: Option<SandboxId>) -> Self {
+    pub fn without_safety_gates(
+        sandbox: Option<Arc<dyn Sandbox>>,
+        sandbox_id: Option<SandboxId>,
+    ) -> Self {
         Self {
             config: RunnerConfig::default().without_safety_gates(),
             tool_executor: ToolExecutor::new(sandbox, sandbox_id),
@@ -763,7 +777,9 @@ mod tests {
         let pending = exec.list_pending_actions().await;
         assert_eq!(pending.len(), 1);
 
-        exec.reject_action(&action_id).await.expect("reject should succeed");
+        exec.reject_action(&action_id)
+            .await
+            .expect("reject should succeed");
 
         let pending = exec.list_pending_actions().await;
         assert!(pending.is_empty());

@@ -102,7 +102,9 @@ impl Sandbox for DockerSandbox {
         self.docker
             .start_container(&response.id, None::<StartContainerOptions<String>>)
             .await
-            .map_err(|e| SandboxError::Other(format!("Failed to start container {}: {e}", response.id)))?;
+            .map_err(|e| {
+                SandboxError::Other(format!("Failed to start container {}: {e}", response.id))
+            })?;
 
         let workspace_id = SandboxId(response.id.clone());
         let _ = self.exec(&workspace_id, "mkdir -p /workspace").await;
@@ -126,7 +128,9 @@ impl Sandbox for DockerSandbox {
             .docker
             .create_exec(container_id, exec_options)
             .await
-            .map_err(|e| SandboxError::Other(format!("Failed to create exec in {container_id}: {e}")))?;
+            .map_err(|e| {
+                SandboxError::Other(format!("Failed to create exec in {container_id}: {e}"))
+            })?;
 
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
@@ -274,7 +278,9 @@ impl Sandbox for DockerSandbox {
         self.docker
             .remove_container(container_id, Some(remove_opts))
             .await
-            .map_err(|e| SandboxError::Other(format!("Failed to remove container {container_id}: {e}")))?;
+            .map_err(|e| {
+                SandboxError::Other(format!("Failed to remove container {container_id}: {e}"))
+            })?;
 
         Ok(())
     }

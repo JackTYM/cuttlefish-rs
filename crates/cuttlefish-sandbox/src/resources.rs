@@ -1,7 +1,7 @@
 //! Resource usage monitoring and enforcement for sandboxes.
 
-use bollard::container::Stats;
 use bollard::Docker;
+use bollard::container::Stats;
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{ResourceLimits, SandboxResult};
 use futures::StreamExt;
@@ -119,8 +119,9 @@ impl ResourceEnforcer {
             .networks
             .as_ref()
             .map(|nets| {
-                nets.values()
-                    .fold((0u64, 0u64), |(rx, tx), net| (rx + net.rx_bytes, tx + net.tx_bytes))
+                nets.values().fold((0u64, 0u64), |(rx, tx), net| {
+                    (rx + net.rx_bytes, tx + net.tx_bytes)
+                })
             })
             .unwrap_or((0, 0));
 
@@ -185,8 +186,7 @@ mod tests {
         };
         let limits = ResourceLimits::standard();
 
-        let docker =
-            Docker::connect_with_socket_defaults().expect("Docker connection for test");
+        let docker = Docker::connect_with_socket_defaults().expect("Docker connection for test");
         let enforcer = ResourceEnforcer { docker };
         let violations = enforcer.check_limits(&usage, &limits);
         assert!(violations.is_empty());
@@ -201,8 +201,7 @@ mod tests {
         };
         let limits = ResourceLimits::standard(); // 512MB limit
 
-        let docker =
-            Docker::connect_with_socket_defaults().expect("Docker connection for test");
+        let docker = Docker::connect_with_socket_defaults().expect("Docker connection for test");
         let enforcer = ResourceEnforcer { docker };
         let violations = enforcer.check_limits(&usage, &limits);
         assert_eq!(violations.len(), 1);

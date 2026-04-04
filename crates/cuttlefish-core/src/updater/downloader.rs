@@ -300,8 +300,7 @@ mod tests {
 
     #[test]
     fn test_parse_checksum_file_standard_format() {
-        let content =
-            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08  cuttlefish-linux-x86_64\n\
+        let content = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08  cuttlefish-linux-x86_64\n\
              e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  cuttlefish-darwin-arm64";
 
         let path = Path::new("/tmp/cuttlefish-linux-x86_64");
@@ -315,8 +314,7 @@ mod tests {
 
     #[test]
     fn test_parse_checksum_file_binary_mode() {
-        let content =
-            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 *cuttlefish-linux-x86_64";
+        let content = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 *cuttlefish-linux-x86_64";
 
         let path = Path::new("/tmp/cuttlefish-linux-x86_64");
         let result = parse_checksum_file(content, path);
@@ -394,7 +392,10 @@ mod tests {
         let downloader = BinaryDownloader::with_defaults();
         let result = downloader.verify_checksum(&file_path, wrong_hash).await;
         assert!(result.is_err());
-        assert!(matches!(result, Err(DownloadError::ChecksumMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(DownloadError::ChecksumMismatch { .. })
+        ));
     }
 
     #[test]
@@ -404,9 +405,6 @@ mod tests {
             verify_checksums: false,
         };
         let downloader = BinaryDownloader::new(config);
-        assert_eq!(
-            downloader.download_dir(),
-            Path::new("/custom/path")
-        );
+        assert_eq!(downloader.download_dir(), Path::new("/custom/path"));
     }
 }

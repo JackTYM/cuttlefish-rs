@@ -1,9 +1,9 @@
 //! Container snapshot management using Docker image commits.
 
 use async_trait::async_trait;
+use bollard::Docker;
 use bollard::container::{Config, CreateContainerOptions};
 use bollard::image::{CommitContainerOptions, ListImagesOptions, RemoveImageOptions};
-use bollard::Docker;
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{
     ContainerConfig, SandboxHandle, SandboxResult, Snapshot, SnapshotManager, SnapshotOptions,
@@ -50,12 +50,11 @@ impl SnapshotManager for DockerSnapshotManager {
         debug!("Creating snapshot {} from container {}", name, handle.id);
 
         if options.pause_container {
-            self.docker
-                .pause_container(&handle.id)
-                .await
-                .map_err(|e| SandboxError::SnapshotError {
+            self.docker.pause_container(&handle.id).await.map_err(|e| {
+                SandboxError::SnapshotError {
                     reason: format!("Failed to pause container: {e}"),
-                })?;
+                }
+            })?;
         }
 
         let mut labels = options.labels.clone();
@@ -176,13 +175,11 @@ impl SnapshotManager for DockerSnapshotManager {
             ..Default::default()
         };
 
-        let images = self
-            .docker
-            .list_images(Some(options))
-            .await
-            .map_err(|e| SandboxError::SnapshotError {
+        let images = self.docker.list_images(Some(options)).await.map_err(|e| {
+            SandboxError::SnapshotError {
                 reason: format!("Failed to list snapshots: {e}"),
-            })?;
+            }
+        })?;
 
         let snapshots = images
             .into_iter()

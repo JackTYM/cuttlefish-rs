@@ -141,14 +141,13 @@ pub async fn update_share_role(
     user_id: &str,
     new_role: ProjectRole,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE project_shares SET role = ? WHERE project_id = ? AND user_id = ?",
-    )
-    .bind(new_role.as_str())
-    .bind(project_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE project_shares SET role = ? WHERE project_id = ? AND user_id = ?")
+            .bind(new_role.as_str())
+            .bind(project_id)
+            .bind(user_id)
+            .execute(pool)
+            .await?;
 
     Ok(result.rows_affected() > 0)
 }
@@ -350,7 +349,9 @@ mod tests {
         .await
         .expect("share member");
 
-        let shares = get_project_shares(&pool, "proj-1").await.expect("get shares");
+        let shares = get_project_shares(&pool, "proj-1")
+            .await
+            .expect("get shares");
         assert_eq!(shares.len(), 2);
     }
 

@@ -4,12 +4,12 @@
 //! separating create/start/stop/remove operations for finer control over container state.
 
 use async_trait::async_trait;
+use bollard::Docker;
 use bollard::container::{
     Config, CreateContainerOptions, InspectContainerOptions, RemoveContainerOptions,
     StartContainerOptions, StopContainerOptions,
 };
 use bollard::exec::{CreateExecOptions, StartExecResults};
-use bollard::Docker;
 use chrono::Utc;
 use cuttlefish_core::error::SandboxError;
 use cuttlefish_core::traits::sandbox::{
@@ -101,13 +101,13 @@ impl DockerSandboxLifecycle {
 
         Config {
             image: Some(image_ref),
-            env: if env.is_empty() {
-                None
-            } else {
-                Some(env)
-            },
+            env: if env.is_empty() { None } else { Some(env) },
             host_config: Some(host_config),
-            cmd: Some(vec!["tail".to_string(), "-f".to_string(), "/dev/null".to_string()]),
+            cmd: Some(vec![
+                "tail".to_string(),
+                "-f".to_string(),
+                "/dev/null".to_string(),
+            ]),
             working_dir: Some(config.working_dir.to_string_lossy().to_string()),
             ..Default::default()
         }
@@ -156,7 +156,9 @@ impl SandboxLifecycle for DockerSandboxLifecycle {
         self.docker
             .start_container(&handle.id, None::<StartContainerOptions<String>>)
             .await
-            .map_err(|e| SandboxError::Other(format!("Failed to start container {}: {e}", handle.id)))?;
+            .map_err(|e| {
+                SandboxError::Other(format!("Failed to start container {}: {e}", handle.id))
+            })?;
 
         info!("Started container: {}", handle.id);
         Ok(())
@@ -233,8 +235,8 @@ impl SandboxLifecycle for DockerSandboxLifecycle {
             .create_exec(&handle.id, exec_options)
             .await
             .map_err(|e| {
-            SandboxError::Other(format!("Failed to create exec in {}: {e}", handle.id))
-        })?;
+                SandboxError::Other(format!("Failed to create exec in {}: {e}", handle.id))
+            })?;
 
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
@@ -327,41 +329,35 @@ impl SandboxLifecycle for DockerSandboxLifecycle {
             })?;
 
         let status = match info.state {
-            Some(state) => {
-                match state.status {
-                    Some(bollard::service::ContainerStateStatusEnum::CREATED) => {
-                        ContainerStatus::Created
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::RUNNING) => {
-                        ContainerStatus::Running
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::PAUSED) => {
-                        ContainerStatus::Paused
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::EXITED) => {
-                        ContainerStatus::Stopped
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::DEAD) => {
-                        ContainerStatus::Stopped
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::REMOVING) => {
-                        ContainerStatus::Removed
-                    }
-                    Some(bollard::service::ContainerStateStatusEnum::RESTARTING) => {
-                        ContainerStatus::Running
-                    }
-                    None => {
-                        if state.running == Some(true) {
-                            ContainerStatus::Running
-                        } else if state.paused == Some(true) {
-                            ContainerStatus::Paused
-                        } else {
-                            ContainerStatus::Stopped
-                        }
-                    }
-                    _ => ContainerStatus::Stopped,
+            Some(state) => match state.status {
+                Some(bollard::service::ContainerStateStatusEnum::CREATED) => {
+                    ContainerStatus::Created
                 }
-            }
+                Some(bollard::service::ContainerStateStatusEnum::RUNNING) => {
+                    ContainerStatus::Running
+                }
+                Some(bollard::service::ContainerStateStatusEnum::PAUSED) => ContainerStatus::Paused,
+                Some(bollard::service::ContainerStateStatusEnum::EXITED) => {
+                    ContainerStatus::Stopped
+                }
+                Some(bollard::service::ContainerStateStatusEnum::DEAD) => ContainerStatus::Stopped,
+                Some(bollard::service::ContainerStateStatusEnum::REMOVING) => {
+                    ContainerStatus::Removed
+                }
+                Some(bollard::service::ContainerStateStatusEnum::RESTARTING) => {
+                    ContainerStatus::Running
+                }
+                None => {
+                    if state.running == Some(true) {
+                        ContainerStatus::Running
+                    } else if state.paused == Some(true) {
+                        ContainerStatus::Paused
+                    } else {
+                        ContainerStatus::Stopped
+                    }
+                }
+                _ => ContainerStatus::Stopped,
+            },
             None => ContainerStatus::Stopped,
         };
 
@@ -438,11 +434,12 @@ mod mock {
 
         async fn start(&self, handle: &SandboxHandle) -> SandboxResult<()> {
             let mut containers = self.containers.write().await;
-            let container = containers.get_mut(&handle.id).ok_or_else(|| {
-                SandboxError::ContainerNotFound {
-                    id: handle.id.clone(),
-                }
-            })?;
+            let container =
+                containers
+                    .get_mut(&handle.id)
+                    .ok_or_else(|| SandboxError::ContainerNotFound {
+                        id: handle.id.clone(),
+                    })?;
 
             match container.status {
                 ContainerStatus::Created | ContainerStatus::Stopped => {
@@ -462,11 +459,12 @@ mod mock {
 
         async fn stop(&self, handle: &SandboxHandle, _timeout_secs: u64) -> SandboxResult<()> {
             let mut containers = self.containers.write().await;
-            let container = containers.get_mut(&handle.id).ok_or_else(|| {
-                SandboxError::ContainerNotFound {
-                    id: handle.id.clone(),
-                }
-            })?;
+            let container =
+                containers
+                    .get_mut(&handle.id)
+                    .ok_or_else(|| SandboxError::ContainerNotFound {
+                        id: handle.id.clone(),
+                    })?;
 
             match container.status {
                 ContainerStatus::Running | ContainerStatus::Paused => {
@@ -498,11 +496,12 @@ mod mock {
             _timeout: std::time::Duration,
         ) -> SandboxResult<ExecutionResult> {
             let containers = self.containers.read().await;
-            let container = containers.get(&handle.id).ok_or_else(|| {
-                SandboxError::ContainerNotFound {
-                    id: handle.id.clone(),
-                }
-            })?;
+            let container =
+                containers
+                    .get(&handle.id)
+                    .ok_or_else(|| SandboxError::ContainerNotFound {
+                        id: handle.id.clone(),
+                    })?;
 
             if container.status != ContainerStatus::Running {
                 return Err(SandboxError::Other(format!(
@@ -521,11 +520,12 @@ mod mock {
 
         async fn status(&self, handle: &SandboxHandle) -> SandboxResult<ContainerStatus> {
             let containers = self.containers.read().await;
-            let container = containers.get(&handle.id).ok_or_else(|| {
-                SandboxError::ContainerNotFound {
-                    id: handle.id.clone(),
-                }
-            })?;
+            let container =
+                containers
+                    .get(&handle.id)
+                    .ok_or_else(|| SandboxError::ContainerNotFound {
+                        id: handle.id.clone(),
+                    })?;
             Ok(container.status)
         }
     }
@@ -546,7 +546,10 @@ mod tests {
         let lifecycle = MockSandboxLifecycle::new();
         let config = default_container_config();
 
-        let handle = lifecycle.create(config).await.expect("create should succeed");
+        let handle = lifecycle
+            .create(config)
+            .await
+            .expect("create should succeed");
         assert!(!handle.id.is_empty());
         assert!(!handle.name.is_empty());
     }
@@ -708,8 +711,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_docker_lifecycle_full() {
-            let lifecycle =
-                DockerSandboxLifecycle::new().expect("should connect to Docker");
+            let lifecycle = DockerSandboxLifecycle::new().expect("should connect to Docker");
 
             let config = ContainerConfig {
                 image: ImageSpec {

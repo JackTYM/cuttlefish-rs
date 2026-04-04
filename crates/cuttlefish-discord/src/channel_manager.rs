@@ -74,9 +74,7 @@ impl ChannelManager {
             .await
             .map_err(|e| DiscordError(format!("Failed to fetch guild channels: {e}")))?;
 
-        let existing = guild_channels
-            .values()
-            .find(|c| c.name == channel_name);
+        let existing = guild_channels.values().find(|c| c.name == channel_name);
 
         if existing.is_some() {
             return Err(DiscordError(format!(
@@ -256,8 +254,14 @@ mod tests {
 
     #[test]
     fn test_pending_action_type_equality() {
-        assert_eq!(PendingActionType::ApproveChange, PendingActionType::ApproveChange);
-        assert_ne!(PendingActionType::ApproveChange, PendingActionType::ReviewDiff);
+        assert_eq!(
+            PendingActionType::ApproveChange,
+            PendingActionType::ApproveChange
+        );
+        assert_ne!(
+            PendingActionType::ApproveChange,
+            PendingActionType::ReviewDiff
+        );
     }
 
     #[test]

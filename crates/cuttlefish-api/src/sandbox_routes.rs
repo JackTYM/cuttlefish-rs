@@ -1,11 +1,11 @@
 //! REST API routes for sandbox management.
 
 use axum::{
+    Router,
     extract::Path,
     http::StatusCode,
     response::Json,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -158,7 +158,9 @@ async fn create_sandbox(
 
     // Generate a mock ID for now
     let id = uuid::Uuid::new_v4().to_string();
-    let name = req.name.unwrap_or_else(|| format!("cuttlefish-{}", &id[..8]));
+    let name = req
+        .name
+        .unwrap_or_else(|| format!("cuttlefish-{}", &id[..8]));
 
     Ok(Json(CreateSandboxResponse {
         id,
@@ -295,7 +297,9 @@ mod tests {
                     .method("POST")
                     .uri("/sandbox")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_string(&body).expect("serialize body")))
+                    .body(Body::from(
+                        serde_json::to_string(&body).expect("serialize body"),
+                    ))
                     .expect("build request"),
             )
             .await
@@ -318,7 +322,9 @@ mod tests {
                     .method("POST")
                     .uri("/sandbox")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_string(&body).expect("serialize body")))
+                    .body(Body::from(
+                        serde_json::to_string(&body).expect("serialize body"),
+                    ))
                     .expect("build request"),
             )
             .await
@@ -341,7 +347,9 @@ mod tests {
                     .method("POST")
                     .uri("/sandbox/test-id/execute")
                     .header("content-type", "application/json")
-                    .body(Body::from(serde_json::to_string(&body).expect("serialize body")))
+                    .body(Body::from(
+                        serde_json::to_string(&body).expect("serialize body"),
+                    ))
                     .expect("build request"),
             )
             .await

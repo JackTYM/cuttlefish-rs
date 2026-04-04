@@ -23,13 +23,17 @@ pub async fn create_password_reset_tokens_table(pool: &SqlitePool) -> Result<(),
     .execute(pool)
     .await?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id)")
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id)",
+    )
+    .execute(pool)
+    .await?;
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash)")
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash)",
+    )
+    .execute(pool)
+    .await?;
 
     Ok(())
 }
@@ -137,7 +141,9 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", db_path.to_string_lossy());
         let pool = SqlitePool::connect(&url).await.expect("connect");
         create_users_table(&pool).await.expect("create users table");
-        create_password_reset_tokens_table(&pool).await.expect("create reset tokens table");
+        create_password_reset_tokens_table(&pool)
+            .await
+            .expect("create reset tokens table");
 
         sqlx::query(
             "INSERT INTO users (id, email, password_hash, created_at, updated_at) VALUES ('user-1', 'test@example.com', 'hash', datetime('now'), datetime('now'))",
@@ -226,7 +232,9 @@ mod tests {
         let cleaned = cleanup_expired_reset_tokens(&pool).await.expect("cleanup");
         assert_eq!(cleaned, 1);
 
-        let exists = token_hash_exists(&pool, "hash-expired").await.expect("check");
+        let exists = token_hash_exists(&pool, "hash-expired")
+            .await
+            .expect("check");
         assert!(!exists);
 
         let exists = token_hash_exists(&pool, "hash-valid").await.expect("check");
@@ -237,14 +245,18 @@ mod tests {
     async fn test_token_hash_exists() {
         let (pool, _dir) = test_pool().await;
 
-        let exists = token_hash_exists(&pool, "nonexistent").await.expect("check");
+        let exists = token_hash_exists(&pool, "nonexistent")
+            .await
+            .expect("check");
         assert!(!exists);
 
         create_reset_token(&pool, "token-exists", "user-1", "hash-exists")
             .await
             .expect("create");
 
-        let exists = token_hash_exists(&pool, "hash-exists").await.expect("check");
+        let exists = token_hash_exists(&pool, "hash-exists")
+            .await
+            .expect("check");
         assert!(exists);
     }
 
@@ -256,8 +268,10 @@ mod tests {
             .await
             .expect("create");
 
-        let created = chrono::DateTime::parse_from_rfc3339(&token.created_at).expect("parse created");
-        let expires = chrono::DateTime::parse_from_rfc3339(&token.expires_at).expect("parse expires");
+        let created =
+            chrono::DateTime::parse_from_rfc3339(&token.created_at).expect("parse created");
+        let expires =
+            chrono::DateTime::parse_from_rfc3339(&token.expires_at).expect("parse expires");
 
         let duration = expires.signed_duration_since(created);
         assert_eq!(duration.num_hours(), RESET_TOKEN_DURATION_HOURS);

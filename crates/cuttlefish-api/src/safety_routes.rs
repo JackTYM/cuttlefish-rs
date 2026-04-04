@@ -6,12 +6,12 @@
 //! - Diff preview for file changes
 
 use axum::{
+    Extension, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     middleware::from_fn_with_state,
     response::Json,
     routing::{delete, get, post},
-    Extension, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -160,7 +160,11 @@ impl From<Checkpoint> for CheckpointResponse {
             trigger: format!("{}", cp.trigger),
             git_ref: cp.components.git_ref,
             container_snapshot_id: cp.components.container_snapshot_id,
-            memory_backup_path: cp.components.memory_backup_path.to_string_lossy().to_string(),
+            memory_backup_path: cp
+                .components
+                .memory_backup_path
+                .to_string_lossy()
+                .to_string(),
         }
     }
 }
@@ -378,7 +382,8 @@ pub async fn create_checkpoint(
         .container_snapshot_id
         .unwrap_or_else(|| format!("snapshot-{}", Uuid::new_v4()));
 
-    let components = CheckpointComponents::new(req.git_ref, container_snapshot_id, memory_backup_path);
+    let components =
+        CheckpointComponents::new(req.git_ref, container_snapshot_id, memory_backup_path);
 
     let trigger = CheckpointTrigger::Manual {
         user_id: user.user_id.clone(),
@@ -467,7 +472,8 @@ pub async fn restore_checkpoint(
 
     // Prepare current components for safety checkpoint if requested
     let current_components = if req.create_safety_checkpoint {
-        let memory_backup_path = project_path.join(".cuttlefish/checkpoints/pre_rollback_memory.json");
+        let memory_backup_path =
+            project_path.join(".cuttlefish/checkpoints/pre_rollback_memory.json");
         Some(CheckpointComponents::new(
             "HEAD",
             format!("pre-rollback-{}", Uuid::new_v4()),
@@ -479,7 +485,12 @@ pub async fn restore_checkpoint(
 
     let (target, safety) = state
         .checkpoint_manager
-        .prepare_rollback(&project_id, &checkpoint_id, req.create_safety_checkpoint, current_components)
+        .prepare_rollback(
+            &project_id,
+            &checkpoint_id,
+            req.create_safety_checkpoint,
+            current_components,
+        )
         .await
         .map_err(|e| {
             error_response(
@@ -499,7 +510,8 @@ pub async fn restore_checkpoint(
     Ok(Json(RestoreResponse {
         restored_checkpoint: target.into(),
         safety_checkpoint: safety.map(CheckpointResponse::from),
-        message: "Rollback prepared. Execute git checkout and container restore to complete.".to_string(),
+        message: "Rollback prepared. Execute git checkout and container restore to complete."
+            .to_string(),
     }))
 }
 
@@ -652,10 +664,7 @@ pub async fn get_action_diff(
     })?;
 
     let diff = action.diff.as_ref().ok_or_else(|| {
-        error_response(
-            StatusCode::NOT_FOUND,
-            "No diff available for this action",
-        )
+        error_response(StatusCode::NOT_FOUND, "No diff available for this action")
     })?;
 
     Ok(Json(DiffPreviewResponse {
@@ -817,7 +826,10 @@ pub fn safety_router(state: SafetyState) -> Router {
         )
         // Undo route
         .route("/api/projects/{id}/undo", post(undo_operations))
-        .layer(from_fn_with_state(auth_config, crate::middleware::require_auth))
+        .layer(from_fn_with_state(
+            auth_config,
+            crate::middleware::require_auth,
+        ))
         .with_state(state)
 }
 
@@ -948,8 +960,8 @@ mod tests {
 
     #[test]
     fn test_pending_action_response_from() {
-        let preview = ActionPreview::new("Write file", ActionType::FileWrite)
-            .with_path("src/main.rs");
+        let preview =
+            ActionPreview::new("Write file", ActionType::FileWrite).with_path("src/main.rs");
         let confidence = ConfidenceScore::medium("Test confidence");
 
         let action = PendingAction {
