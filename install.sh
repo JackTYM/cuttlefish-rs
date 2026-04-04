@@ -96,6 +96,10 @@ PROVIDERS_DATA="
 13:custom:Custom Endpoint:custom::provide your own API endpoint
 "
 
+# Upgrade mode (detected if existing config found)
+UPGRADE_MODE=false
+EXISTING_CONFIG=""
+
 # Collected API keys (will be populated during configuration)
 ANTHROPIC_API_KEY=""
 OPENAI_API_KEY=""
@@ -220,6 +224,178 @@ get_provider_field() {
         prefix)   echo "$line" | cut -d: -f5 ;;
         models)   echo "$line" | cut -d: -f6 ;;
     esac
+}
+
+parse_toml_value() {
+    local file="$1"
+    local section="$2"
+    local key="$3"
+    local in_section=false
+    local value=""
+    
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^\[([^\]]+)\] ]]; then
+            if [[ "${BASH_REMATCH[1]}" == "$section" ]]; then
+                in_section=true
+            else
+                in_section=false
+            fi
+            continue
+        fi
+        
+        if $in_section && [[ "$line" =~ ^[[:space:]]*${key}[[:space:]]*=[[:space:]]*(.+) ]]; then
+            value="${BASH_REMATCH[1]}"
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            echo "$value"
+            return 0
+        fi
+    done < "$file"
+    
+    echo ""
+    return 1
+}
+
+detect_existing_config() {
+    local config_file="$CONFIG_DIR/cuttlefish.toml"
+    
+    if [[ -f "$config_file" ]]; then
+        EXISTING_CONFIG="$config_file"
+        UPGRADE_MODE=true
+        return 0
+    fi
+    
+    return 1
+}
+
+load_existing_config() {
+    if [[ -z "$EXISTING_CONFIG" || ! -f "$EXISTING_CONFIG" ]]; then
+        return 1
+    fi
+    
+    info "Loading existing configuration from $EXISTING_CONFIG"
+    
+    local val
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "server" "host")
+    [[ -n "$val" ]] && SERVER_HOST="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "server" "port")
+    [[ -n "$val" ]] && SERVER_PORT="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "database" "path")
+    [[ -n "$val" ]] && DB_PATH="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "sandbox" "docker_socket")
+    [[ -n "$val" ]] && DOCKER_SOCKET="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "sandbox" "memory_limit_mb")
+    [[ -n "$val" ]] && MEMORY_LIMIT="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "sandbox" "cpu_limit")
+    [[ -n "$val" ]] && CPU_LIMIT="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "sandbox" "disk_limit_gb")
+    [[ -n "$val" ]] && DISK_LIMIT="$val"
+    
+    val=$(parse_toml_value "$EXISTING_CONFIG" "sandbox" "max_concurrent")
+    [[ -n "$val" ]] && MAX_CONCURRENT="$val"
+    
+    if grep -q "^\[discord\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        ENABLE_DISCORD=true
+    fi
+    
+    success "Loaded existing configuration"
+    return 0
+}
+
+load_existing_env() {
+    local env_file="$CONFIG_DIR/cuttlefish.env"
+    
+    if [[ ! -f "$env_file" ]]; then
+        return 1
+    fi
+    
+    info "Loading existing environment from $env_file"
+    
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        value="${value#\"}"
+        value="${value%\"}"
+        
+        case "$key" in
+            CUTTLEFISH_API_KEY)  API_KEY="$value" ;;
+            ANTHROPIC_API_KEY)   ANTHROPIC_API_KEY="$value" ;;
+            OPENAI_API_KEY)      OPENAI_API_KEY="$value" ;;
+            GOOGLE_API_KEY)      GOOGLE_API_KEY="$value" ;;
+            MOONSHOT_API_KEY)    MOONSHOT_API_KEY="$value" ;;
+            ZHIPU_API_KEY)       ZHIPU_API_KEY="$value" ;;
+            MINIMAX_API_KEY)     MINIMAX_API_KEY="$value" ;;
+            XAI_API_KEY)         XAI_API_KEY="$value" ;;
+            AZURE_API_KEY)       AZURE_API_KEY="$value" ;;
+            AWS_ACCESS_KEY_ID)   AWS_ACCESS_KEY_ID="$value"; AWS_CONFIGURED=true ;;
+            AWS_SECRET_ACCESS_KEY) AWS_SECRET_ACCESS_KEY="$value" ;;
+            AWS_DEFAULT_REGION)  AWS_REGION="$value" ;;
+            DISCORD_BOT_TOKEN)   DISCORD_TOKEN="$value" ;;
+        esac
+    done < "$env_file"
+    
+    success "Loaded existing environment variables"
+    return 0
+}
+
+detect_configured_providers() {
+    if [[ -z "$EXISTING_CONFIG" || ! -f "$EXISTING_CONFIG" ]]; then
+        return 1
+    fi
+    
+    SELECTED_PROVIDERS=""
+    
+    if grep -q "^\[providers\.anthropic\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 1"
+    fi
+    if grep -q "^\[providers\.openai\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 2"
+    fi
+    if grep -q "^\[providers\.google\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 3"
+    fi
+    if grep -q "^\[providers\.moonshot\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 4"
+    fi
+    if grep -q "^\[providers\.zhipu\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 5"
+    fi
+    if grep -q "^\[providers\.minimax\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 6"
+    fi
+    if grep -q "^\[providers\.xai\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 7"
+    fi
+    if grep -q "^\[providers\.claude-oauth\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 8"
+    fi
+    if grep -q "^\[providers\.chatgpt-oauth\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 9"
+    fi
+    if grep -q "^\[providers\.ollama\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 10"
+    fi
+    if grep -q "^\[providers\.bedrock\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 11"
+    fi
+    if grep -q "^\[providers\.azure\]" "$EXISTING_CONFIG" 2>/dev/null; then
+        SELECTED_PROVIDERS="$SELECTED_PROVIDERS 12"
+    fi
+    
+    SELECTED_PROVIDERS=$(echo "$SELECTED_PROVIDERS" | xargs)
+    
+    if [[ -n "$SELECTED_PROVIDERS" ]]; then
+        return 0
+    fi
+    return 1
 }
 
 is_provider_selected() {
@@ -1280,11 +1456,19 @@ configure_server() {
     echo -e "${BOLD}=== Server Configuration ===${NC}"
     echo ""
     
-    prompt SERVER_HOST "Server bind address" "0.0.0.0"
-    prompt SERVER_PORT "Server port" "8080"
+    prompt SERVER_HOST "Server bind address" "${SERVER_HOST:-0.0.0.0}"
+    prompt SERVER_PORT "Server port" "${SERVER_PORT:-8080}"
     
-    # Generate API key if not provided
-    if prompt_yn "Generate a random API key?" "y"; then
+    if [[ -n "${API_KEY:-}" ]]; then
+        if prompt_yn "Keep existing API key?" "y"; then
+            success "Keeping existing API key: ${API_KEY:0:8}...${API_KEY: -8}"
+        elif prompt_yn "Generate a new random API key?" "y"; then
+            API_KEY=$(openssl rand -hex 32)
+            success "Generated API key: ${API_KEY:0:8}...${API_KEY: -8}"
+        else
+            prompt_secret API_KEY "Enter API key"
+        fi
+    elif prompt_yn "Generate a random API key?" "y"; then
         API_KEY=$(openssl rand -hex 32)
         success "Generated API key: ${API_KEY:0:8}...${API_KEY: -8}"
     else
@@ -1297,7 +1481,7 @@ configure_database() {
     echo -e "${BOLD}=== Database Configuration ===${NC}"
     echo ""
     
-    prompt DB_PATH "Database file path" "${DATA_DIR}/cuttlefish.db"
+    prompt DB_PATH "Database file path" "${DB_PATH:-${DATA_DIR}/cuttlefish.db}"
 }
 
 configure_sandbox() {
@@ -1305,11 +1489,11 @@ configure_sandbox() {
     echo -e "${BOLD}=== Docker Sandbox Configuration ===${NC}"
     echo ""
     
-    prompt DOCKER_SOCKET "Docker socket path" "unix:///var/run/docker.sock"
-    prompt MEMORY_LIMIT "Memory limit per sandbox (MB)" "2048"
-    prompt CPU_LIMIT "CPU limit per sandbox" "2.0"
-    prompt DISK_LIMIT "Disk limit per sandbox (GB)" "10"
-    prompt MAX_CONCURRENT "Maximum concurrent sandboxes" "5"
+    prompt DOCKER_SOCKET "Docker socket path" "${DOCKER_SOCKET:-unix:///var/run/docker.sock}"
+    prompt MEMORY_LIMIT "Memory limit per sandbox (MB)" "${MEMORY_LIMIT:-2048}"
+    prompt CPU_LIMIT "CPU limit per sandbox" "${CPU_LIMIT:-2.0}"
+    prompt DISK_LIMIT "Disk limit per sandbox (GB)" "${DISK_LIMIT:-10}"
+    prompt MAX_CONCURRENT "Maximum concurrent sandboxes" "${MAX_CONCURRENT:-5}"
 }
 
 configure_discord() {
@@ -1317,16 +1501,36 @@ configure_discord() {
     echo -e "${BOLD}=== Discord Bot Configuration ===${NC}"
     echo ""
     
-    if prompt_yn "Enable Discord bot?" "n"; then
+    local discord_default="n"
+    [[ "$ENABLE_DISCORD" == true ]] && discord_default="y"
+    
+    if prompt_yn "Enable Discord bot?" "$discord_default"; then
         ENABLE_DISCORD=true
-        echo ""
-        echo "To get a Discord bot token:"
-        echo "  1. Go to https://discord.com/developers/applications"
-        echo "  2. Create a new application"
-        echo "  3. Go to Bot section, create bot, copy token"
-        echo ""
-        prompt_secret DISCORD_TOKEN "Discord bot token"
-        prompt DISCORD_GUILD_IDS "Guild IDs (comma-separated, or empty for global)" ""
+        
+        if [[ -n "${DISCORD_TOKEN:-}" ]]; then
+            if prompt_yn "Keep existing Discord token?" "y"; then
+                success "Keeping existing Discord token"
+            else
+                echo ""
+                echo "To get a Discord bot token:"
+                echo "  1. Go to https://discord.com/developers/applications"
+                echo "  2. Create a new application"
+                echo "  3. Go to Bot section, create bot, copy token"
+                echo ""
+                prompt_secret DISCORD_TOKEN "Discord bot token"
+            fi
+        else
+            echo ""
+            echo "To get a Discord bot token:"
+            echo "  1. Go to https://discord.com/developers/applications"
+            echo "  2. Create a new application"
+            echo "  3. Go to Bot section, create bot, copy token"
+            echo ""
+            prompt_secret DISCORD_TOKEN "Discord bot token"
+        fi
+        prompt DISCORD_GUILD_IDS "Guild IDs (comma-separated, or empty for global)" "${DISCORD_GUILD_IDS:-}"
+    else
+        ENABLE_DISCORD=false
     fi
 }
 
@@ -2012,6 +2216,68 @@ main() {
     fi
     
     detect_platform
+    
+    if detect_existing_config; then
+        echo ""
+        echo -e "${GREEN}${BOLD}Existing installation detected!${NC}"
+        echo "  Config: $EXISTING_CONFIG"
+        echo ""
+        echo "Installation options:"
+        echo "  1) Upgrade - Reinstall binary, keep current config as defaults"
+        echo "  2) Reconfigure - Go through all options with current values as defaults"
+        echo "  3) Fresh install - Ignore existing config entirely"
+        echo ""
+        
+        local install_mode
+        prompt install_mode "Select option [1-3]" "1"
+        
+        case "$install_mode" in
+            1)
+                info "Upgrade mode: Reinstalling binary with existing configuration"
+                load_existing_config
+                load_existing_env
+                detect_configured_providers
+                
+                check_dependencies
+                install_rust
+                
+                create_user
+                create_directories
+                download_binary
+                
+                print_summary
+                return
+                ;;
+            2)
+                info "Reconfigure mode: Using existing values as defaults"
+                load_existing_config
+                load_existing_env
+                detect_configured_providers
+                ;;
+            3)
+                info "Fresh install: Ignoring existing configuration"
+                UPGRADE_MODE=false
+                EXISTING_CONFIG=""
+                ;;
+            *)
+                info "Defaulting to upgrade mode"
+                load_existing_config
+                load_existing_env
+                detect_configured_providers
+                
+                check_dependencies
+                install_rust
+                
+                create_user
+                create_directories
+                download_binary
+                
+                print_summary
+                return
+                ;;
+        esac
+    fi
+    
     select_deployment_mode
     
     check_dependencies
@@ -2021,8 +2287,28 @@ main() {
     configure_database
     configure_sandbox
     
-    select_providers
-    collect_provider_credentials
+    if [[ "$UPGRADE_MODE" == true && -n "$SELECTED_PROVIDERS" ]]; then
+        echo ""
+        echo -e "${BOLD}=== Provider Configuration ===${NC}"
+        echo ""
+        echo "Currently configured providers:"
+        for idx in $SELECTED_PROVIDERS; do
+            local pname
+            pname=$(get_provider_field "$idx" name)
+            echo "  - $pname"
+        done
+        echo ""
+        
+        if prompt_yn "Keep existing provider configuration?" "y"; then
+            info "Keeping existing providers"
+        else
+            select_providers
+            collect_provider_credentials
+        fi
+    else
+        select_providers
+        collect_provider_credentials
+    fi
     
     configure_discord
     
