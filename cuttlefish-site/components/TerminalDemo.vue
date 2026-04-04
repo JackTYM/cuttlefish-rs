@@ -12,13 +12,14 @@ interface TerminalLine {
 
 const terminalLines: TerminalLine[] = [
   { type: 'command', content: '$ cuttlefish init my-project', delay: 0 },
-  { type: 'output', content: '🐙 Initializing project...', delay: 800 },
-  { type: 'success', content: '✓ Created my-project/', delay: 1600 },
-  { type: 'command', content: '$ cuttlefish chat "Add user authentication"', delay: 2400 },
-  { type: 'agent', content: '🧠 Orchestrator: Planning implementation...', delay: 3200 },
-  { type: 'agent', content: '👨‍💻 Coder: Writing auth middleware...', delay: 4800 },
-  { type: 'agent', content: '🔍 Critic: Reviewing changes...', delay: 6400 },
-  { type: 'success', content: '✓ Authentication added! See diff below.', delay: 8000 },
+  { type: 'output', content: '🐙 Initializing project...', delay: 600 },
+  { type: 'success', content: '✓ Created my-project/', delay: 1200 },
+  { type: 'command', content: '$ cuttlefish run "Add dark mode"', delay: 2000 },
+  { type: 'agent', content: '🧠 Orchestrator: Analyzing task...', delay: 2800 },
+  { type: 'agent', content: '📋 Planner: Creating implementation plan...', delay: 3600 },
+  { type: 'agent', content: '👨‍💻 Coder: Writing CSS variables...', delay: 4800 },
+  { type: 'agent', content: '🔍 Critic: Reviewing changes...', delay: 6000 },
+  { type: 'success', content: '✓ Dark mode added! 3 files changed.', delay: 7500 },
 ]
 
 const visibleLines = ref<TerminalLine[]>([])

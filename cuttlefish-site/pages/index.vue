@@ -69,12 +69,13 @@
         </div>
         
         <!-- Right: Terminal Demo -->
-        <div class="relative">
+        <div class="relative order-first lg:order-last">
           <!-- Glow effect behind terminal -->
           <div class="absolute -inset-4 bg-cyan-500/10 blur-3xl rounded-full" aria-hidden="true" />
+          <div class="absolute -inset-8 bg-purple-500/5 blur-3xl rounded-full" aria-hidden="true" />
           
           <!-- Terminal -->
-          <TerminalDemo class="relative" aria-label="Terminal demonstration showing Cuttlefish in action" />
+          <TerminalDemo class="relative terminal-glow" aria-label="Terminal demonstration showing Cuttlefish in action" />
         </div>
       </div>
     </section>
@@ -236,6 +237,14 @@ definePageMeta({
 /* Feature card hover glow */
 .feature-card:hover {
   box-shadow: 0 0 40px -10px rgba(34, 211, 238, 0.15);
+}
+
+/* Terminal glow effect */
+.terminal-glow {
+  box-shadow: 
+    0 0 60px -15px rgba(34, 211, 238, 0.3),
+    0 0 100px -20px rgba(34, 211, 238, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* Smooth scroll */
