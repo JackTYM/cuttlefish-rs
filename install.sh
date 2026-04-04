@@ -1651,10 +1651,18 @@ stop_running_service() {
 }
 
 get_latest_release() {
+    # First try to get the 'latest' pre-release (built on every push)
     local response
+    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/tags/latest" 2>&1)
+    
+    if echo "$response" | grep -q '"tag_name"'; then
+        echo "latest"
+        return 0
+    fi
+    
+    # Fall back to actual latest release
     response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" 2>&1) || {
         warn "Failed to fetch releases from GitHub API"
-        warn "Response: $response"
         return 1
     }
     
@@ -1663,7 +1671,6 @@ get_latest_release() {
     
     if [[ -z "$tag" ]]; then
         warn "No releases found (repository may not have any releases yet)"
-        warn "API response: ${response:0:200}..."
         return 1
     fi
     
