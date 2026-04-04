@@ -14,8 +14,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8080',
-      wsUrl: 'ws://localhost:8080/ws',
+      apiBase: '', // Empty = relative URLs (same origin)
+      wsUrl: '', // Will be computed at runtime
     },
   },
 })

@@ -35,7 +35,9 @@ export function useWebSocket(apiKey?: string) {
   const connect = () => {
     if (ws) return
     try {
-      const url = `${config.public.wsUrl}${apiKey ? `?key=${apiKey}` : ''}`
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsBase = config.public.wsUrl || `${wsProtocol}//${window.location.host}`
+      const url = `${wsBase}/ws${apiKey ? `?key=${apiKey}` : ''}`
       ws = new WebSocket(url)
       
       ws.onopen = () => { connected.value = true }
