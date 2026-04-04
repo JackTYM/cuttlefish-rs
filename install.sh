@@ -1821,8 +1821,8 @@ build_from_source() {
         info "Building WebUI..."
         if command -v pnpm &> /dev/null; then
             cd cuttlefish-web
-            pnpm install --frozen-lockfile 2>/dev/null || pnpm install
-            pnpm generate
+            NUXT_TELEMETRY_DISABLED=1 pnpm install --no-frozen-lockfile
+            NUXT_TELEMETRY_DISABLED=1 pnpm generate
             cd ..
             
             if [[ -d "cuttlefish-web/.output/public" ]]; then
@@ -1835,8 +1835,8 @@ build_from_source() {
             fi
         elif command -v npm &> /dev/null; then
             cd cuttlefish-web
-            npm install
-            npm run generate
+            NUXT_TELEMETRY_DISABLED=1 npm install
+            NUXT_TELEMETRY_DISABLED=1 npm run generate
             cd ..
             
             if [[ -d "cuttlefish-web/.output/public" ]]; then
