@@ -1,0 +1,60 @@
+name: Auto Tag on Version Bump
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Cargo.toml'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      should_tag: ${{ steps.check.outputs.should_tag }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for version change
+        id: check
+        run: |
+          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version: $CURRENT_VERSION"
+          
+          git show HEAD~1:Cargo.toml > /tmp/old_cargo.toml 2>/dev/null || echo 'version = "0.0.0"' > /tmp/old_cargo.toml
+          OLD_VERSION=$(grep '^version = ' /tmp/old_cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Previous version: $OLD_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$OLD_VERSION" ]; then
+            echo "Version changed from $OLD_VERSION to $CURRENT_VERSION"
+            echo "should_tag=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged"
+            echo "should_tag=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if tag exists
+        if: steps.check.outputs.should_tag == 'true'
+        id: tag_exists
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/v${{ steps.check.outputs.version }}"; then
+            echo "Tag v${{ steps.check.outputs.version }} already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag v${{ steps.check.outputs.version }} does not exist"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check.outputs.should_tag == 'true' && steps.tag_exists.outputs.exists != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.check.outputs.version }}" -m "Release v${{ steps.check.outputs.version }}"
+          git push origin "v${{ steps.check.outputs.version }}"
+          echo "✓ Created and pushed tag v${{ steps.check.outputs.version }}"

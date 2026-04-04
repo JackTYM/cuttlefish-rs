@@ -97,6 +97,10 @@ async fn main() -> anyhow::Result<()> {
                 print_help();
                 return Ok(());
             }
+            "--version" | "-V" => {
+                println!("cuttlefish {}", env!("CARGO_PKG_VERSION"));
+                return Ok(());
+            }
             _ => {
                 i += 1;
             }
@@ -246,7 +250,10 @@ async fn shutdown_signal() {
 }
 
 fn print_help() {
-    println!("Cuttlefish - Multi-agent, multi-model agentic coding platform");
+    println!(
+        "Cuttlefish {} - Multi-agent, multi-model agentic coding platform",
+        env!("CARGO_PKG_VERSION")
+    );
     println!();
     println!("USAGE:");
     println!("    cuttlefish-rs [OPTIONS] [COMMAND]");
@@ -254,6 +261,7 @@ fn print_help() {
     println!("OPTIONS:");
     println!("    -c, --config <PATH>    Path to configuration file");
     println!("    -h, --help             Print this help message");
+    println!("    -V, --version          Print version information");
     println!();
     println!("COMMANDS:");
     println!("    validate-templates     Validate template files in a directory");
