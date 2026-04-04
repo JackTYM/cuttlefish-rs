@@ -1,0 +1,40 @@
+[build]
+command = "npm run generate"
+publish = ".output/public"
+functions = "netlify/functions"
+
+[build.environment]
+NODE_VERSION = "20"
+NPM_VERSION = "10"
+
+[[redirects]]
+from = "/github"
+to = "https://github.com/JackTYM/cuttlefish-rs"
+status = 302
+force = false
+
+[[redirects]]
+from = "/docs"
+to = "/docs/getting-started"
+status = 302
+force = false
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/*"
+[headers.values]
+Cache-Control = "public, max-age=3600, s-maxage=3600"
+X-Content-Type-Options = "nosniff"
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' fonts.googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://app.cuttlefish.dev"
