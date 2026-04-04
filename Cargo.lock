@@ -1139,6 +1139,7 @@ dependencies = [
  "chrono",
  "cuttlefish-api",
  "cuttlefish-core",
+ "cuttlefish-db",
  "cuttlefish-providers",
  "cuttlefish-sandbox",
  "regex",

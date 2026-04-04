@@ -376,17 +376,8 @@ interface Template {
   language: string
 }
 
-// Available templates (will be fetched from API later)
-const templates: Template[] = [
-  { id: 'rust-cli', name: 'Rust CLI', description: 'Command-line application with argument parsing and logging', language: 'Rust' },
-  { id: 'rust-lib', name: 'Rust Library', description: 'Library with tests, documentation, and CI/CD', language: 'Rust' },
-  { id: 'nuxt-app', name: 'Nuxt App', description: 'Nuxt 3 web application with Tailwind CSS', language: 'TypeScript' },
-  { id: 'fastapi', name: 'FastAPI', description: 'Python FastAPI backend with async support', language: 'Python' },
-  { id: 'discord-bot', name: 'Discord Bot', description: 'Discord bot starter with slash commands', language: 'TypeScript' },
-  { id: 'go-microservice', name: 'Go Microservice', description: 'Go microservice with gRPC and Docker', language: 'Go' },
-]
-
 // State
+const templates = ref<Template[]>([])
 const projects = ref<Project[]>([])
 const newProjectName = ref('')
 const newProjectDesc = ref('')
@@ -403,7 +394,7 @@ const nameInputRef = ref<HTMLInputElement>()
 
 // Computed
 const selectedTemplateInfo = computed(() =>
-  templates.find(t => t.id === selectedTemplate.value)
+  templates.value.find(t => t.id === selectedTemplate.value)
 )
 
 const filteredProjects = computed(() => {
@@ -568,20 +559,27 @@ const deleteProject = async () => {
   }
 }
 
-// Fetch projects on mount
+// Fetch projects and templates on mount
 onMounted(async () => {
   isLoading.value = true
   try {
     const config = useRuntimeConfig()
-    const res = await $fetch<Project[]>(`${config.public.apiBase}/api/projects`)
-    projects.value = res.map(p => ({
+    
+    // Fetch projects and templates in parallel
+    const [projectsRes, templatesRes] = await Promise.all([
+      $fetch<Project[]>(`${config.public.apiBase}/api/projects`).catch(() => []),
+      $fetch<Template[]>(`${config.public.apiBase}/api/templates`).catch(() => [])
+    ])
+    
+    projects.value = projectsRes.map(p => ({
       ...p,
       updatedAt: p.updatedAt || new Date().toISOString(),
-      messageCount: p.messageCount || Math.floor(Math.random() * 50),
+      messageCount: p.messageCount || 0,
     }))
+    
+    templates.value = templatesRes
   } catch (e) {
-    console.error('Failed to fetch projects', e)
-    // Don't show error on initial load - just show empty state
+    console.error('Failed to fetch data', e)
   } finally {
     isLoading.value = false
   }

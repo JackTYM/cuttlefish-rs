@@ -17,15 +17,36 @@ use crate::routes::AppState;
 
 /// Response for a template summary (used in list endpoint).
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TemplateSummary {
+    /// Template ID (same as name for now).
+    pub id: String,
     /// Template name.
     pub name: String,
     /// One-line description.
     pub description: String,
+    /// Full description (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub full_description: Option<String>,
     /// Programming language/stack.
     pub language: String,
+    /// Template category.
+    pub category: String,
     /// Tags for categorization.
     pub tags: Vec<String>,
+    /// Number of times used.
+    pub use_count: u32,
+    /// Star count (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stars: Option<u32>,
+    /// Last updated timestamp.
+    pub updated_at: String,
+    /// Source URL (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    /// File structure preview (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_structure: Option<String>,
 }
 
 /// Response for full template details.
@@ -79,11 +100,34 @@ pub async fn list_templates(State(state): State<AppState>) -> Json<Vec<TemplateS
     Json(
         templates
             .into_iter()
-            .map(|t| TemplateSummary {
-                name: t.manifest.name,
-                description: t.manifest.description,
-                language: t.manifest.language,
-                tags: t.manifest.tags,
+            .map(|t| {
+                // Derive category from language or tags
+                let category = if t.manifest.tags.iter().any(|tag| tag == "cli") {
+                    "CLI".to_string()
+                } else if t.manifest.tags.iter().any(|tag| tag == "web" || tag == "frontend") {
+                    "Web".to_string()
+                } else if t.manifest.tags.iter().any(|tag| tag == "library" || tag == "lib") {
+                    "Library".to_string()
+                } else if t.manifest.tags.iter().any(|tag| tag == "api" || tag == "backend") {
+                    "API".to_string()
+                } else {
+                    "Other".to_string()
+                };
+
+                TemplateSummary {
+                    id: t.manifest.name.clone(),
+                    name: t.manifest.name,
+                    description: t.manifest.description,
+                    full_description: None,
+                    language: t.manifest.language,
+                    category,
+                    tags: t.manifest.tags,
+                    use_count: 0,
+                    stars: None,
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    source_url: None,
+                    file_structure: None,
+                }
             })
             .collect(),
     )
@@ -156,15 +200,28 @@ pub struct CreateProjectRequest {
 
 /// Response body for a project.
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectResponse {
     /// Project ID.
     pub id: String,
     /// Project name.
     pub name: String,
+    /// Project description.
+    pub description: String,
     /// Status.
     pub status: String,
     /// Template used (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
+    /// Whether the project is archived.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_archived: Option<bool>,
+    /// Last updated timestamp.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    /// Number of messages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_count: Option<u32>,
 }
 
 /// Create a new project.
@@ -204,13 +261,29 @@ pub async fn create_project(
     };
 
     let id = uuid::Uuid::new_v4().to_string();
+    let project = state
+        .db
+        .create_project(&id, &req.name, &req.description, req.template.as_deref())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create project: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to create project" })),
+            )
+        })?;
+
     Ok((
         StatusCode::CREATED,
         Json(ProjectResponse {
-            id,
-            name: req.name,
-            status: "active".to_string(),
-            template: req.template,
+            id: project.id,
+            name: project.name,
+            description: project.description,
+            status: project.status.clone(),
+            template: project.template_name,
+            is_archived: Some(project.status == "archived"),
+            updated_at: Some(project.updated_at),
+            message_count: Some(0),
         }),
     ))
 }
@@ -218,37 +291,109 @@ pub async fn create_project(
 /// List all projects.
 ///
 /// GET /api/projects
-pub async fn list_projects(State(_state): State<AppState>) -> Json<Vec<ProjectResponse>> {
-    // In a real implementation this would query DB
-    Json(vec![])
+pub async fn list_projects(State(state): State<AppState>) -> Json<Vec<ProjectResponse>> {
+    match state.db.list_active_projects().await {
+        Ok(projects) => Json(
+            projects
+                .into_iter()
+                .map(|p| ProjectResponse {
+                    id: p.id,
+                    name: p.name,
+                    description: p.description,
+                    status: p.status.clone(),
+                    template: p.template_name,
+                    is_archived: Some(p.status == "archived"),
+                    updated_at: Some(p.updated_at),
+                    message_count: None,
+                })
+                .collect(),
+        ),
+        Err(e) => {
+            tracing::error!("Failed to list projects: {}", e);
+            Json(vec![])
+        }
+    }
 }
 
 /// Get a project by ID.
 ///
 /// GET /api/projects/:id
 pub async fn get_project(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ProjectResponse>, (StatusCode, Json<serde_json::Value>)> {
-    // In a real implementation this would query DB
-    Err((
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({ "error": format!("Project {} not found", id) })),
-    ))
+    let project = state
+        .db
+        .get_project(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get project: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Database error" })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": format!("Project {} not found", id) })),
+            )
+        })?;
+
+    Ok(Json(ProjectResponse {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status.clone(),
+        template: project.template_name,
+        is_archived: Some(project.status == "archived"),
+        updated_at: Some(project.updated_at),
+        message_count: None,
+    }))
 }
 
 /// Cancel/delete a project.
 ///
 /// DELETE /api/projects/:id
 pub async fn cancel_project(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let _ = id;
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({ "status": "cancelled" })),
-    )
+    match state.db.update_project_status(&id, "cancelled").await {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "status": "cancelled" })),
+        ),
+        Err(e) => {
+            tracing::error!("Failed to cancel project: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to cancel project" })),
+            )
+        }
+    }
+}
+
+/// Archive a project.
+///
+/// POST /api/projects/:id/archive
+pub async fn archive_project(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    match state.db.update_project_status(&id, "archived").await {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "status": "archived" })),
+        ),
+        Err(e) => {
+            tracing::error!("Failed to archive project: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Failed to archive project" })),
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -268,24 +413,38 @@ mod tests {
         let resp = ProjectResponse {
             id: "abc".to_string(),
             name: "test".to_string(),
+            description: "A test project".to_string(),
             status: "active".to_string(),
             template: None,
+            is_archived: Some(false),
+            updated_at: None,
+            message_count: None,
         };
         let json = serde_json::to_string(&resp).expect("serialize");
         assert!(json.contains("active"));
+        assert!(json.contains("isArchived"));
     }
 
     #[test]
     fn test_template_summary_serializes() {
         let summary = TemplateSummary {
+            id: "rust-web".to_string(),
             name: "rust-web".to_string(),
             description: "Rust web project".to_string(),
+            full_description: None,
             language: "rust".to_string(),
+            category: "Web".to_string(),
             tags: vec!["backend".to_string(), "web".to_string()],
+            use_count: 42,
+            stars: Some(10),
+            updated_at: "2025-01-01T00:00:00Z".to_string(),
+            source_url: None,
+            file_structure: None,
         };
         let json = serde_json::to_string(&summary).expect("serialize");
         assert!(json.contains("rust-web"));
         assert!(json.contains("backend"));
+        assert!(json.contains("useCount"));
         assert!(!json.contains("docker_image"));
     }
 

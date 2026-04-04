@@ -2,9 +2,13 @@
 //!
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
-use cuttlefish_api::{WebUiConfig, build_app, build_app_with_webui, routes::AppState};
+use cuttlefish_api::{
+    ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui,
+    routes::AppState,
+};
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
+use cuttlefish_db::Database;
 use cuttlefish_tunnel::client::{TunnelClient, TunnelClientConfig};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -134,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
     let api_key = config
         .server
         .api_key
+        .clone()
         .or_else(|| std::env::var("CUTTLEFISH_API_KEY").ok())
         .unwrap_or_else(|| {
             tracing::warn!("No API key configured. Set CUTTLEFISH_API_KEY or add api_key to [server] in cuttlefish.toml");
@@ -146,13 +151,53 @@ async fn main() -> anyhow::Result<()> {
     info!("WebSocket endpoint: ws://{}/ws", addr);
     info!("Health check: http://{}/health", addr);
 
+    let db = Database::open(&config.database.path)
+        .await
+        .expect("Failed to open database");
+    let db = Arc::new(db);
+
+    let db_url = format!(
+        "sqlite://{}?mode=rwc",
+        config.database.path.to_string_lossy()
+    );
+    let pool = SqlitePool::connect(&db_url)
+        .await
+        .expect("Failed to create SQLite pool");
+    let pool = Arc::new(pool);
+
+    cuttlefish_db::usage::run_usage_migrations(&pool)
+        .await
+        .expect("Failed to run usage migrations");
+
     let template_registry = Arc::new(TemplateRegistry::new());
     let state = AppState {
-        api_key,
+        api_key: api_key.clone(),
         template_registry,
+        db,
     };
 
-    // Configure WebUI static file serving
+    let jwt_secret = std::env::var("CUTTLEFISH_JWT_SECRET")
+        .unwrap_or_else(|_| api_key.clone())
+        .into_bytes();
+
+    let auth_config = AuthConfig::new(jwt_secret)
+        .with_legacy_api_key(api_key)
+        .with_db((*pool).clone());
+
+    let projects_dir = std::env::var("CUTTLEFISH_PROJECTS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("./projects"));
+
+    let pricing_config = PricingConfig::with_defaults();
+
+    let api_config = ApiConfig {
+        app_state: state,
+        pool: pool.clone(),
+        auth_config,
+        projects_dir,
+        pricing_config,
+    };
+
     let webui_config = if let Some(ref webui) = config.webui {
         if webui.enabled {
             WebUiConfig::new(&webui.static_dir)
@@ -160,7 +205,6 @@ async fn main() -> anyhow::Result<()> {
             WebUiConfig::disabled()
         }
     } else {
-        // Default: try common locations
         let default_paths = [
             PathBuf::from("/opt/cuttlefish/webui"),
             PathBuf::from("./webui"),
@@ -175,12 +219,12 @@ async fn main() -> anyhow::Result<()> {
 
     let app = if webui_config.enabled && webui_config.is_valid() {
         info!("WebUI enabled: {}", webui_config.static_dir.display());
-        build_app_with_webui(state, webui_config)
+        build_full_app_with_webui(api_config, webui_config)
     } else {
         if webui_config.enabled {
             info!("WebUI directory not found, serving API only");
         }
-        build_app(state)
+        build_full_app(api_config)
     };
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;

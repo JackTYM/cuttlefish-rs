@@ -1050,10 +1050,10 @@ const fileTree = ref<FileItem[]>([
   { name: 'README.md', path: 'README.md', type: 'file', size: '0.3 KB', content: '# My Project\n\nA Cuttlefish project.' },
 ])
 
-// Settings state
+// Settings state - populated from API
 const settings = ref({
-  name: 'my-project',
-  description: 'A sample project',
+  name: '',
+  description: '',
   memoryLimit: 2048,
   cpuLimit: 2,
   diskLimit: 10,
@@ -1157,13 +1157,15 @@ const saveSettings = () => {
 }
 
 const resetSettings = () => {
-  settings.value = {
-    name: 'my-project',
-    description: 'A sample project',
-    memoryLimit: 2048,
-    cpuLimit: 2,
-    diskLimit: 10,
-    networkAccess: 'enabled',
+  if (projectInfo.value) {
+    settings.value = {
+      name: projectInfo.value.name,
+      description: '',
+      memoryLimit: 2048,
+      cpuLimit: 2,
+      diskLimit: 10,
+      networkAccess: 'enabled',
+    }
   }
   agentSettings.value.forEach(a => a.model = 'claude-3.5-sonnet')
   showToast('info', 'Settings reset to defaults')
@@ -1175,11 +1177,13 @@ const loadProject = async () => {
   
   try {
     const config = useRuntimeConfig()
-    const res = await $fetch<{ name: string; template?: string; isArchived?: boolean }>(
+    const res = await $fetch<{ name: string; description?: string; template?: string; isArchived?: boolean }>(
       `${config.public.apiBase}/api/projects/${projectId.value}`
     )
     projectInfo.value = res
     isArchived.value = res.isArchived || false
+    settings.value.name = res.name
+    settings.value.description = res.description || ''
   } catch (e) {
     console.error('Failed to load project', e)
     loadError.value = 'Could not load project details. Please try again.'

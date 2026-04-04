@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use axum::{http::StatusCode, response::Json};
 use cuttlefish_core::TemplateRegistry;
+use cuttlefish_db::Database;
 use serde::Serialize;
 
 /// Application state shared across handlers.
@@ -13,6 +14,8 @@ pub struct AppState {
     pub api_key: String,
     /// Template registry for project scaffolding.
     pub template_registry: Arc<TemplateRegistry>,
+    /// Database connection.
+    pub db: Arc<Database>,
 }
 
 /// Health check response.
