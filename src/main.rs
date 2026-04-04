@@ -990,7 +990,7 @@ async fn checkpoint_command(args: &[String]) -> anyhow::Result<()> {
         } else {
             println!("Checkpoints for project '{}':", project_id);
             println!("{:-<80}", "");
-            println!("{:<36} {:<20} {}", "ID", "Created", "Description");
+            println!("{:<36} {:<20} Description", "ID", "Created");
             println!("{:-<80}", "");
             for cp in checkpoints {
                 println!(
