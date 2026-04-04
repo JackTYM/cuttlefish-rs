@@ -1064,6 +1064,7 @@ check_dependencies() {
     local docker_missing=false
     local docker_not_running=false
     local build_tools_missing=false
+    local nodejs_missing=false
     
     for cmd in curl git; do
         if command -v "$cmd" &> /dev/null; then
@@ -1094,6 +1095,18 @@ check_dependencies() {
         docker_missing=true
     fi
     
+    if command -v node &> /dev/null; then
+        success "Node.js is installed ($(node --version))"
+        if command -v pnpm &> /dev/null; then
+            success "pnpm is installed"
+        elif command -v npm &> /dev/null; then
+            success "npm is installed (pnpm recommended)"
+        fi
+    else
+        warn "Node.js is not installed (required for WebUI)"
+        nodejs_missing=true
+    fi
+    
     if [[ ${#missing[@]} -gt 0 ]]; then
         echo ""
         error "Missing dependencies: ${missing[*]}"
@@ -1113,6 +1126,15 @@ check_dependencies() {
                 install_dependencies_macos "build-essential"
                 ;;
         esac
+    fi
+    
+    if [[ "$nodejs_missing" == true ]]; then
+        echo ""
+        if prompt_yn "Install Node.js and pnpm for WebUI support?" "y"; then
+            install_nodejs
+        else
+            warn "Skipping Node.js - WebUI will not be available"
+        fi
     fi
     
     if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
@@ -1156,6 +1178,48 @@ check_dependencies() {
             exit 1
         fi
         success "Docker is now running"
+    fi
+}
+
+install_nodejs() {
+    info "Installing Node.js..."
+    
+    case "$PLATFORM" in
+        linux|wsl)
+            if command -v apt-get &>/dev/null; then
+                curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+                apt-get install -y nodejs
+            elif command -v dnf &>/dev/null; then
+                curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+                dnf install -y nodejs
+            elif command -v pacman &>/dev/null; then
+                pacman -S --noconfirm nodejs npm
+            else
+                warn "Could not auto-install Node.js. Please install manually."
+                return 1
+            fi
+            ;;
+        macos)
+            if command -v brew &>/dev/null; then
+                brew install node
+            else
+                warn "Homebrew not found. Please install Node.js manually."
+                return 1
+            fi
+            ;;
+    esac
+    
+    if command -v node &>/dev/null; then
+        success "Node.js installed ($(node --version))"
+        
+        info "Installing pnpm..."
+        npm install -g pnpm
+        if command -v pnpm &>/dev/null; then
+            success "pnpm installed"
+        fi
+    else
+        warn "Node.js installation may have failed"
+        return 1
     fi
 }
 
@@ -1566,6 +1630,26 @@ create_directories() {
     success "Created directories"
 }
 
+stop_running_service() {
+    if [[ "$HAS_SYSTEMD" == true ]] && systemctl is-active --quiet cuttlefish 2>/dev/null; then
+        info "Stopping running Cuttlefish service..."
+        systemctl stop cuttlefish
+        sleep 1
+        success "Service stopped"
+        return 0
+    fi
+    
+    if pgrep -f "cuttlefish-rs" >/dev/null 2>&1; then
+        info "Stopping running Cuttlefish process..."
+        pkill -f "cuttlefish-rs" 2>/dev/null || true
+        sleep 1
+        success "Process stopped"
+        return 0
+    fi
+    
+    return 1
+}
+
 get_latest_release() {
     local response
     response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" 2>&1) || {
@@ -1607,6 +1691,8 @@ download_binary() {
     echo ""
     echo -e "${BOLD}=== Installing Cuttlefish ===${NC}"
     echo ""
+    
+    stop_running_service
     
     local version arch os_name download_url tarball
     
