@@ -57,14 +57,14 @@ watch(() => props.animated, async (newVal) => {
 </script>
 
 <template>
-  <div class="rounded-xl overflow-hidden border border-gray-700 shadow-2xl shadow-black/50">
+  <div class="rounded-xl overflow-hidden border border-gray-700 shadow-2xl shadow-black/50" role="region" :aria-label="title ? `Terminal: ${title}` : 'Terminal window'">
     <!-- Title bar with traffic lights -->
-    <div class="flex items-center gap-2 px-4 py-3 bg-gray-800 border-b border-gray-700">
+    <div class="flex items-center gap-2 px-4 py-3 bg-gray-800 border-b border-gray-700" aria-hidden="true">
       <!-- Traffic light buttons -->
       <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors cursor-pointer" />
-        <span class="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 transition-colors cursor-pointer" />
-        <span class="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 transition-colors cursor-pointer" />
+        <span class="w-3 h-3 rounded-full bg-red-500" />
+        <span class="w-3 h-3 rounded-full bg-yellow-500" />
+        <span class="w-3 h-3 rounded-full bg-green-500" />
       </div>
       
       <!-- Optional title -->
@@ -79,18 +79,19 @@ watch(() => props.animated, async (newVal) => {
       <!-- Typing indicator -->
       <span 
         v-if="animated && isTyping" 
-        class="ml-auto text-xs text-cyan-400 animate-pulse"
+        class="ml-auto text-xs text-cyan-400 animate-pulse motion-reduce:animate-none"
       >
         typing...
       </span>
     </div>
     
     <!-- Content area -->
-    <div class="bg-gray-900 p-4 min-h-[100px]" style="font-family: 'JetBrains Mono', monospace;">
+    <div class="bg-gray-900 p-4 min-h-[100px]" style="font-family: 'JetBrains Mono', monospace;" :aria-live="animated ? 'polite' : undefined">
       <template v-if="animated">
         <pre class="text-gray-300 text-sm whitespace-pre-wrap">{{ contentToDisplay }}<span 
           v-if="isTyping" 
-          class="inline-block w-2 h-4 bg-cyan-400 animate-pulse ml-0.5"
+          class="inline-block w-2 h-4 bg-cyan-400 animate-pulse motion-reduce:animate-none ml-0.5"
+          aria-hidden="true"
         /></pre>
       </template>
       <template v-else>

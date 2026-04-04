@@ -27,6 +27,8 @@ pub struct CuttlefishConfig {
     /// Model routing configuration.
     #[serde(default)]
     pub routing: RoutingConfig,
+    /// WebUI configuration (optional).
+    pub webui: Option<WebUiConfigToml>,
 }
 
 /// Server configuration.
@@ -100,6 +102,25 @@ pub struct SandboxConfig {
     /// Maximum concurrent sandboxes.
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: usize,
+}
+
+/// WebUI configuration from TOML.
+#[derive(Debug, Deserialize)]
+pub struct WebUiConfigToml {
+    /// Whether WebUI serving is enabled.
+    #[serde(default = "default_webui_enabled")]
+    pub enabled: bool,
+    /// Path to the directory containing static files.
+    #[serde(default = "default_webui_static_dir")]
+    pub static_dir: PathBuf,
+}
+
+fn default_webui_enabled() -> bool {
+    true
+}
+
+fn default_webui_static_dir() -> PathBuf {
+    PathBuf::from("/opt/cuttlefish/webui")
 }
 
 impl Default for SandboxConfig {

@@ -208,7 +208,7 @@ Coder    Critic
 
 ```bash
 # Download and run the guided installer
-curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | bash
+bash <(curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)
 ```
 
 The installer will:

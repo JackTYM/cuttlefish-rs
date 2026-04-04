@@ -73,14 +73,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="terminal-window rounded-xl overflow-hidden border border-slate-700/50 shadow-2xl shadow-cyan-500/10">
+  <div class="terminal-window rounded-xl overflow-hidden border border-slate-700/50 shadow-2xl shadow-cyan-500/10" role="region" aria-label="Terminal demonstration showing Cuttlefish in action">
     <!-- Title bar with traffic lights -->
-    <div class="flex items-center gap-2 px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 backdrop-blur-sm">
+    <div class="flex items-center gap-2 px-4 py-3 bg-slate-800/80 border-b border-slate-700/50 backdrop-blur-sm" aria-hidden="true">
       <!-- Traffic light buttons -->
       <div class="flex items-center gap-2">
-        <span class="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-400 transition-colors cursor-pointer" />
-        <span class="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-400 transition-colors cursor-pointer" />
-        <span class="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-400 transition-colors cursor-pointer" />
+        <span class="w-3 h-3 rounded-full bg-red-500/80" />
+        <span class="w-3 h-3 rounded-full bg-yellow-500/80" />
+        <span class="w-3 h-3 rounded-full bg-green-500/80" />
       </div>
       
       <!-- Title -->
@@ -90,7 +90,7 @@ onUnmounted(() => {
       
       <!-- Status indicator -->
       <span 
-        class="ml-auto text-xs px-2 py-0.5 rounded-full transition-all duration-300"
+        class="ml-auto text-xs px-2 py-0.5 rounded-full transition-all duration-300 motion-reduce:transition-none"
         :class="isTyping ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700/50 text-slate-500'"
       >
         {{ isTyping ? '● running' : '● idle' }}
@@ -98,7 +98,7 @@ onUnmounted(() => {
     </div>
     
     <!-- Terminal content -->
-    <div class="bg-slate-900/95 p-5 min-h-[280px] font-mono text-sm leading-relaxed">
+    <div class="bg-slate-900/95 p-5 min-h-[280px] font-mono text-sm leading-relaxed" aria-live="polite" aria-atomic="false">
       <TransitionGroup name="terminal-line">
         <div 
           v-for="(line, index) in visibleLines" 
@@ -117,8 +117,9 @@ onUnmounted(() => {
       
       <!-- Cursor -->
       <span 
-        class="inline-block w-2 h-5 bg-cyan-400 ml-1 align-middle transition-opacity duration-100"
+        class="inline-block w-2 h-5 bg-cyan-400 ml-1 align-middle transition-opacity duration-100 motion-reduce:transition-none"
         :class="cursorVisible ? 'opacity-100' : 'opacity-0'"
+        aria-hidden="true"
       />
     </div>
   </div>

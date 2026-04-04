@@ -33,7 +33,7 @@ const lineNumberWidth = computed(() => String(lines.value.length).length * 0.6 +
 </script>
 
 <template>
-  <div class="relative group rounded-lg bg-gray-900 border border-gray-800 overflow-hidden">
+  <div class="relative group rounded-lg bg-gray-900 border border-gray-800 overflow-hidden" role="region" :aria-label="language ? `${language} code block` : 'Code block'">
     <!-- Header with language badge and copy button -->
     <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/50">
       <span v-if="language" class="text-xs text-gray-500 font-mono uppercase tracking-wider">
@@ -43,10 +43,11 @@ const lineNumberWidth = computed(() => String(lines.value.length).length * 0.6 +
       
       <button
         @click="copyToClipboard"
-        class="text-xs px-2 py-1 rounded transition-all duration-200"
+        class="text-xs px-2 py-1 rounded transition-all duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
         :class="copied 
           ? 'bg-green-900/50 text-green-400' 
           : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'"
+        :aria-label="copied ? 'Copied to clipboard' : 'Copy code to clipboard'"
       >
         {{ copied ? '✓ Copied!' : 'Copy' }}
       </button>
@@ -62,6 +63,7 @@ const lineNumberWidth = computed(() => String(lines.value.length).length * 0.6 +
           v-if="showLineNumbers"
           class="select-none text-gray-600 mr-4 text-right shrink-0"
           :style="{ width: `${lineNumberWidth}rem` }"
+          aria-hidden="true"
         >{{ i + 1 }}</span><span class="text-gray-300">{{ line }}</span></div></code></pre>
     </div>
   </div>

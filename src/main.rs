@@ -2,7 +2,7 @@
 //!
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
-use cuttlefish_api::{build_app, routes::AppState};
+use cuttlefish_api::{build_app, build_app_with_webui, routes::AppState, WebUiConfig};
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_tunnel::client::{TunnelClient, TunnelClientConfig};
@@ -126,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
                 discord: None,
                 sandbox: cuttlefish_core::config::SandboxConfig::default(),
                 routing: cuttlefish_core::RoutingConfig::default(),
+                webui: None,
             }
         }),
     };
@@ -150,7 +151,37 @@ async fn main() -> anyhow::Result<()> {
         api_key,
         template_registry,
     };
-    let app = build_app(state);
+    
+    // Configure WebUI static file serving
+    let webui_config = if let Some(ref webui) = config.webui {
+        if webui.enabled {
+            WebUiConfig::new(&webui.static_dir)
+        } else {
+            WebUiConfig::disabled()
+        }
+    } else {
+        // Default: try common locations
+        let default_paths = [
+            PathBuf::from("/opt/cuttlefish/webui"),
+            PathBuf::from("./webui"),
+            PathBuf::from("./cuttlefish-web/.output/public"),
+        ];
+        default_paths
+            .into_iter()
+            .find(|p| p.join("index.html").exists())
+            .map(WebUiConfig::new)
+            .unwrap_or_else(WebUiConfig::disabled)
+    };
+    
+    let app = if webui_config.enabled && webui_config.is_valid() {
+        info!("WebUI enabled: {}", webui_config.static_dir.display());
+        build_app_with_webui(state, webui_config)
+    } else {
+        if webui_config.enabled {
+            info!("WebUI directory not found, serving API only");
+        }
+        build_app(state)
+    };
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
@@ -427,6 +458,7 @@ async fn get_db_pool(config_path: &Option<PathBuf>) -> anyhow::Result<SqlitePool
             discord: None,
             sandbox: cuttlefish_core::config::SandboxConfig::default(),
             routing: cuttlefish_core::RoutingConfig::default(),
+            webui: None,
         }),
     };
 

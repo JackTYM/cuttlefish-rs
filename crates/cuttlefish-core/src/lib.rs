@@ -20,6 +20,7 @@ pub mod template_manifest;
 pub mod template_registry;
 pub mod tracing;
 pub mod traits;
+pub mod updater;
 
 pub use advanced::{
     AgentRoutingConfig, GithubAppClaims, ModelConfig, ProjectTemplate, ReleaseAsset, ReleaseInfo,
@@ -49,3 +50,10 @@ pub use template_engine::TemplateEngine;
 pub use template_fetcher::TemplateFetcher;
 pub use template_manifest::{TemplateError, TemplateManifest, TemplateVariable, parse_manifest};
 pub use template_registry::{LoadedTemplate, TemplateRegistry, TemplateSource};
+pub use updater::{
+    BinaryDownloader, DownloadConfig, DownloadError, DownloadProgress, PauseCallback,
+    RestoreConfig, RestoreError, RestoreResult, RestoredTask, ShutdownConfig, ShutdownError,
+    ShutdownSignal, ShutdownState, TaskProvider, TaskRestorer, UpdateAvailable, UpdateChecker,
+    UpdateConfig, UpdateCoordinator, UpdateError, backup_binary, exec_replace,
+    get_platform_binary_name, should_resume_tasks,
+};

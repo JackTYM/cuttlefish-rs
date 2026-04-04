@@ -1526,6 +1526,43 @@ build_from_source() {
         chmod +x "$INSTALL_DIR/cuttlefish-tui"
     fi
     
+    # Build and install WebUI if Node.js/pnpm is available
+    if [[ -d "cuttlefish-web" ]]; then
+        info "Building WebUI..."
+        if command -v pnpm &> /dev/null; then
+            cd cuttlefish-web
+            pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+            pnpm generate
+            cd ..
+            
+            if [[ -d "cuttlefish-web/.output/public" ]]; then
+                mkdir -p "$INSTALL_DIR/webui"
+                cp -r cuttlefish-web/.output/public/* "$INSTALL_DIR/webui/"
+                chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/webui"
+                success "WebUI built and installed to $INSTALL_DIR/webui"
+            else
+                warn "WebUI build did not produce expected output"
+            fi
+        elif command -v npm &> /dev/null; then
+            cd cuttlefish-web
+            npm install
+            npm run generate
+            cd ..
+            
+            if [[ -d "cuttlefish-web/.output/public" ]]; then
+                mkdir -p "$INSTALL_DIR/webui"
+                cp -r cuttlefish-web/.output/public/* "$INSTALL_DIR/webui/"
+                chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/webui"
+                success "WebUI built and installed to $INSTALL_DIR/webui"
+            else
+                warn "WebUI build did not produce expected output"
+            fi
+        else
+            warn "Neither pnpm nor npm found - skipping WebUI build"
+            info "Install Node.js and pnpm to enable WebUI: https://nodejs.org"
+        fi
+    fi
+    
     success "Built and installed binaries to $INSTALL_DIR"
 }
 
@@ -1554,6 +1591,10 @@ memory_limit_mb = $MEMORY_LIMIT
 cpu_limit = $CPU_LIMIT
 disk_limit_gb = $DISK_LIMIT
 max_concurrent = $MAX_CONCURRENT
+
+[webui]
+enabled = true
+static_dir = "$INSTALL_DIR/webui"
 EOF
 
     local first_deep_provider=""

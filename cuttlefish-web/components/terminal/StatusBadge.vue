@@ -43,10 +43,13 @@ const displayLabel = computed(() => props.label || props.status)
   <span 
     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shadow-sm"
     :class="colorClasses"
+    role="status"
+    :aria-label="`Status: ${displayLabel}`"
   >
     <span 
-      class="w-1.5 h-1.5 rounded-full"
+      class="w-1.5 h-1.5 rounded-full motion-reduce:animate-none"
       :class="[dotColor, { 'animate-pulse': pulse }]"
+      aria-hidden="true"
     />
     {{ displayLabel }}
   </span>

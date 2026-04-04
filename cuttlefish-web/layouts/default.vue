@@ -138,7 +138,7 @@
       >
         <button
           @click="mobileMenuOpen = true"
-          class="p-1.5 text-gray-400 hover:text-white transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"
+          class="p-2.5 sm:p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 text-gray-400 hover:text-white transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"
           aria-label="Open navigation menu"
           aria-expanded="false"
           aria-controls="mobile-nav"

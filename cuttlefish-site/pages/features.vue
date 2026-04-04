@@ -16,7 +16,7 @@
     <section class="py-16 px-4" aria-labelledby="feature-grid-heading">
       <h2 id="feature-grid-heading" class="sr-only">Feature Details</h2>
       <div class="max-w-7xl mx-auto">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <!-- Multi-Agent System -->
           <FeatureCard
             icon="🤖"
@@ -49,7 +49,7 @@
               'Configure routing per-agent or per-category'
             ]"
           >
-            <ModelTable />
+            <CodeBlock :lines="modelRoutingLines" language="toml" />
           </FeatureCard>
 
           <!-- Docker Sandboxes -->
@@ -172,58 +172,58 @@
           Why Cuttlefish?
         </h2>
         
-        <div class="overflow-x-auto">
-          <table class="w-full" aria-describedby="comparison-heading">
+        <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <table class="w-full min-w-[500px] sm:min-w-0" aria-describedby="comparison-heading">
             <thead>
               <tr class="border-b border-slate-700">
-                <th scope="col" class="text-left py-4 px-4 text-slate-400 font-medium">Feature</th>
-                <th scope="col" class="py-4 px-4 text-cyan-400 font-semibold">Cuttlefish</th>
-                <th scope="col" class="py-4 px-4 text-slate-400">Cursor</th>
-                <th scope="col" class="py-4 px-4 text-slate-400">GitHub Copilot</th>
+                <th scope="col" class="text-left py-4 px-2 sm:px-4 text-slate-400 font-medium">Feature</th>
+                <th scope="col" class="py-4 px-2 sm:px-4 text-cyan-400 font-semibold">Cuttlefish</th>
+                <th scope="col" class="py-4 px-2 sm:px-4 text-slate-400">Cursor</th>
+                <th scope="col" class="py-4 px-2 sm:px-4 text-slate-400">GitHub Copilot</th>
               </tr>
             </thead>
             <tbody class="text-center">
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Multi-Agent System</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Multi-Agent System</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Multi-Model Routing</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-yellow-400 text-sm">Partial</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Multi-Model Routing</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-yellow-400 text-sm">Partial</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Self-Hosted</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Self-Hosted</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Discord Bot</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Discord Bot</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Docker Sandboxes</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Docker Sandboxes</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr class="border-b border-slate-800">
-                <td class="text-left py-4 px-4 text-slate-300">Open Source</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Open Source</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
               <tr>
-                <td class="text-left py-4 px-4 text-slate-300">Self-Developing</td>
-                <td class="py-4 px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
-                <td class="py-4 px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="text-left py-4 px-2 sm:px-4 text-slate-300">Self-Developing</td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-green-400 text-xl" aria-label="Yes">✓</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
+                <td class="py-4 px-2 sm:px-4"><span class="text-slate-600" aria-label="No">—</span></td>
               </tr>
             </tbody>
           </table>
@@ -265,6 +265,22 @@ const hashlineLines = [
   '# Edit by hash',
   'replace fghij with:',
   '    println!("Hello, World!");'
+]
+
+// Model routing config example
+const modelRoutingLines = [
+  '# Route agents to optimal models',
+  '[agents.orchestrator]',
+  'category = "deep"',
+  '',
+  '[agents.coder]',
+  'category = "deep"',
+  '',
+  '[agents.critic]',
+  'category = "unspecified-high"',
+  '',
+  '[agents.explorer]',
+  'category = "quick"  # Fast & cheap'
 ]
 </script>
 

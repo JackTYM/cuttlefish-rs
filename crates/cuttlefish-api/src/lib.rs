@@ -37,6 +37,8 @@ pub mod sandbox_routes;
 pub mod usage_routes;
 /// WebSocket handler and message protocol.
 pub mod ws;
+/// WebUI static file serving.
+pub mod webui;
 
 use axum::{
     Router,
@@ -51,6 +53,7 @@ pub use organization_routes::{OrganizationState, organization_router};
 pub use proxy::{ProxyRegistry, ProxyRoute};
 pub use routes::AppState;
 pub use safety_routes::{SafetyState, safety_router, queue_pending_action, is_action_approved, wait_for_approval};
+pub use webui::{WebUiConfig, WebUiState, webui_router};
 pub use ws::{ClientMessage, ServerMessage};
 
 /// Build the axum application router with all routes.
@@ -65,4 +68,40 @@ pub fn build_app(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)
+}
+
+/// Build the axum application router with WebUI static file serving.
+pub fn build_app_with_webui(state: AppState, webui_config: WebUiConfig) -> Router {
+    use tower_http::services::ServeDir;
+    
+    let api_router = Router::new()
+        .route("/health", get(routes::health_handler))
+        .route("/ws", any(ws::ws_handler))
+        .route("/api/templates", get(api_routes::list_templates))
+        .route("/api/templates/{name}", get(api_routes::get_template))
+        .route("/api/templates/fetch", post(api_routes::fetch_template))
+        .layer(TraceLayer::new_for_http())
+        .layer(CorsLayer::permissive())
+        .with_state(state);
+
+    if !webui_config.enabled || !webui_config.is_valid() {
+        if webui_config.enabled {
+            tracing::warn!(
+                static_dir = %webui_config.static_dir.display(),
+                "WebUI static directory not found or missing index.html"
+            );
+        }
+        return api_router.fallback(routes::not_found_handler);
+    }
+
+    tracing::info!(
+        static_dir = %webui_config.static_dir.display(),
+        "WebUI serving enabled"
+    );
+
+    let index_html = webui_config.static_dir.join("index.html");
+    let serve_dir = ServeDir::new(&webui_config.static_dir)
+        .not_found_service(tower_http::services::ServeFile::new(&index_html));
+
+    api_router.fallback_service(serve_dir)
 }
