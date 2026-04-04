@@ -1,0 +1,163 @@
+# Task 1: Create Marketing Site Nuxt App — COMPLETION EVIDENCE
+
+## Task Specification
+From: .sisyphus/plans/v1-webui.md (Lines 193-253)
+
+### What to do:
+- Create `cuttlefish-site/` directory alongside `cuttlefish-web/` ✓
+- Initialize Nuxt 3 with TypeScript ✓
+- Add Tailwind CSS with typography plugin ✓
+- Configure `nuxt.config.ts` with SSG mode ✓
+- Create base `tailwind.config.ts` with dark theme defaults ✓
+- Create `layouts/default.vue` with marketing nav ✓
+- Create placeholder `pages/index.vue` ✓
+
+### Must NOT do:
+- Don't use SSR mode (static site generation only) ✓
+- Don't add any UI component libraries ✓
+
+---
+
+## Implementation Details
+
+### 1. Nuxt 3 Project
+- Framework: Nuxt 3.21.2
+- TypeScript: Enabled
+- Mode: SSG (Static Site Generation)
+- Build Tool: Vite
+
+### 2. Tailwind CSS Configuration
+- Version: 3.4.19
+- Typography Plugin: 0.5.19
+- Dark Mode: Class-based
+- Theme Colors:
+  * dark-bg: #0f172a (slate-950)
+  * dark-card: #1e293b (slate-900)
+  * dark-border: #334155 (slate-700)
+- Font: JetBrains Mono (400, 500, 600, 700)
+
+### 3. SSG Configuration
+- Preset: nitro.preset = 'static'
+- Output: .output/public/
+- Routes Prerendered: 15 routes
+- Build Time: ~1.3 seconds
+
+### 4. Layout Structure
+- File: layouts/default.vue
+- Features:
+  * Sticky header with navigation
+  * Mobile-responsive hamburger menu
+  * Dark theme with cyan accents
+  * Navigation links: Features, Install, Docs, Marketplace
+  * CTA button: "Launch App →"
+
+### 5. Hero Page
+- File: pages/index.vue
+- Features:
+  * Animated terminal demo
+  * Hero headline with gradient
+  * Feature cards (4 cards)
+  * Philosophy section
+  * CTA buttons
+  * Accessibility support
+
+### 6. Components
+- TerminalDemo.vue: Animated terminal
+- CodeBlock.vue: Code display
+- TerminalBlock.vue: Terminal styling
+- FeatureCard.vue: Feature cards
+- FAQItem.vue: FAQ accordion
+- ModelTable.vue: Model comparison
+
+---
+
+## Verification Results
+
+### Build Status
+✓ npm run build — Success (1.2s)
+✓ npm run generate — Success (1.3s)
+✓ npm run dev — Success (dev server running)
+
+### Static Output
+✓ .output/public/index.html — 51KB
+✓ 15 routes prerendered
+✓ Assets optimized
+
+### Dev Server
+✓ http://localhost:3000 — Responds correctly
+✓ Title: "Cuttlefish - Multi-Agent AI Coding Platform"
+✓ Tailwind classes applied
+✓ JetBrains Mono font loaded
+
+### Acceptance Criteria
+[x] `cd cuttlefish-site && npm run dev` starts without errors
+[x] `npm run generate` produces static site in `.output/public/`
+[x] Tailwind classes work (bg-slate-950, text-cyan-400, etc.)
+
+---
+
+## Files Modified
+1. cuttlefish-site/nuxt.config.ts
+   - Added Google Fonts link for JetBrains Mono
+   - Configured SSG mode
+   - Added metadata
+
+2. cuttlefish-site/tailwind.config.ts
+   - Added dark theme colors
+   - Added mono font family
+   - Configured typography plugin
+
+## Files Already Present
+- cuttlefish-site/package.json (dependencies installed)
+- cuttlefish-site/layouts/default.vue (marketing layout)
+- cuttlefish-site/pages/index.vue (hero page)
+- cuttlefish-site/components/ (terminal components)
+- cuttlefish-site/content/docs/ (documentation)
+
+---
+
+## Commit
+feat(site): configure SSG mode, dark theme, and JetBrains Mono font
+Commit: 84633cd6
+
+---
+
+## QA Scenarios Passed
+
+### Scenario 1: Dev server starts successfully
+✓ PASS
+- Dev server started without errors
+- HTTP 200 response
+- Correct HTML structure
+- Title verified
+
+### Scenario 2: Static generation works
+✓ PASS
+- Build completed successfully
+- Static files generated
+- 15 routes prerendered
+- Assets present
+
+---
+
+## Patterns Matched
+
+### From cuttlefish-web/nuxt.config.ts
+✓ Google Fonts preconnect pattern
+✓ JetBrains Mono font configuration
+✓ Head metadata structure
+
+### From cuttlefish-web/tailwind.config.ts
+✓ Dark mode class-based configuration
+✓ Typography plugin setup
+✓ Color theme extension pattern
+
+---
+
+## Status: ✓ COMPLETE
+
+All acceptance criteria met.
+All QA scenarios passed.
+Ready for Wave 2 tasks.
+
+Task 1 of v1-webui Wave 1 complete.

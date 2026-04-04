@@ -35,6 +35,8 @@ pub mod oauth_flow;
 pub mod ollama;
 /// OpenAI API provider implementation.
 pub mod openai;
+/// Tracked provider wrapper for usage logging.
+pub mod tracked;
 /// xAI (Grok) API provider implementation.
 pub mod xai;
 /// Zhipu (GLM) API provider implementation.
@@ -45,3 +47,4 @@ pub mod registry;
 
 pub use cuttlefish_core::traits::provider::ModelProvider;
 pub use registry::ProviderRegistry;
+pub use tracked::{TrackedProvider, UsageContext};

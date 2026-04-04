@@ -2,7 +2,18 @@
 export default defineNuxtConfig({
   ssr: true,
   nitro: {
-    preset: 'static'
+    preset: 'static',
+    prerender: {
+      crawlLinks: true,
+      routes: [
+        '/docs',
+        '/docs/getting-started',
+        '/docs/configuration',
+        '/docs/agents',
+        '/docs/templates',
+        '/docs/api'
+      ]
+    }
   },
   modules: ['@nuxtjs/tailwindcss', '@nuxt/content'],
   tailwindcss: {

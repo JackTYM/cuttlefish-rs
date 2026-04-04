@@ -14,6 +14,8 @@ pub mod devops;
 pub mod explorer;
 /// Librarian agent that retrieves documentation for libraries and APIs.
 pub mod librarian;
+/// Agent memory system for persistent project context.
+pub mod memory;
 /// Orchestrator agent that plans and delegates work.
 pub mod orchestrator;
 /// Planner agent that creates detailed implementation plans.
@@ -24,6 +26,8 @@ pub mod prompt_registry;
 pub mod runner;
 /// Tool registry and built-in tool definitions.
 pub mod tools;
+/// Safety system: confidence scoring, action gates, and diff generation.
+pub mod safety;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
 pub mod workflow;
 
@@ -33,6 +37,13 @@ pub use critic::{CriticAgent, ReviewResult, ReviewVerdict};
 pub use devops::DevOpsAgent;
 pub use explorer::ExplorerAgent;
 pub use librarian::LibrarianAgent;
+pub use memory::{
+    get_conversation_excerpt, get_excerpts_for_decisions, redact_sensitive, why, 
+    BranchDiff, BranchError, BranchId, BranchStore, ChangeType, ConversationExcerpt,
+    DecisionEntry, DecisionIndex, DecisionLog, ExcerptMessage, GitDiffSummary,
+    MemoryHooks, MemorySection, MemoryTrigger, ProjectMemory, StateBranch, UpdateEvent,
+    WhyExplanation, WhyTarget, MAX_BRANCHES_PER_PROJECT,
+};
 pub use orchestrator::OrchestratorAgent;
 pub use planner::PlannerAgent;
 pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
@@ -42,6 +53,11 @@ pub use runner::{
 };
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowConfig, WorkflowEngine, WorkflowResult};
+pub use safety::{
+    ActionGate, ActionPreview, ActionType, ConfidenceCalculator, ConfidenceFactor,
+    ConfidenceScore, DiffHunk, DiffLine, DiffStats, FileDiff, GateConfig, GateDecision,
+    QuickDecision, RiskFactor, ThresholdOverride, detect_language, MAX_DIFF_FILE_SIZE,
+};
 
 pub use cuttlefish_core::traits::{
     agent::{Agent, AgentContext, AgentOutput, AgentRole, Category},

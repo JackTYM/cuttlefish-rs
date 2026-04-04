@@ -8,16 +8,33 @@
 //! - `GET /api/templates` — list all templates
 //! - `GET /api/templates/:name` — get template details
 //! - `POST /api/templates/fetch` — fetch remote template
-//! - Authentication middleware
+//! - Authentication middleware and routes
+//! - Safety API (checkpoints, approvals, diff preview)
 
 /// REST API route handlers.
 pub mod api_routes;
-/// API key authentication middleware.
+/// API key authentication middleware (legacy).
 pub mod auth;
+/// Authentication API routes (registration, login, tokens, API keys).
+pub mod auth_routes;
+/// Collaboration API routes (sharing, invites, handoffs, activity).
+pub mod collaboration_routes;
+/// Memory, decisions, and branching API endpoints.
+pub mod memory_routes;
+/// Authentication middleware (JWT, API key validation).
+pub mod middleware;
+/// Organization API routes (CRUD, members, config, API keys).
+pub mod organization_routes;
 /// Reverse proxy route registry.
 pub mod proxy;
 /// HTTP route handlers.
 pub mod routes;
+/// Safety API routes (checkpoints, approvals, diff preview).
+pub mod safety_routes;
+/// Sandbox management API endpoints.
+pub mod sandbox_routes;
+/// Usage tracking and billing API endpoints.
+pub mod usage_routes;
 /// WebSocket handler and message protocol.
 pub mod ws;
 
@@ -28,8 +45,12 @@ use axum::{
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 pub use auth::{auth_middleware, generate_api_key};
+pub use collaboration_routes::{CollaborationState, collaboration_router};
+pub use memory_routes::{MemoryState, memory_router};
+pub use organization_routes::{OrganizationState, organization_router};
 pub use proxy::{ProxyRegistry, ProxyRoute};
 pub use routes::AppState;
+pub use safety_routes::{SafetyState, safety_router, queue_pending_action, is_action_approved, wait_for_approval};
 pub use ws::{ClientMessage, ServerMessage};
 
 /// Build the axum application router with all routes.

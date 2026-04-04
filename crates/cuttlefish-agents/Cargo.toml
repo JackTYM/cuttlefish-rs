@@ -11,7 +11,6 @@ workspace = true
 cuttlefish-core = { path = "../cuttlefish-core" }
 cuttlefish-sandbox = { path = "../cuttlefish-sandbox" }
 cuttlefish-providers = { path = "../cuttlefish-providers" }
-cuttlefish-api = { path = "../cuttlefish-api" }
 tokio = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
@@ -20,6 +19,9 @@ serde_json = "1"
 serde_yaml = "0.9"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
 
 [dev-dependencies]
 tempfile = "3"
+cuttlefish-api = { path = "../cuttlefish-api" }

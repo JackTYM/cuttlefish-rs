@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 cuttlefish-core = { path = "../cuttlefish-core" }
+cuttlefish-db = { path = "../cuttlefish-db" }
 
 # AWS Bedrock
 aws-sdk-bedrockruntime = "1"
@@ -37,3 +38,13 @@ tracing = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
+
+# UUID and time
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Database (for tracked provider)
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite"] }
+
+[dev-dependencies]
+tempfile = "3"

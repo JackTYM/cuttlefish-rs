@@ -1,4 +1,6 @@
-//! Discord slash command definitions and parsing.
+//! Legacy Discord slash command definitions and parsing.
+//!
+//! **Deprecated**: Use the `commands` module instead for the new slash command framework.
 
 use cuttlefish_core::error::DiscordError;
 

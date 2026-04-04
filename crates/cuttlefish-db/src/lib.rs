@@ -3,8 +3,34 @@
 
 //! Database layer for Cuttlefish using SQLite + sqlx.
 
+/// Activity logging database operations.
+pub mod activity;
+/// API key database operations.
+pub mod api_keys;
+/// Authentication-related database operations.
+pub mod auth;
+/// Async handoff system for collaboration.
+pub mod handoffs;
+/// Project invite database operations.
+pub mod invites;
 /// Database model types for all tables.
 pub mod models;
+/// Organization API key pool management.
+pub mod org_api_keys;
+/// Organization-level configuration management.
+pub mod org_config;
+/// Organization database operations.
+pub mod organization;
+/// Password reset token database operations.
+pub mod password_reset;
+/// Project membership and role database operations.
+pub mod roles;
+/// Session management database operations.
+pub mod sessions;
+/// Project sharing database operations.
+pub mod sharing;
+/// Usage tracking for API cost monitoring.
+pub mod usage;
 
 use sqlx::{Row, SqlitePool};
 use std::path::Path;
@@ -191,6 +217,21 @@ impl Database {
         )
         .execute(pool)
         .await?;
+
+        usage::run_usage_migrations(pool).await?;
+
+        auth::create_users_table(pool).await?;
+        sessions::create_sessions_table(pool).await?;
+        api_keys::create_api_keys_table(pool).await?;
+        roles::create_project_members_table(pool).await?;
+        password_reset::create_password_reset_tokens_table(pool).await?;
+        sharing::create_project_shares_table(pool).await?;
+        invites::create_project_invites_table(pool).await?;
+        activity::create_activity_log_table(pool).await?;
+        handoffs::create_handoffs_table(pool).await?;
+        organization::create_organizations_tables(pool).await?;
+        org_config::create_org_configs_table(pool).await?;
+        org_api_keys::create_org_api_keys_table(pool).await?;
 
         Ok(())
     }

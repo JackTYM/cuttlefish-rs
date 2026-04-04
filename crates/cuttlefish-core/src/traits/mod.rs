@@ -12,5 +12,11 @@ pub use provider::{
     CompletionRequest, CompletionResponse, Message, MessageRole, ModelProvider, StreamChunk,
     ToolCall,
 };
-pub use sandbox::{ExecOutput, Sandbox, SandboxConfig, SandboxId};
+pub use sandbox::{
+    CleanupManager, CleanupPolicy, CleanupResult, ContainerConfig, ContainerStatus, ExecOutput,
+    ExecutionResult, HealthChecker, ImageBuildOptions, ImageRegistry, ImageSpec, Language,
+    ResourceLimits, ResourceLimitsBuilder, Sandbox, SandboxConfig, SandboxHandle, SandboxHealth,
+    SandboxId, SandboxLifecycle, SandboxUsage, Snapshot, SnapshotManager, SnapshotOptions,
+    VolumeHandle, VolumeManager, VolumeMount,
+};
 pub use vcs::{CommitInfo, VersionControl};

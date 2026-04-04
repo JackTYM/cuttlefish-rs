@@ -6,12 +6,28 @@ export interface ChatMessage {
   timestamp: number
 }
 
+export interface PendingApprovalEvent {
+  id: string
+  projectId: string
+  actionType: string
+  description: string
+  path?: string
+  command?: string
+  confidence: number
+  confidenceReasoning: string
+  riskFactors?: { type: string; description: string }[]
+  createdAt: string
+  timeoutSecs: number
+  hasDiff: boolean
+}
+
 export function useWebSocket(apiKey?: string) {
   const config = useRuntimeConfig()
   const messages = ref<ChatMessage[]>([])
   const logLines = ref<string[]>([])
   const diffContent = ref('')
   const connected = ref(false)
+  const pendingApprovals = ref<PendingApprovalEvent[]>([])
   
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -44,6 +60,25 @@ export function useWebSocket(apiKey?: string) {
             if (logLines.value.length > 2000) logLines.value.splice(0, 100)
           } else if (msg.type === 'diff') {
             diffContent.value = msg.patch
+          } else if (msg.type === 'pending_approval') {
+            pendingApprovals.value.push({
+              id: msg.action_id,
+              projectId: msg.project_id,
+              actionType: msg.action_type,
+              description: msg.description,
+              path: msg.path,
+              command: msg.command,
+              confidence: msg.confidence,
+              confidenceReasoning: msg.confidence_reasoning,
+              riskFactors: msg.risk_factors,
+              createdAt: msg.created_at,
+              timeoutSecs: msg.timeout_secs,
+              hasDiff: msg.has_diff,
+            })
+          } else if (msg.type === 'approval_resolved') {
+            pendingApprovals.value = pendingApprovals.value.filter(
+              p => p.id !== msg.action_id
+            )
           }
         } catch {}
       }
@@ -65,8 +100,20 @@ export function useWebSocket(apiKey?: string) {
     ws = null
   }
   
+  const removePendingApproval = (actionId: string) => {
+    pendingApprovals.value = pendingApprovals.value.filter(p => p.id !== actionId)
+  }
+  
   onMounted(() => connect())
   onUnmounted(() => disconnect())
   
-  return { messages, logLines, diffContent, connected, send }
+  return { 
+    messages, 
+    logLines, 
+    diffContent, 
+    connected, 
+    send,
+    pendingApprovals,
+    removePendingApproval,
+  }
 }

@@ -11,10 +11,12 @@ workspace = true
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "migrate", "uuid", "chrono"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 serde = { workspace = true }
+serde_json = "1"
 tracing = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
+getrandom = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true }

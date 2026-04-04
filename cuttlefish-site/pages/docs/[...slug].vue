@@ -19,11 +19,11 @@
       <nav class="space-y-2">
         <NuxtLink 
           v-for="doc in navigation" 
-          :key="doc._path"
-          :to="doc._path"
+          :key="doc.path"
+          :to="doc.path"
           @click="showMobileMenu = false"
           class="block px-3 py-3 sm:py-2 min-h-[44px] sm:min-h-0 rounded text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-          :class="{ 'bg-slate-800 text-white': isActive(doc._path) }"
+          :class="{ 'bg-slate-800 text-white': isActive(doc.path) }"
         >
           {{ doc.title }}
         </NuxtLink>
@@ -48,9 +48,15 @@
 const route = useRoute()
 const showMobileMenu = ref(false)
 
-const { data: navigation } = await useAsyncData('navigation', () =>
-  queryContent('docs').only(['title', '_path']).find()
-)
+// Static navigation list for all documentation pages
+const navigation = [
+  { title: 'Documentation', path: '/docs' },
+  { title: 'Getting Started', path: '/docs/getting-started' },
+  { title: 'Configuration', path: '/docs/configuration' },
+  { title: 'Agents', path: '/docs/agents' },
+  { title: 'Templates', path: '/docs/templates' },
+  { title: 'API Reference', path: '/docs/api' }
+]
 
 const isActive = (path) => {
   return route.path === path

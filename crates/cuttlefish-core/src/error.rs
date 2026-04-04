@@ -46,8 +46,70 @@ pub struct ProviderError(pub String);
 
 /// Sandbox error.
 #[derive(Error, Debug)]
-#[error("{0}")]
-pub struct SandboxError(pub String);
+pub enum SandboxError {
+    /// Docker image was not found locally or in remote registry.
+    #[error("Image not found: {name}:{tag}")]
+    ImageNotFound {
+        /// Image name.
+        name: String,
+        /// Image tag.
+        tag: String,
+    },
+
+    /// Docker image build failed.
+    #[error("Image build failed: {reason}")]
+    ImageBuildFailed {
+        /// Failure reason.
+        reason: String,
+    },
+
+    /// Container with the given ID was not found.
+    #[error("Container not found: {id}")]
+    ContainerNotFound {
+        /// Container ID.
+        id: String,
+    },
+
+    /// Command execution timed out.
+    #[error("Execution timeout after {seconds}s")]
+    Timeout {
+        /// Timeout duration in seconds.
+        seconds: u64,
+    },
+
+    /// Container exceeded resource limits (CPU, memory, disk).
+    #[error("Resource limit exceeded: {resource}")]
+    ResourceLimitExceeded {
+        /// Which resource was exceeded.
+        resource: String,
+    },
+
+    /// Failed to mount a volume into the container.
+    #[error("Volume mount error: {reason}")]
+    VolumeMountError {
+        /// Failure reason.
+        reason: String,
+    },
+
+    /// Snapshot operation failed.
+    #[error("Snapshot error: {reason}")]
+    SnapshotError {
+        /// Failure reason.
+        reason: String,
+    },
+
+    /// Invalid or unsupported programming language.
+    #[error("Invalid language: {0}")]
+    InvalidLanguage(String),
+
+    /// I/O error.
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// Other sandbox error.
+    #[error("{0}")]
+    Other(String),
+}
 
 /// VCS/Git error.
 #[derive(Error, Debug)]
@@ -106,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_error_display() {
-        let err = SandboxError("sandbox failed".to_string());
+        let err = SandboxError::Other("sandbox failed".to_string());
         assert_eq!(err.to_string(), "sandbox failed");
     }
 

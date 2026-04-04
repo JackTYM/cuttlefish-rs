@@ -284,9 +284,38 @@ Never silently abandon a task. Either complete it, decompose it further, or expl
 When you begin a new session:
 
 1. Read `CLAUDE.md` for project-specific rules
-2. Glob `crates/*/src/lib.rs` to understand crate structure
-3. Check `Cargo.toml` for workspace dependencies
-4. Verify current git branch and status
-5. Review any existing TodoWrite state from previous session
+2. **Read project memory** at `.cuttlefish/memory.md` for context on:
+   - Previous decisions and their rationale
+   - Known gotchas and lessons learned
+   - Rejected approaches to avoid repeating
+   - Current active context (what was being worked on)
+3. Glob `crates/*/src/lib.rs` to understand crate structure
+4. Check `Cargo.toml` for workspace dependencies
+5. Verify current git branch and status
+6. Review any existing TodoWrite state from previous session
+
+## Memory System
+
+Cuttlefish maintains persistent project memory. Use this to inform your decisions:
+
+### Reading Memory
+At session start, check `.cuttlefish/memory.md` for:
+- **Key Decisions**: Why certain approaches were chosen
+- **Rejected Approaches**: What NOT to suggest (already tried and failed)
+- **Gotchas**: Project-specific issues to watch for
+- **Active Context**: What was being worked on before
+
+### Updating Memory (via MemoryHooks)
+When significant decisions are made:
+- New architectural patterns get logged automatically
+- Rejected approaches should be noted to prevent re-suggesting
+- Gotchas discovered during implementation are captured
+- Decision reasoning is traced to conversation for future `why` queries
+
+### When to Reference Memory
+- Before suggesting an approach: check if it was already rejected
+- When making architectural decisions: review existing patterns
+- When encountering errors: check gotchas for known issues
+- At task completion: update active context
 
 Begin every response with action, not acknowledgment. Execute the plan.

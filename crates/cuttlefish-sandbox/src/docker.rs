@@ -31,7 +31,7 @@ impl DockerSandbox {
     /// Returns [`SandboxError`] if the Docker daemon is unreachable.
     pub fn new() -> Result<Self, SandboxError> {
         let docker = Docker::connect_with_socket_defaults()
-            .map_err(|e| SandboxError(format!("Failed to connect to Docker: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to connect to Docker: {e}")))?;
         Ok(Self { docker })
     }
 
@@ -43,7 +43,7 @@ impl DockerSandbox {
     pub fn with_socket(socket_path: &str) -> Result<Self, SandboxError> {
         let docker = Docker::connect_with_socket(socket_path, 30, bollard::API_DEFAULT_VERSION)
             .map_err(|e| {
-                SandboxError(format!(
+                SandboxError::Other(format!(
                     "Failed to connect to Docker socket {socket_path}: {e}"
                 ))
             })?;
@@ -97,12 +97,12 @@ impl Sandbox for DockerSandbox {
             .docker
             .create_container(Some(options), container_config)
             .await
-            .map_err(|e| SandboxError(format!("Failed to create container: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to create container: {e}")))?;
 
         self.docker
             .start_container(&response.id, None::<StartContainerOptions<String>>)
             .await
-            .map_err(|e| SandboxError(format!("Failed to start container {}: {e}", response.id)))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to start container {}: {e}", response.id)))?;
 
         let workspace_id = SandboxId(response.id.clone());
         let _ = self.exec(&workspace_id, "mkdir -p /workspace").await;
@@ -126,7 +126,7 @@ impl Sandbox for DockerSandbox {
             .docker
             .create_exec(container_id, exec_options)
             .await
-            .map_err(|e| SandboxError(format!("Failed to create exec in {container_id}: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to create exec in {container_id}: {e}")))?;
 
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
@@ -135,7 +135,7 @@ impl Sandbox for DockerSandbox {
             .docker
             .start_exec(&exec.id, None)
             .await
-            .map_err(|e| SandboxError(format!("Failed to start exec: {e}")))?
+            .map_err(|e| SandboxError::Other(format!("Failed to start exec: {e}")))?
         {
             let mut truncated = false;
             while let Some(chunk) = output.next().await {
@@ -170,7 +170,7 @@ impl Sandbox for DockerSandbox {
             .docker
             .inspect_exec(&exec.id)
             .await
-            .map_err(|e| SandboxError(format!("Failed to inspect exec: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to inspect exec: {e}")))?;
 
         let exit_code = inspect.exit_code.unwrap_or(-1);
 
@@ -204,7 +204,7 @@ impl Sandbox for DockerSandbox {
 
         let result = self.exec(id, &cmd).await?;
         if !result.success() {
-            return Err(SandboxError(format!(
+            return Err(SandboxError::Other(format!(
                 "Failed to write file {path_str} in container {container_id}: {}",
                 result.stderr
             )));
@@ -222,14 +222,14 @@ impl Sandbox for DockerSandbox {
 
         let result = self.exec(id, &cmd).await?;
         if !result.success() {
-            return Err(SandboxError(format!(
+            return Err(SandboxError::Other(format!(
                 "Failed to read file {path_str}: {}",
                 result.stderr
             )));
         }
 
         base64_decode(result.stdout.trim())
-            .map_err(|e| SandboxError(format!("Failed to decode file content: {e}")))
+            .map_err(|e| SandboxError::Other(format!("Failed to decode file content: {e}")))
     }
 
     async fn list_files(
@@ -242,7 +242,7 @@ impl Sandbox for DockerSandbox {
 
         let result = self.exec(id, &cmd).await?;
         if !result.success() {
-            return Err(SandboxError(format!(
+            return Err(SandboxError::Other(format!(
                 "Failed to list files in {path_str}: {}",
                 result.stderr
             )));
@@ -274,7 +274,7 @@ impl Sandbox for DockerSandbox {
         self.docker
             .remove_container(container_id, Some(remove_opts))
             .await
-            .map_err(|e| SandboxError(format!("Failed to remove container {container_id}: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to remove container {container_id}: {e}")))?;
 
         Ok(())
     }
@@ -331,7 +331,7 @@ impl DockerSandbox {
             .docker
             .list_containers(Some(options))
             .await
-            .map_err(|e| SandboxError(format!("Failed to list containers: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to list containers: {e}")))?;
 
         Ok(containers.iter().filter_map(|c| c.id.clone()).collect())
     }
@@ -360,7 +360,7 @@ impl DockerSandbox {
             .docker
             .list_containers(Some(options))
             .await
-            .map_err(|e| SandboxError(format!("Failed to list containers: {e}")))?;
+            .map_err(|e| SandboxError::Other(format!("Failed to list containers: {e}")))?;
 
         let mut removed = 0;
         for container in containers {
