@@ -16,7 +16,7 @@ path = "src/bin/tunnel-daemon.rs"
 
 [dependencies]
 tokio = { workspace = true }
-tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.21", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 serde = { workspace = true }
 serde_json = "1"
 tracing = { workspace = true }
