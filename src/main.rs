@@ -10,7 +10,8 @@ use cuttlefish_api::{
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::traits::provider::ModelProvider;
 use cuttlefish_core::updater::{
-    BinaryDownloader, DownloadConfig, UpdateChecker, UpdateConfig, get_platform_binary_name,
+    AutoUpdateConfig, AutoUpdater, BinaryDownloader, DownloadConfig, UpdateChecker, UpdateConfig,
+    get_platform_binary_name,
 };
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_db::Database;
@@ -145,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
                 sandbox: cuttlefish_core::config::SandboxConfig::default(),
                 routing: cuttlefish_core::RoutingConfig::default(),
                 webui: None,
+                auto_update: cuttlefish_core::config::AutoUpdateConfigToml::default(),
             }
         }),
     };
@@ -318,11 +320,50 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // Start auto-updater if enabled
+    let auto_updater = if config.auto_update.enabled {
+        let auto_config = AutoUpdateConfig {
+            enabled: true,
+            poll_interval_secs: config.auto_update.poll_interval_secs,
+            auto_apply: config.auto_update.auto_apply,
+            ..AutoUpdateConfig::default()
+        };
+
+        let updater = Arc::new(AutoUpdater::new(auto_config));
+
+        // Check for restart state from previous update
+        if let Some(restart_state) = updater.load_restart_state().await {
+            info!(
+                "Resuming after update from v{} to v{}",
+                restart_state.from_version, restart_state.to_version
+            );
+            info!(
+                "Restoring {} active sessions",
+                restart_state.active_sessions.len()
+            );
+            // TODO: Restore active sessions and pending approvals
+        }
+
+        // Start polling in background
+        let polling_handle = updater.clone().start_polling();
+        info!("Auto-update polling started");
+
+        Some((updater, polling_handle))
+    } else {
+        info!("Auto-update is disabled");
+        None
+    };
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
 
     let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
     serve_future.await?;
+
+    // Shutdown auto-updater if running
+    if let Some((updater, _handle)) = auto_updater {
+        updater.shutdown();
+    }
 
     info!("Cuttlefish server stopped gracefully");
     Ok(())
@@ -660,6 +701,7 @@ async fn get_db_pool(config_path: &Option<PathBuf>) -> anyhow::Result<SqlitePool
             sandbox: cuttlefish_core::config::SandboxConfig::default(),
             routing: cuttlefish_core::RoutingConfig::default(),
             webui: None,
+            auto_update: cuttlefish_core::config::AutoUpdateConfigToml::default(),
         }),
     };
 

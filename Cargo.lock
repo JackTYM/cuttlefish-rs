@@ -1191,6 +1191,7 @@ dependencies = [
  "base64",
  "chrono",
  "cuttlefish-db",
+ "dirs",
  "futures",
  "hex",
  "jsonwebtoken",

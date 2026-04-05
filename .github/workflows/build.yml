@@ -10,8 +10,46 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  determine-version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          # Get base version from Cargo.toml
+          base=$(grep '^version = ' Cargo.toml | grep -v workspace | head -1 | sed 's/version = "\(.*\)"/\1/')
+          base_major=$(echo $base | cut -d. -f1)
+          base_minor=$(echo $base | cut -d. -f2)
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, use base version with -pr suffix
+            echo "version=${base}-pr${{ github.event.number }}" >> $GITHUB_OUTPUT
+            echo "Version for PR: ${base}-pr${{ github.event.number }}"
+          else
+            # Find highest patch version for this major.minor
+            latest_patch=$(git tag -l "v${base_major}.${base_minor}.*" | sed "s/v${base_major}.${base_minor}.//" | sort -n | tail -1)
+
+            if [ -z "$latest_patch" ]; then
+              new_patch=1
+            else
+              new_patch=$((latest_patch + 1))
+            fi
+
+            new_version="${base_major}.${base_minor}.${new_patch}"
+            echo "version=$new_version" >> $GITHUB_OUTPUT
+            echo "Next version: $new_version"
+          fi
+
   build:
     name: Build ${{ matrix.target }}
+    needs: determine-version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,6 +74,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Update version in Cargo.toml
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          echo "Setting version to $VERSION"
+          # Update root Cargo.toml
+          sed -i.bak "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" Cargo.toml
+          # Update all crate Cargo.toml files
+          for f in crates/*/Cargo.toml; do
+            sed -i.bak "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" "$f"
+          done
+          # Show the change
+          grep '^version = ' Cargo.toml
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -85,7 +136,7 @@ jobs:
 
   create-release:
     name: Create Versioned Release
-    needs: build
+    needs: [determine-version, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
@@ -94,27 +145,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Determine next version
-        id: version
-        run: |
-          # Get base version from Cargo.toml
-          base=$(grep '^version = ' Cargo.toml | grep -v workspace | head -1 | sed 's/version = "\(.*\)"/\1/')
-          base_major=$(echo $base | cut -d. -f1)
-          base_minor=$(echo $base | cut -d. -f2)
-
-          # Find highest patch version for this major.minor
-          latest_patch=$(git tag -l "v${base_major}.${base_minor}.*" | sed "s/v${base_major}.${base_minor}.//" | sort -n | tail -1)
-
-          if [ -z "$latest_patch" ]; then
-            new_patch=1
-          else
-            new_patch=$((latest_patch + 1))
-          fi
-
-          new_version="${base_major}.${base_minor}.${new_patch}"
-          echo "version=$new_version" >> $GITHUB_OUTPUT
-          echo "Next version: $new_version"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -127,23 +157,48 @@ jobs:
           find artifacts -name '*.tar.gz' -exec mv {} release/ \;
           ls -la release/
 
+      - name: Generate release notes
+        run: |
+          VERSION="v${{ needs.determine-version.outputs.version }}"
+
+          # Get the previous version tag
+          PREV_TAG=$(git tag -l "v0.*" | sort -V | tail -2 | head -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            # No previous tag, get last 20 commits
+            COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)")
+          else
+            # Get commits since previous tag
+            COMMITS=$(git log ${PREV_TAG}..HEAD --oneline --pretty=format:"- %s (%h)")
+          fi
+
+          # Create release notes file
+          cat > release_notes.md << EOF
+          ## Cuttlefish $VERSION
+
+          **Commit:** ${{ github.sha }}
+          **Built:** ${{ github.event.head_commit.timestamp }}
+
+          ### Changes since ${PREV_TAG:-initial commit}
+          $COMMITS
+
+          ### Installation
+          \`\`\`bash
+          sudo bash -c "\$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
+          \`\`\`
+
+          Or download the binary for your platform below.
+          EOF
+
+          echo "Generated release notes:"
+          cat release_notes.md
+
       - name: Create versioned release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
-          body: |
-            ## Cuttlefish v${{ steps.version.outputs.version }}
-
-            **Commit:** ${{ github.sha }}
-            **Built:** ${{ github.event.head_commit.timestamp }}
-
-            ### Installation
-            ```bash
-            sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
-            ```
-
-            Or download the binary for your platform below.
+          tag_name: v${{ needs.determine-version.outputs.version }}
+          name: v${{ needs.determine-version.outputs.version }}
+          body_path: release_notes.md
           files: release/*
           prerelease: false
         env:
@@ -151,7 +206,7 @@ jobs:
 
   update-latest:
     name: Update Latest Release
-    needs: build
+    needs: [determine-version, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
@@ -181,10 +236,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest Build
+          name: Latest Build (v${{ needs.determine-version.outputs.version }})
           body: |
             Automated build from master branch.
 
+            **Version:** v${{ needs.determine-version.outputs.version }}
             **Commit:** ${{ github.sha }}
             **Built:** ${{ github.event.head_commit.timestamp }}
 

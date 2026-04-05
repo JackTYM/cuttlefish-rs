@@ -103,3 +103,15 @@ model = "grok-2"
 provider_type = "ollama"
 model = "llama3.1"
 # No auth required - uses local Ollama at http://localhost:11434
+
+# =============================================================================
+# Auto-Update Configuration
+# =============================================================================
+
+[auto_update]
+# Enable automatic update checking and application
+enabled = false
+# How often to check for updates (in seconds, default: 3600 = 1 hour)
+poll_interval_secs = 3600
+# Automatically apply updates when found (if false, only notifies)
+auto_apply = true

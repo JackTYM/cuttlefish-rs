@@ -29,6 +29,41 @@ pub struct CuttlefishConfig {
     pub routing: RoutingConfig,
     /// WebUI configuration (optional).
     pub webui: Option<WebUiConfigToml>,
+    /// Auto-update configuration (optional).
+    #[serde(default)]
+    pub auto_update: AutoUpdateConfigToml,
+}
+
+/// Auto-update configuration from TOML.
+#[derive(Debug, Deserialize)]
+pub struct AutoUpdateConfigToml {
+    /// Whether auto-update is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Poll interval in seconds (default: 3600 = 1 hour).
+    #[serde(default = "default_poll_interval")]
+    pub poll_interval_secs: u64,
+    /// Whether to automatically apply updates.
+    #[serde(default = "default_auto_apply")]
+    pub auto_apply: bool,
+}
+
+impl Default for AutoUpdateConfigToml {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            poll_interval_secs: default_poll_interval(),
+            auto_apply: default_auto_apply(),
+        }
+    }
+}
+
+fn default_poll_interval() -> u64 {
+    3600
+}
+
+fn default_auto_apply() -> bool {
+    true
 }
 
 /// Server configuration.

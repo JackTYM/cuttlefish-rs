@@ -1,11 +1,13 @@
 //! Update checking, binary download, and task state checkpointing functionality.
 
+mod auto_update;
 mod checker;
 mod downloader;
 pub mod restore;
 mod shutdown;
 mod task_state;
 
+pub use auto_update::{AutoUpdateConfig, AutoUpdater, PendingApprovalState, RestartState};
 pub use checker::{UpdateAvailable, UpdateChecker, UpdateConfig, UpdateError};
 pub use downloader::{
     BinaryDownloader, DownloadConfig, DownloadError, DownloadProgress, get_platform_binary_name,
