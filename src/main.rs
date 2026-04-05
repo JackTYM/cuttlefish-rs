@@ -1719,7 +1719,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             std::fs::create_dir_all(&download_dir)?;
 
             let binary_name = get_platform_binary_name();
-            let dest_path = download_dir.join(&binary_name);
+            let tarball_path = download_dir.join(format!("{}.tar.gz", binary_name));
 
             println!("Downloading v{}...", update.latest_version);
 
@@ -1742,16 +1742,33 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                     .download_and_verify(
                         &download_url,
                         checksum_url,
-                        &dest_path,
+                        &tarball_path,
                         Some(&progress_callback),
                     )
                     .await?;
             } else {
                 downloader
-                    .download_binary(&download_url, &dest_path, Some(&progress_callback))
+                    .download_binary(&download_url, &tarball_path, Some(&progress_callback))
                     .await?;
             }
             println!("\r✓ Downloaded v{}         ", update.latest_version);
+
+            // Extract binary from tarball
+            let extract_dir = download_dir.join("extract");
+            std::fs::create_dir_all(&extract_dir)?;
+
+            let tarball_file = std::fs::File::open(&tarball_path)?;
+            let tar_decoder = flate2::read::GzDecoder::new(tarball_file);
+            let mut archive = tar::Archive::new(tar_decoder);
+            archive.unpack(&extract_dir)?;
+
+            let extracted_binary = extract_dir.join("cuttlefish-rs");
+            if !extracted_binary.exists() {
+                anyhow::bail!(
+                    "Binary not found in tarball. Expected: {}",
+                    extracted_binary.display()
+                );
+            }
 
             // Stop service if running
             let service_was_running = stop_cuttlefish_service();
@@ -1766,8 +1783,8 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             // Create backup of current binary
             std::fs::copy(&current_exe, &backup_path)?;
 
-            // Copy new binary to temp location
-            std::fs::copy(&dest_path, &temp_path)?;
+            // Copy extracted binary to temp location
+            std::fs::copy(&extracted_binary, &temp_path)?;
 
             // Make executable on Unix
             #[cfg(unix)]
@@ -1782,8 +1799,9 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             // The running process keeps the old inode, but the path points to new file
             std::fs::rename(&temp_path, &current_exe)?;
 
-            // Clean up downloaded file
-            std::fs::remove_file(&dest_path).ok();
+            // Clean up downloaded and extracted files
+            std::fs::remove_file(&tarball_path).ok();
+            std::fs::remove_dir_all(&extract_dir).ok();
 
             println!("✓ Updated to v{}", update.latest_version);
 
@@ -1836,7 +1854,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             std::fs::create_dir_all(&download_dir)?;
 
             let binary_name = get_platform_binary_name();
-            let dest_path = download_dir.join(&binary_name);
+            let tarball_path = download_dir.join(format!("{}.tar.gz", binary_name));
 
             println!("Downloading v{}...", update.latest_version);
 
@@ -1859,7 +1877,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                     .download_and_verify(
                         &download_url,
                         checksum_url,
-                        &dest_path,
+                        &tarball_path,
                         Some(&progress_callback),
                     )
                     .await?;
@@ -1867,7 +1885,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                 println!("✓ Downloaded and verified v{}", update.latest_version);
             } else {
                 downloader
-                    .download_binary(&download_url, &dest_path, Some(&progress_callback))
+                    .download_binary(&download_url, &tarball_path, Some(&progress_callback))
                     .await?;
                 println!("\r  Progress: 100.0%  ");
                 println!(
@@ -1876,18 +1894,28 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                 );
             }
 
+            // Extract binary from tarball
+            let extract_dir = download_dir.join("extract");
+            std::fs::create_dir_all(&extract_dir)?;
+
+            let tarball_file = std::fs::File::open(&tarball_path)?;
+            let tar_decoder = flate2::read::GzDecoder::new(tarball_file);
+            let mut archive = tar::Archive::new(tar_decoder);
+            archive.unpack(&extract_dir)?;
+
+            let extracted_binary = extract_dir.join("cuttlefish-rs");
+
             println!();
-            println!("Downloaded to: {}", dest_path.display());
+            println!("Downloaded to: {}", extracted_binary.display());
             println!("To apply: cuttlefish update apply");
         }
         "apply" => {
             let download_dir = dirs::cache_dir()
                 .unwrap_or_else(std::env::temp_dir)
                 .join("cuttlefish-updates");
-            let binary_name = get_platform_binary_name();
-            let downloaded_path = download_dir.join(&binary_name);
+            let extracted_binary = download_dir.join("extract").join("cuttlefish-rs");
 
-            if !downloaded_path.exists() {
+            if !extracted_binary.exists() {
                 eprintln!("✗ No downloaded update found.");
                 eprintln!("  Run 'cuttlefish update download' first.");
                 std::process::exit(1);
@@ -1898,7 +1926,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
 
             println!("Applying update...");
             println!("  Current binary: {}", current_exe.display());
-            println!("  New binary: {}", downloaded_path.display());
+            println!("  New binary: {}", extracted_binary.display());
             println!("  Backup will be created at: {}", backup_path.display());
             println!();
 
@@ -1918,8 +1946,8 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             std::fs::copy(&current_exe, &backup_path)?;
             println!("✓ Backup created");
 
-            // Copy new binary
-            std::fs::copy(&downloaded_path, &current_exe)?;
+            // Copy extracted binary
+            std::fs::copy(&extracted_binary, &current_exe)?;
 
             // Make executable on Unix
             #[cfg(unix)]
@@ -1935,8 +1963,11 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             println!("Please restart cuttlefish to use the new version.");
             println!("If issues occur, restore from: {}", backup_path.display());
 
-            // Clean up downloaded file
-            std::fs::remove_file(&downloaded_path).ok();
+            // Clean up extracted files
+            std::fs::remove_dir_all(download_dir.join("extract")).ok();
+            // Remove tarball too
+            let binary_name = get_platform_binary_name();
+            std::fs::remove_file(download_dir.join(format!("{}.tar.gz", binary_name))).ok();
         }
         _ => {
             eprintln!("Unknown update command: {}", subcommand);
