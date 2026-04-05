@@ -2212,6 +2212,23 @@ EOF
     success "Systemd service created"
 }
 
+create_symlinks() {
+    info "Creating command symlinks..."
+
+    # Create symlink for 'cuttlefish' command
+    ln -sf "$INSTALL_DIR/cuttlefish-rs" /usr/local/bin/cuttlefish
+
+    # Also create cuttlefish-rs symlink for explicit invocation
+    ln -sf "$INSTALL_DIR/cuttlefish-rs" /usr/local/bin/cuttlefish-rs
+
+    # Create symlink for TUI if it exists
+    if [[ -f "$INSTALL_DIR/cuttlefish-tui" ]]; then
+        ln -sf "$INSTALL_DIR/cuttlefish-tui" /usr/local/bin/cuttlefish-tui
+    fi
+
+    success "Created symlinks in /usr/local/bin/"
+}
+
 #######################################
 # Finalization
 #######################################
@@ -2224,6 +2241,7 @@ print_summary() {
     echo ""
     echo -e "${BOLD}Installation Summary:${NC}"
     echo "  Binary:        $INSTALL_DIR/cuttlefish-rs"
+    echo "  Command:       cuttlefish (symlinked to /usr/local/bin/)"
     echo "  Config:        $CONFIG_DIR/cuttlefish.toml"
     echo "  Environment:   $CONFIG_DIR/cuttlefish.env"
     echo "  Database:      $DB_PATH"
@@ -2271,8 +2289,10 @@ print_summary() {
         echo "  Discord:       Bot enabled"
     fi
     echo ""
-    echo -e "${BOLD}TUI Client:${NC}"
-    echo "  $INSTALL_DIR/cuttlefish-tui --server ws://${SERVER_HOST}:${SERVER_PORT} --api-key \$API_KEY"
+    echo -e "${BOLD}CLI Commands:${NC}"
+    echo "  cuttlefish --help           Show all commands"
+    echo "  cuttlefish update check     Check for updates"
+    echo "  cuttlefish-tui              Launch TUI client"
     echo ""
     
     if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
@@ -2330,14 +2350,15 @@ main() {
                 load_existing_config
                 load_existing_env
                 detect_configured_providers
-                
+
                 check_dependencies
                 install_rust
-                
+
                 create_user
                 create_directories
                 download_binary
-                
+                create_symlinks
+
                 print_summary
                 return
                 ;;
@@ -2357,14 +2378,15 @@ main() {
                 load_existing_config
                 load_existing_env
                 detect_configured_providers
-                
+
                 check_dependencies
                 install_rust
-                
+
                 create_user
                 create_directories
                 download_binary
-                
+                create_symlinks
+
                 print_summary
                 return
                 ;;
@@ -2412,12 +2434,13 @@ main() {
     create_user
     create_directories
     download_binary
+    create_symlinks
     write_config
     write_env_file
     if [[ "$DEPLOYMENT_MODE" == "systemd" ]]; then
         write_systemd_service
     fi
-    
+
     print_summary
 }
 
