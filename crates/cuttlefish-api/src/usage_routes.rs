@@ -198,14 +198,19 @@ fn api_error(status: StatusCode, message: &str) -> (StatusCode, Json<serde_json:
 /// GET /api/usage - User's usage summary.
 pub async fn get_usage_summary(
     State(state): State<UsageState>,
-    Extension(user): Extension<AuthenticatedUser>,
+    user: Option<Extension<AuthenticatedUser>>,
     Query(query): Query<UsageQuery>,
 ) -> ApiResult<UsageSummaryResponse> {
     let period = query.parse_period();
 
+    // Use authenticated user or default to "anonymous"
+    let user_id = user
+        .map(|u| u.user_id.clone())
+        .unwrap_or_else(|| "anonymous".to_string());
+
     let summary = state
         .stats
-        .user_summary(&user.user_id, period)
+        .user_summary(&user_id, period)
         .await
         .map_err(|e| api_error(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()))?;
 

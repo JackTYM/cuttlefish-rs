@@ -130,6 +130,14 @@ pub fn build_full_app(config: ApiConfig) -> Router {
         system_state = system_state.with_provider_registry(registry);
     }
 
+    // Build usage router with auth middleware
+    let usage_router_with_auth = usage_router()
+        .with_state(usage_state)
+        .layer(axum::middleware::from_fn_with_state(
+            config.auth_config.clone(),
+            middleware::optional_auth,
+        ));
+
     Router::new()
         .route("/health", get(routes::health_handler))
         .route("/ws", any(ws::ws_handler))
@@ -149,7 +157,7 @@ pub fn build_full_app(config: ApiConfig) -> Router {
             post(api_routes::archive_project),
         )
         .with_state(config.app_state)
-        .merge(usage_router().with_state(usage_state))
+        .merge(usage_router_with_auth)
         .merge(safety_router(safety_state))
         .merge(memory_router().with_state(memory_state))
         .merge(system_router(system_state))
@@ -224,6 +232,14 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
         system_state = system_state.with_provider_registry(registry);
     }
 
+    // Build usage router with auth middleware
+    let usage_router_with_auth = usage_router()
+        .with_state(usage_state)
+        .layer(axum::middleware::from_fn_with_state(
+            config.auth_config.clone(),
+            middleware::optional_auth,
+        ));
+
     let api_router = Router::new()
         .route("/health", get(routes::health_handler))
         .route("/ws", any(ws::ws_handler))
@@ -243,7 +259,7 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
             post(api_routes::archive_project),
         )
         .with_state(config.app_state)
-        .merge(usage_router().with_state(usage_state))
+        .merge(usage_router_with_auth)
         .merge(safety_router(safety_state))
         .merge(memory_router().with_state(memory_state))
         .merge(system_router(system_state))
