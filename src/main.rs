@@ -9,6 +9,9 @@ use cuttlefish_api::{
 };
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::traits::provider::ModelProvider;
+use cuttlefish_core::updater::{
+    BinaryDownloader, DownloadConfig, UpdateChecker, UpdateConfig, get_platform_binary_name,
+};
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_db::Database;
 use cuttlefish_providers::ProviderRegistry;
@@ -96,6 +99,9 @@ async fn main() -> anyhow::Result<()> {
             }
             "safety" => {
                 return safety_command(&args[i + 1..]).await;
+            }
+            "update" => {
+                return update_command(&args[i + 1..]).await;
             }
             "--help" | "-h" => {
                 print_help();
@@ -424,6 +430,12 @@ fn print_help() {
     println!("    pricing                Show current pricing table");
     println!("    pricing set <PROVIDER> <MODEL> <INPUT> <OUTPUT>");
     println!("                           Set pricing (USD per million tokens)");
+    println!();
+    println!("UPDATE SUBCOMMANDS:");
+    println!("    update                 Check for updates");
+    println!("    update check           Check if a new version is available");
+    println!("    update download        Download the latest version");
+    println!("    update apply           Apply the downloaded update (requires restart)");
     println!();
     println!("BRANCH SUBCOMMANDS:");
     println!("    branch list [PROJECT]  List all branches for a project");
@@ -1529,4 +1541,199 @@ async fn safety_command(args: &[String]) -> anyhow::Result<()> {
     eprintln!("Unknown safety command: {}", args[0]);
     eprintln!("Available: config");
     std::process::exit(1);
+}
+
+async fn update_command(args: &[String]) -> anyhow::Result<()> {
+    let config = UpdateConfig::default();
+    let checker = UpdateChecker::new(config);
+
+    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("check");
+
+    match subcommand {
+        "check" | "" => {
+            println!(
+                "Checking for updates... (current: v{})",
+                env!("CARGO_PKG_VERSION")
+            );
+
+            match checker.check_for_update().await {
+                Ok(Some(update)) => {
+                    println!();
+                    println!("✓ Update available!");
+                    println!("  Current version: v{}", update.current_version);
+                    println!("  Latest version:  v{}", update.latest_version);
+                    if let Some(ref notes) = update.release_notes {
+                        println!();
+                        println!("Release notes:");
+                        for line in notes.lines().take(10) {
+                            println!("  {}", line);
+                        }
+                        if notes.lines().count() > 10 {
+                            println!("  ...(truncated)");
+                        }
+                    }
+                    println!();
+                    println!("To download: cuttlefish update download");
+                }
+                Ok(None) => {
+                    println!(
+                        "✓ You are running the latest version (v{})",
+                        env!("CARGO_PKG_VERSION")
+                    );
+                }
+                Err(e) => {
+                    eprintln!("✗ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "download" => {
+            println!(
+                "Checking for updates... (current: v{})",
+                env!("CARGO_PKG_VERSION")
+            );
+
+            let update = match checker.check_for_update().await {
+                Ok(Some(update)) => update,
+                Ok(None) => {
+                    println!(
+                        "✓ You are running the latest version (v{})",
+                        env!("CARGO_PKG_VERSION")
+                    );
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("✗ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            let download_url = match update.download_url {
+                Some(url) => url,
+                None => {
+                    eprintln!(
+                        "✗ No download URL found for your platform ({})",
+                        get_platform_binary_name()
+                    );
+                    eprintln!("  Please download manually from GitHub releases.");
+                    std::process::exit(1);
+                }
+            };
+
+            let download_dir = dirs::cache_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("cuttlefish-updates");
+            std::fs::create_dir_all(&download_dir)?;
+
+            let binary_name = get_platform_binary_name();
+            let dest_path = download_dir.join(&binary_name);
+
+            println!("Downloading v{}...", update.latest_version);
+
+            let dl_config = DownloadConfig {
+                download_dir: download_dir.clone(),
+                verify_checksums: update.checksum_url.is_some(),
+            };
+            let downloader = BinaryDownloader::new(dl_config);
+
+            let progress_callback = |progress: cuttlefish_core::updater::DownloadProgress| {
+                if let Some(percent) = progress.percent {
+                    print!("\r  Progress: {:.1}%  ", percent);
+                    use std::io::Write;
+                    std::io::stdout().flush().ok();
+                }
+            };
+
+            if let Some(ref checksum_url) = update.checksum_url {
+                downloader
+                    .download_and_verify(
+                        &download_url,
+                        checksum_url,
+                        &dest_path,
+                        Some(&progress_callback),
+                    )
+                    .await?;
+                println!("\r  Progress: 100.0%  ");
+                println!("✓ Downloaded and verified v{}", update.latest_version);
+            } else {
+                downloader
+                    .download_binary(&download_url, &dest_path, Some(&progress_callback))
+                    .await?;
+                println!("\r  Progress: 100.0%  ");
+                println!(
+                    "✓ Downloaded v{} (no checksum available)",
+                    update.latest_version
+                );
+            }
+
+            println!();
+            println!("Downloaded to: {}", dest_path.display());
+            println!("To apply: cuttlefish update apply");
+        }
+        "apply" => {
+            let download_dir = dirs::cache_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("cuttlefish-updates");
+            let binary_name = get_platform_binary_name();
+            let downloaded_path = download_dir.join(&binary_name);
+
+            if !downloaded_path.exists() {
+                eprintln!("✗ No downloaded update found.");
+                eprintln!("  Run 'cuttlefish update download' first.");
+                std::process::exit(1);
+            }
+
+            let current_exe = std::env::current_exe()?;
+            let backup_path = current_exe.with_extension("bak");
+
+            println!("Applying update...");
+            println!("  Current binary: {}", current_exe.display());
+            println!("  New binary: {}", downloaded_path.display());
+            println!("  Backup will be created at: {}", backup_path.display());
+            println!();
+
+            // Confirm before applying
+            print!("Continue with update? [y/N] ");
+            use std::io::Write;
+            std::io::stdout().flush()?;
+
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("Update cancelled.");
+                return Ok(());
+            }
+
+            // Create backup
+            std::fs::copy(&current_exe, &backup_path)?;
+            println!("✓ Backup created");
+
+            // Copy new binary
+            std::fs::copy(&downloaded_path, &current_exe)?;
+
+            // Make executable on Unix
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = std::fs::metadata(&current_exe)?.permissions();
+                perms.set_mode(0o755);
+                std::fs::set_permissions(&current_exe, perms)?;
+            }
+
+            println!("✓ Update applied successfully!");
+            println!();
+            println!("Please restart cuttlefish to use the new version.");
+            println!("If issues occur, restore from: {}", backup_path.display());
+
+            // Clean up downloaded file
+            std::fs::remove_file(&downloaded_path).ok();
+        }
+        _ => {
+            eprintln!("Unknown update command: {}", subcommand);
+            eprintln!("Available: check, download, apply");
+            std::process::exit(1);
+        }
+    }
+
+    Ok(())
 }
