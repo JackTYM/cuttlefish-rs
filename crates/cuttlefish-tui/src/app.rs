@@ -4,7 +4,6 @@ use std::collections::VecDeque;
 
 /// A message displayed in the chat view.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ChatMessage {
     /// Message sender (e.g., "user", "coder", "orchestrator").
     pub sender: String,
@@ -27,7 +26,6 @@ pub enum AppView {
 }
 
 /// Application state for the TUI.
-#[allow(dead_code)]
 pub struct App {
     /// Whether the app should exit.
     pub should_exit: bool,
@@ -47,7 +45,6 @@ pub struct App {
     pub connected: bool,
 }
 
-#[allow(dead_code)]
 impl App {
     /// Create a new application state.
     pub fn new() -> Self {

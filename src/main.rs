@@ -2,19 +2,24 @@
 //!
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
+use cuttlefish_agents::TokioMessageBus;
 use cuttlefish_api::{
-    ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui, routes::AppState,
+    ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui,
+    create_approval_registry, routes::AppState,
 };
 use cuttlefish_core::config::CuttlefishConfig;
+use cuttlefish_core::traits::provider::ModelProvider;
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_db::Database;
+use cuttlefish_providers::ProviderRegistry;
 use cuttlefish_tunnel::client::{TunnelClient, TunnelClientConfig};
+use dashmap::DashMap;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -172,11 +177,68 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to run usage migrations");
 
+    // Initialize provider registry
+    let mut provider_registry = ProviderRegistry::new();
+    let mut default_provider: Option<String> = None;
+
+    // Load providers from config
+    for (name, provider_config) in &config.providers {
+        match initialize_provider(name, provider_config).await {
+            Ok(provider) => {
+                info!("Initialized provider: {}", name);
+                provider_registry.register(name.clone(), provider);
+                if default_provider.is_none() {
+                    default_provider = Some(name.clone());
+                }
+            }
+            Err(e) => {
+                warn!("Failed to initialize provider '{}': {}", name, e);
+            }
+        }
+    }
+
+    if provider_registry.is_empty() {
+        warn!("No providers configured. Add provider configuration to cuttlefish.toml");
+        warn!("Example: [providers.anthropic]");
+        warn!("         provider_type = \"anthropic\"");
+        warn!("         model = \"claude-sonnet-4-6\"");
+    } else {
+        info!(
+            "Loaded {} provider(s): {:?}",
+            provider_registry.len(),
+            provider_registry.names()
+        );
+    }
+
+    let provider_registry = Arc::new(provider_registry);
+
+    // Set up prompts directory
+    let prompts_dir = std::env::var("CUTTLEFISH_PROMPTS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("./prompts"));
+
+    if !prompts_dir.exists() {
+        info!(
+            "Prompts directory not found at {}, using built-in prompts",
+            prompts_dir.display()
+        );
+    }
+
     let template_registry = Arc::new(TemplateRegistry::new());
+    let message_bus = Arc::new(TokioMessageBus::new());
+    let active_sessions = Arc::new(DashMap::new());
+    let approval_registry = create_approval_registry();
+
     let state = AppState {
         api_key: api_key.clone(),
         template_registry,
         db,
+        provider_registry: provider_registry.clone(),
+        active_sessions,
+        message_bus,
+        prompts_dir,
+        default_provider,
+        approval_registry,
     };
 
     let jwt_secret = std::env::var("CUTTLEFISH_JWT_SECRET")
@@ -199,6 +261,7 @@ async fn main() -> anyhow::Result<()> {
         auth_config,
         projects_dir,
         pricing_config,
+        provider_registry: Some(provider_registry),
     };
 
     let webui_config = if let Some(ref webui) = config.webui {
@@ -230,6 +293,25 @@ async fn main() -> anyhow::Result<()> {
         build_full_app(api_config)
     };
 
+    // Start Discord bot if configured
+    let _discord_handle = if let Some(ref discord_config) = config.discord {
+        let token = std::env::var(&discord_config.token_env_var).ok();
+        if let Some(token) = token {
+            info!("Starting Discord bot...");
+            let bot_config = cuttlefish_discord::BotConfig::new(token)
+                .with_guild_ids(discord_config.guild_ids.clone());
+            Some(cuttlefish_discord::start_bot_background(bot_config))
+        } else {
+            warn!(
+                "Discord configured but {} env var not set",
+                discord_config.token_env_var
+            );
+            None
+        }
+    } else {
+        None
+    };
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
 
@@ -246,6 +328,64 @@ async fn shutdown_signal() {
         .await
         .expect("Failed to install CTRL+C signal handler");
     tracing::info!("Shutdown signal received");
+}
+
+/// Initialize a model provider from configuration.
+async fn initialize_provider(
+    name: &str,
+    config: &cuttlefish_core::config::ProviderConfig,
+) -> anyhow::Result<Arc<dyn ModelProvider>> {
+    use cuttlefish_providers::{anthropic, bedrock, google, ollama, openai};
+
+    let provider_type = config.provider_type.as_str();
+
+    match provider_type {
+        "anthropic" => {
+            let model = config.model.as_deref().unwrap_or("claude-sonnet-4-6");
+            let provider = anthropic::AnthropicProvider::new(model)
+                .map_err(|e| anyhow::anyhow!("Failed to create Anthropic provider: {}", e))?;
+            Ok(Arc::new(provider) as Arc<dyn ModelProvider>)
+        }
+        "openai" => {
+            let model = config.model.as_deref().unwrap_or("gpt-4o");
+            let provider = openai::OpenAiProvider::new(model)
+                .map_err(|e| anyhow::anyhow!("Failed to create OpenAI provider: {}", e))?;
+            Ok(Arc::new(provider) as Arc<dyn ModelProvider>)
+        }
+        "bedrock" => {
+            // Bedrock model ID includes the full ARN-style format
+            let model = config
+                .model
+                .as_deref()
+                .unwrap_or("anthropic.claude-sonnet-4-6-20260101-v1:0");
+            let provider = bedrock::BedrockProvider::new(model)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create Bedrock provider: {}", e))?;
+            Ok(Arc::new(provider) as Arc<dyn ModelProvider>)
+        }
+        "google" | "gemini" => {
+            let model = config.model.as_deref().unwrap_or("gemini-2.0-flash");
+            let provider = google::GoogleProvider::new(model)
+                .map_err(|e| anyhow::anyhow!("Failed to create Google provider: {}", e))?;
+            Ok(Arc::new(provider) as Arc<dyn ModelProvider>)
+        }
+        "ollama" => {
+            let model = config.model.as_deref().unwrap_or("llama3.1");
+            let provider = if let Some(ref base_url) = config.base_url {
+                ollama::OllamaProvider::with_base_url(base_url, model)
+            } else {
+                ollama::OllamaProvider::new(model)
+            };
+            Ok(Arc::new(provider) as Arc<dyn ModelProvider>)
+        }
+        _ => {
+            anyhow::bail!(
+                "Unknown provider type '{}' for provider '{}'. Supported: anthropic, openai, bedrock, google, ollama",
+                provider_type,
+                name
+            );
+        }
+    }
 }
 
 fn print_help() {

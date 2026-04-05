@@ -2,143 +2,72 @@
   <img src=".github/assets/logo.svg" alt="Cuttlefish Logo" width="200"/>
 </p>
 
-<h1 align="center">🐙 Cuttlefish</h1>
+<h1 align="center">Cuttlefish</h1>
 
 <p align="center">
-  <strong>A portable, multi-agent, multi-model agentic coding platform built in Rust</strong>
+  <strong>A persistent, device-agnostic agentic coding platform built in Rust</strong>
 </p>
 
 <p align="center">
-  <a href="#philosophy">Philosophy</a> •
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#inspirations">Inspirations</a>
+  <a href="#vision">Vision</a> |
+  <a href="#current-status">Current Status</a> |
+  <a href="#architecture">Architecture</a> |
+  <a href="#installation">Installation</a> |
+  <a href="#configuration">Configuration</a> |
+  <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
-## Philosophy
+## Vision
 
-**Different AI models have different strengths.** A model optimized for speed isn't the same as one optimized for deep reasoning. A model trained for code generation excels at different tasks than one fine-tuned for code review.
-
-Cuttlefish embraces this reality with **category-based model routing**: each agent role can be mapped to the optimal model for its task. The Orchestrator might use a fast model for quick task decomposition, while the Coder uses a powerful model for complex implementations, and the Critic uses yet another model optimized for analytical review.
+Cuttlefish is a persistent, multi-agent coding assistant that runs on a server and can be accessed from anywhere. Start a project on your desktop, continue it from your phone, and pick up right where you left off - including running background processes.
 
 ### Core Principles
 
-1. **Multi-Model by Design**: Route each agent to the model that does its job best
-2. **Isolated Execution**: Every project runs in its own Docker sandbox—no cross-contamination
-3. **Interface Agnostic**: Same agent system accessible via Discord, WebUI, or TUI
-4. **Zero Unsafe Code**: The entire codebase is `#![deny(unsafe_code)]`—memory safety guaranteed
-5. **Self-Developing**: Cuttlefish can update itself via GitHub Actions
+1. **Multi-Agent System**: Specialized agents (Planner, Coder, Critic, etc.) collaborate on complex tasks
+2. **Multi-Model Routing**: Route each agent to the optimal model for its task category
+3. **Project Isolation**: Every project runs in its own Docker container
+4. **Interface Agnostic**: Same backend accessible via WebUI, TUI, Discord, or other clients
+5. **BYOK (Bring Your Own Keys)**: Users provide their own API keys - no proxying
+6. **Zero Unsafe Code**: The entire Rust codebase is `#![deny(unsafe_code)]`
 
 ### Why "Cuttlefish"?
 
-The cuttlefish is nature's ultimate adapter. With millions of chromatophores in their skin, cuttlefish can change color, pattern, and texture in milliseconds—matching their environment or communicating complex messages through dynamic displays.
-
-**This platform works the same way:**
-
-- **Multi-Colored = Multi-Agent**: Just as a cuttlefish displays many colors simultaneously through specialized chromatophores, Cuttlefish deploys multiple specialized agents working in concert. Each agent has its own "color"—its own expertise, tools, and optimal model.
-
-- **Rapid Adaptation = Dynamic Model Routing**: A cuttlefish switches from camouflage to warning display to mating pattern instantly. Cuttlefish (the platform) switches between fast models for quick tasks and powerful models for deep reasoning—adapting its intelligence to match the challenge.
-
-- **Camouflage = Seamless Integration**: Cuttlefish blend into any environment. This platform integrates into your existing workflow—Discord for team chat, WebUI for visual work, TUI for SSH sessions. Same agents, any interface.
-
-- **Giant Brain = Distributed Intelligence**: Cuttlefish have the largest brain-to-body ratio of any invertebrate. This platform distributes intelligence across specialized agents, each contributing their unique cognitive strength to the whole.
-
-- **Self-Evolution**: Cuttlefish don't just adapt to their environment—their species evolves rapidly. This platform can update itself, fix its own bugs, and deploy new versions autonomously. True self-developing software.
-
-```
-    🐙 The Cuttlefish Way
-    
-    Task arrives → Orchestrator assesses → Routes to optimal agent
-                                              ↓
-    ┌─────────────┬─────────────┬─────────────┬─────────────┐
-    │   Planner   │    Coder    │   Critic    │   DevOps    │
-    │  ultrabrain │    deep     │    high     │    high     │
-    │  "strategy" │   "build"   │  "review"   │  "deploy"   │
-    └─────────────┴─────────────┴─────────────┴─────────────┘
-                              ↓
-    Different models, different strengths, one unified system
-```
+The cuttlefish adapts its color and texture to match any environment. This platform adapts its interface (Discord, WebUI, TUI) and its intelligence (routing to different models) based on the task and context.
 
 ---
 
-## Features
+## Current Status
 
-### 🤖 Multi-Agent System
+> **Note**: Cuttlefish is in active development. Core functionality is now working end-to-end.
 
-Cuttlefish implements a **Planner → Coder → Critic** workflow loop inspired by the Sisyphus/Ultraworker pattern:
+### What's Working
 
-| Agent | Role | Category |
-|-------|------|----------|
-| **Orchestrator** | Coordinates agents, manages lifecycle | `deep` |
-| **Planner** | Creates strategic implementation plans | `ultrabrain` |
-| **Coder** | Writes code, runs builds, executes tests | `deep` |
-| **Critic** | Reviews code, runs tests, approves/rejects | `unspecified-high` |
-| **Explorer** | Searches codebases, finds patterns | `quick` |
-| **Librarian** | Finds documentation, retrieves external resources | `quick` |
-| **DevOps** | Handles builds, deployments, CI/CD | `unspecified-high` |
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Core infrastructure | Complete | Error types, config, traits |
+| Database layer | Complete | SQLite with full schema |
+| Model providers | Complete | 11 providers supported |
+| Agent definitions | Complete | All agents implemented |
+| Safety system | Complete | Confidence scoring, gates, REST routes |
+| Memory system | Complete | Project memory, branching |
+| Docker sandbox | Complete | Container lifecycle + API routes |
+| API routes | Complete | All routes implemented with real backends |
+| WebSocket | Complete | Routes to agent workflow engine |
+| WebUI | Complete | Full UI with working backend |
+| TUI | Complete | Full terminal client with WebSocket |
+| Discord bot | Complete | Event handler, commands, startup from config |
+| Provider testing | Complete | Makes real API calls to verify |
+| Safety workflow | Complete | Approval registry with async wait |
+| Architecture docs | Complete | Protocol specs in `/docs/architecture/` |
+| Integration tests | Complete | End-to-end tests in `tests/integration/` |
 
-### 🎯 Category-Based Model Routing
+### What Needs Work
 
-Configure which models serve which task categories:
+- **Logs Page Verification**: WebUI logs page needs testing with real WebSocket messages
 
-| Category | Use Case | Recommended Model |
-|----------|----------|-------------------|
-| `ultrabrain` | Hard logic, architecture | claude-opus-4-6 |
-| `deep` | Complex autonomous work | gpt-5.4 or claude-sonnet-4-6 |
-| `quick` | Simple fast tasks | claude-haiku-4-5 |
-| `visual` | Frontend, UI/UX | gemini-2.0-flash |
-| `unspecified-high` | General higher effort | claude-sonnet-4-6 |
-| `unspecified-low` | General lower effort | claude-haiku-4-5 |
-
-### 🐳 Docker Sandboxes
-
-Each project gets an isolated Docker container with:
-- Configurable CPU limits (default: 2 cores)
-- Configurable memory limits (default: 2GB)
-- Configurable disk limits (default: 10GB)
-- Network access for package installation
-- Automatic cleanup of stale containers
-
-### 🔌 Multi-Interface Access
-
-Access your agents from anywhere:
-
-- **Discord Bot**: Channel-per-project management, slash commands, real-time updates
-- **Web UI**: Nuxt-based interface with chat, build logs, and file diffs
-- **TUI**: ratatui terminal client for remote development over SSH
-
-### 📦 Model Providers
-
-Cuttlefish supports 11 model providers out of the box:
-
-| Provider | Auth Method | Models | Best For |
-|----------|-------------|--------|----------|
-| **Anthropic** | `ANTHROPIC_API_KEY` | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 | General, planning |
-| **OpenAI** | `OPENAI_API_KEY` | gpt-5.4, gpt-5-nano, gpt-4o | Coding, reasoning |
-| **Google Gemini** | `GOOGLE_API_KEY` | gemini-2.0-flash, gemini-1.5-pro | Visual, frontend |
-| **Moonshot (Kimi)** | `MOONSHOT_API_KEY` | kimi-k2.5, moonshot-v1-128k | Claude-like tasks |
-| **Zhipu (GLM)** | `ZHIPU_API_KEY` | glm-4-flash, glm-4 | Broad tasks |
-| **MiniMax** | `MINIMAX_API_KEY` + `MINIMAX_GROUP_ID` | abab6.5s-chat, abab6.5t-chat | Fast utility |
-| **xAI (Grok)** | `XAI_API_KEY` | grok-2, grok-beta | Code search |
-| **AWS Bedrock** | IAM / Access Keys | Claude family via Bedrock | Enterprise |
-| **Ollama** | None (local) | Any GGUF model | Privacy, offline |
-| **Claude OAuth** | PKCE Flow | Claude (via claude.ai) | Personal accounts |
-| **ChatGPT OAuth** | Bearer Token | GPT-4o, GPT-4 | Personal accounts |
-
-See [docs/providers/](docs/providers/) for setup guides.
-
-### 🔧 Additional Features
-
-- **Hashline Editing**: Surgical file edits using content-addressable line hashes (5-char xxHash)
-- **Context Management**: Sliding window with automatic summarization for long conversations
-- **GitHub Integration**: Clone, branch, commit, push, create PRs, monitor Actions
-- **Template System**: Project scaffolding from markdown-based templates
-- **Self-Update**: Pull new binaries from GitHub Releases and restart automatically
+See [CLAUDE.md](CLAUDE.md) for detailed implementation status and fix priorities.
 
 ---
 
@@ -146,94 +75,77 @@ See [docs/providers/](docs/providers/) for setup guides.
 
 ### Crate Structure
 
-Cuttlefish is organized as a Cargo workspace with focused, single-responsibility crates:
-
 ```
 cuttlefish-rs/
 ├── src/main.rs                    # Server binary entry point
+├── cuttlefish-web/                # Nuxt 3 WebUI
 └── crates/
-    ├── cuttlefish-core/           # Error types, config, tracing, shared traits
-    ├── cuttlefish-db/             # SQLite persistence (sqlx, WAL mode)
-    ├── cuttlefish-providers/      # Model providers (Bedrock, Claude OAuth)
-    ├── cuttlefish-sandbox/        # Docker container management (bollard)
-    ├── cuttlefish-vcs/            # Git operations (git2) + GitHub API
-    ├── cuttlefish-agents/         # Agent system (Orchestrator, Coder, Critic)
-    ├── cuttlefish-discord/        # Discord bot (serenity)
-    ├── cuttlefish-api/            # Axum HTTP/WebSocket server
-    └── cuttlefish-tui/            # ratatui terminal client
+    ├── cuttlefish-core/           # Shared traits, config, errors
+    ├── cuttlefish-db/             # SQLite persistence (sqlx)
+    ├── cuttlefish-providers/      # Model providers (11 supported)
+    ├── cuttlefish-sandbox/        # Docker container management
+    ├── cuttlefish-vcs/            # Git operations + GitHub API
+    ├── cuttlefish-agents/         # Agent system
+    ├── cuttlefish-discord/        # Discord bot
+    ├── cuttlefish-api/            # HTTP/WebSocket server
+    ├── cuttlefish-tui/            # Terminal client
+    └── cuttlefish-tunnel/         # Reverse tunnel for remote access
 ```
 
-### Dependency Flow
+### Agent System
 
-```
-cuttlefish-core (no internal deps)
-       ↑
-cuttlefish-db, cuttlefish-providers, cuttlefish-sandbox, cuttlefish-vcs
-       ↑
-cuttlefish-agents (depends on all above)
-       ↑
-cuttlefish-discord, cuttlefish-api, cuttlefish-tui (interface crates)
-       ↑
-cuttlefish-rs (root binary — wires everything)
-```
+The agent system implements a Planner -> Coder -> Critic loop:
 
-### Request Flow
+| Agent | Role | Default Category |
+|-------|------|------------------|
+| **Orchestrator** | Coordinates agents, manages lifecycle | `deep` |
+| **Planner** | Creates implementation plans | `ultrabrain` |
+| **Coder** | Writes code, runs builds | `deep` |
+| **Critic** | Reviews code, approves/rejects | `unspecified-high` |
+| **Explorer** | Searches codebases | `quick` |
+| **Librarian** | Retrieves documentation | `quick` |
+| **DevOps** | Handles builds, deployments | `unspecified-high` |
 
-```
-User (Discord/WebUI/TUI)
-        │
-        ▼
-   cuttlefish-api (WebSocket)
-        │
-        ▼
-   Orchestrator Agent
-        │
-   ┌────┴────┐
-   ▼         ▼
-Coder    Critic
-   │         │
-   └────┬────┘
-        ▼
-   Docker Sandbox
-        │
-        ▼
-   GitHub (push)
-```
+### Model Categories
+
+| Category | Use Case | Typical Model |
+|----------|----------|---------------|
+| `ultrabrain` | Hard logic, architecture | claude-opus-4-6 |
+| `deep` | Complex autonomous work | claude-sonnet-4-6 |
+| `quick` | Fast simple tasks | claude-haiku-4-5 |
+| `visual` | Frontend, UI/UX | gemini-2.0-flash |
+| `unspecified-high` | General higher effort | claude-sonnet-4-6 |
+| `unspecified-low` | General lower effort | claude-haiku-4-5 |
+
+### Supported Providers
+
+| Provider | Auth | Notes |
+|----------|------|-------|
+| Anthropic | API Key | Claude models |
+| OpenAI | API Key | GPT models |
+| AWS Bedrock | IAM | Enterprise Claude |
+| Google Gemini | API Key | Gemini models |
+| Moonshot (Kimi) | API Key | Chinese market |
+| Zhipu (GLM) | API Key | Chinese market |
+| MiniMax | API Key + Group ID | Fast utility |
+| xAI (Grok) | API Key | Code search |
+| Ollama | None (local) | Privacy, offline |
+| Claude OAuth | PKCE | Personal accounts |
+| ChatGPT OAuth | Bearer | Personal accounts |
 
 ---
 
 ## Installation
 
-### Quick Start (Recommended)
+### Prerequisites
+
+- Rust 1.94.0+ (`rustup install 1.94.0`)
+- Docker (for project sandboxes)
+- Git
+
+### Quick Start
 
 ```bash
-# Download and run the guided installer
-bash <(curl -sSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)
-```
-
-The installer will:
-1. **Detect your platform** (Linux, macOS, or WSL) and configure accordingly
-2. **Choose deployment mode**:
-   - **Systemd Service** (recommended) — Cuttlefish runs as a system service with Docker sandbox isolation per project
-   - **Docker Container** — Simpler setup, no systemd required (no project sandbox isolation)
-3. Check and install dependencies (Rust, Docker, Git) for your platform
-4. Guide you through **provider selection** (choose which AI providers to configure)
-5. Set up API keys for your selected providers
-6. For **AWS Bedrock**: select from all regional model variants (default, US, EU, global cross-region inference)
-7. Optionally configure **custom model IDs and API endpoints** for any provider
-8. Configure server, database, and sandbox settings
-9. Optionally set up Discord bot integration
-10. Build and install Cuttlefish from source
-11. Start the service (systemd mode) or provide Docker run command
-
-### Manual Installation
-
-If you prefer manual setup:
-
-```bash
-# Prerequisites: Rust 1.94.0+, Docker, Git
-rustup install 1.94.0
-
 # Clone and build
 git clone https://github.com/JackTYM/cuttlefish-rs.git
 cd cuttlefish-rs
@@ -243,30 +155,31 @@ cargo build --release
 cp cuttlefish.example.toml cuttlefish.toml
 # Edit cuttlefish.toml with your settings
 
-# Set API keys for your providers (examples)
+# Set required environment variables
 export CUTTLEFISH_API_KEY="your-secure-api-key"
-export ANTHROPIC_API_KEY="sk-ant-..."      # For Anthropic
-export OPENAI_API_KEY="sk-..."              # For OpenAI
-export GOOGLE_API_KEY="..."                 # For Google Gemini
-# See docs/providers/ for all provider options
+# Add provider API keys as needed (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
 
 # Run
 ./target/release/cuttlefish-rs
 ```
 
+### Build WebUI (Optional)
+
+```bash
+cd cuttlefish-web
+npm install
+npm run build
+# Built files go to .output/public/, served automatically by the server
+```
+
 ### Docker Deployment
 
 ```bash
-# Build the Docker image
 docker build -t cuttlefish .
-
-# Run with configuration
 docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd)/cuttlefish.toml:/etc/cuttlefish/cuttlefish.toml \
   -e CUTTLEFISH_API_KEY="your-key" \
-  -e AWS_ACCESS_KEY_ID="..." \
-  -e AWS_SECRET_ACCESS_KEY="..." \
   -p 8080:8080 \
   cuttlefish
 ```
@@ -275,127 +188,65 @@ docker run -d \
 
 ## Configuration
 
-Cuttlefish uses TOML configuration with environment variable overrides for secrets.
-
 ### Configuration Files
 
 | File | Purpose |
 |------|---------|
 | `cuttlefish.toml` | Main configuration (gitignored) |
-| `cuttlefish.example.toml` | Example with documented defaults |
-| `/etc/cuttlefish/cuttlefish.toml` | System-wide config (production) |
-| `~/.config/cuttlefish/config.toml` | User config (alternative) |
+| `cuttlefish.example.toml` | Example with defaults |
+| `/etc/cuttlefish/cuttlefish.toml` | System-wide (production) |
 
-### Environment Variables
+### Key Environment Variables
 
-**Required:**
 ```bash
-CUTTLEFISH_API_KEY      # API key for WebUI/TUI authentication
-```
+CUTTLEFISH_API_KEY      # Required: API authentication
+CUTTLEFISH_JWT_SECRET   # JWT signing (defaults to API key)
+DISCORD_BOT_TOKEN       # For Discord bot
+RUST_LOG                # Log level (info, debug, trace)
 
-**For AWS Bedrock:**
-```bash
-AWS_ACCESS_KEY_ID       # AWS credentials
+# Provider keys (as needed)
+ANTHROPIC_API_KEY
+OPENAI_API_KEY
+GOOGLE_API_KEY
+AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
-AWS_DEFAULT_REGION      # e.g., us-east-1
 ```
 
-**For Discord:**
-```bash
-DISCORD_BOT_TOKEN       # Discord bot token
-```
-
-### Full Configuration Reference
+### Example Configuration
 
 ```toml
-# =============================================================================
-# Server Configuration
-# =============================================================================
 [server]
-host = "127.0.0.1"      # Bind address (use 0.0.0.0 for external access)
-port = 8080             # HTTP/WebSocket port
+host = "127.0.0.1"
+port = 8080
 
-# =============================================================================
-# Database Configuration
-# =============================================================================
 [database]
-path = "cuttlefish.db"  # SQLite database path (WAL mode enabled)
+path = "cuttlefish.db"
 
-# =============================================================================
-# Docker Sandbox Configuration
-# =============================================================================
 [sandbox]
 docker_socket = "unix:///var/run/docker.sock"
-memory_limit_mb = 2048  # Per-container memory limit
-cpu_limit = 2.0         # Per-container CPU limit (cores)
-disk_limit_gb = 10      # Per-container disk limit
-max_concurrent = 5      # Maximum concurrent sandboxes
+memory_limit_mb = 2048
+cpu_limit = 2.0
 
-# =============================================================================
-# Model Providers
-# =============================================================================
-
-# AWS Bedrock (recommended for production)
 [providers.claude]
 provider_type = "bedrock"
 model = "anthropic.claude-sonnet-4-6-20260101-v1:0"
 region = "us-east-1"
 
-# Fast model for quick tasks
-[providers.claude-fast]
-provider_type = "bedrock"
-model = "anthropic.claude-haiku-4-5-20260101-v1:0"
-region = "us-east-1"
-
-# Powerful model for complex reasoning
-[providers.claude-opus]
-provider_type = "bedrock"
-model = "anthropic.claude-opus-4-6-20260101-v1:0"
-region = "us-east-1"
-
-# =============================================================================
-# Agent Configuration
-# =============================================================================
-
-# Map agents to categories (which then map to providers)
 [agents.orchestrator]
-category = "deep"               # Uses claude (Sonnet)
+category = "deep"
 
 [agents.coder]
-category = "deep"               # Uses claude (Sonnet)
+category = "deep"
 
 [agents.critic]
-category = "unspecified-high"   # Can use a different model
-
-# Optional: Override the model directly
-# [agents.coder]
-# category = "deep"
-# model_override = "anthropic.claude-opus-4-6-20260101-v1:0"
-
-# =============================================================================
-# Discord Configuration (Optional)
-# =============================================================================
-[discord]
-token_env_var = "DISCORD_BOT_TOKEN"  # Env var containing the token
-guild_ids = []                        # Empty = global commands, or specify guild IDs
+category = "unspecified-high"
 ```
-
-### Model Recommendations by Task
-
-| Task Type | Recommended Model | Why |
-|-----------|-------------------|-----|
-| **Planning & Orchestration** | Claude Sonnet 4.6 | Good balance of speed and reasoning |
-| **Code Generation** | Claude Sonnet 4.6 or Opus 4.6 | Strong at code, handles complexity |
-| **Code Review** | Claude Sonnet 4.6 | Analytical, catches issues |
-| **Quick Searches** | Claude Haiku 4.5 | Fast, cheap, good enough for simple tasks |
-| **Architecture Decisions** | Claude Opus 4.6 | Deepest reasoning capability |
-| **Frontend/UI Work** | Gemini 2.0 Flash | Strong visual understanding |
 
 ---
 
 ## Usage
 
-### Starting the Server
+### Server
 
 ```bash
 # Development
@@ -404,69 +255,53 @@ cargo run
 # Production
 ./target/release/cuttlefish-rs
 
-# With systemd (after install.sh)
-sudo systemctl start cuttlefish
+# With custom config
+./target/release/cuttlefish-rs --config /path/to/config.toml
 ```
 
-### Endpoints
+### CLI Commands
+
+```bash
+# Template validation
+cuttlefish-rs validate-templates [DIR]
+
+# Usage statistics
+cuttlefish-rs usage [--project ID] [--daily|--weekly|--monthly]
+
+# Cost tracking
+cuttlefish-rs costs [--export path.csv]
+
+# Project memory
+cuttlefish-rs memory [PROJECT_PATH]
+
+# Decision tracing
+cuttlefish-rs why <FILE>
+
+# State branching
+cuttlefish-rs branch list|create|restore|delete [NAME]
+
+# Checkpoints
+cuttlefish-rs checkpoint [create|list]
+cuttlefish-rs rollback <ID|--latest>
+
+# Safety configuration
+cuttlefish-rs safety config [--auto-approve THRESHOLD] [--prompt THRESHOLD]
+
+# Tunnel management
+cuttlefish-rs tunnel connect|status|disconnect
+```
+
+### API Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `http://localhost:8080/health` | Health check |
-| `ws://localhost:8080/ws` | WebSocket for clients |
-| `http://localhost:8080/api/...` | REST API |
-
-### TUI Client
-
-```bash
-# Build the TUI
-cargo build --release -p cuttlefish-tui
-
-# Connect to server
-./target/release/cuttlefish-tui \
-  --server ws://localhost:8080 \
-  --api-key "$CUTTLEFISH_API_KEY"
-```
-
-### Discord Bot
-
-1. Create a Discord application at https://discord.com/developers
-2. Create a bot and copy the token
-3. Set `DISCORD_BOT_TOKEN` environment variable
-4. Enable Discord in config
-5. Invite bot to your server with appropriate permissions
-6. Use `/cuttlefish` slash commands
-
----
-
-## Inspirations
-
-Cuttlefish stands on the shoulders of giants. This project draws inspiration from several innovative AI coding platforms:
-
-### OmO / Sisyphus Labs
-
-The **OhMyOpenCode (OmO)** project and its **Sisyphus** agent system pioneered many concepts used in Cuttlefish:
-
-- **Category-based model routing**: Different tasks routed to different models based on task category (visual, deep, quick, ultrabrain)
-- **Multi-agent orchestration**: Planner → Coder → Critic workflow loop (Ultraworker pattern)
-- **Hashline editing**: Content-addressable line hashes for surgical file edits
-- **Agent dispatch with skills**: Loading specialized knowledge per-agent
-
-*"Different AI models have different strengths"* — the core philosophy that Cuttlefish inherits.
-
-### OpenClaw
-
-**OpenClaw** contributed architectural patterns:
-
-- **Gateway control plane**: Multi-channel message routing
-- **Skills platform**: Bundled, managed, and workspace-level skills
-- **Multi-interface design**: Single backend, multiple frontends
-
-### Other Influences
-
-- **Moltis**: Large Rust workspace architecture (46 crates), zero unsafe code, SQLite patterns
-- **Hermes Agent**: Personality systems, dynamic agent switching, toolset distributions
-- **IronClaw**: Sandbox isolation concepts, capability-based permissions
+| `GET /health` | Health check |
+| `ws://host/ws` | WebSocket for clients |
+| `GET /api/projects` | List projects |
+| `POST /api/projects` | Create project |
+| `GET /api/templates` | List templates |
+| `GET /api/system/config` | Get configuration |
+| `PUT /api/system/config` | Update configuration |
 
 ---
 
@@ -475,86 +310,67 @@ The **OhMyOpenCode (OmO)** project and its **Sisyphus** agent system pioneered m
 ### Building
 
 ```bash
-# Debug build
-cargo build --workspace
-
-# Release build
-cargo build --release --workspace
-
-# Run tests
-cargo test --workspace
-
-# Run clippy
-cargo clippy --workspace -- -D warnings
-
-# Format code
-cargo fmt --all
+cargo build --workspace            # Debug
+cargo build --release --workspace  # Release
+cargo test --workspace             # Run tests
+cargo clippy --workspace -- -D warnings  # Lint
+cargo fmt --all                    # Format
 ```
 
-### Project Conventions
+### Code Standards
 
 - **Edition**: Rust 2024
 - **MSRV**: 1.94.0
 - **No unsafe**: `#![deny(unsafe_code)]` workspace-wide
 - **No unwrap**: `#![deny(clippy::unwrap_used)]` in library crates
-- **Errors**: Use `thiserror` for library errors, `anyhow` for binaries
+- **Errors**: `thiserror` for libraries, `anyhow` for binaries
 - **Logging**: `tracing` macros only, no `println!`
 
-### Contributing
+### Commit Convention
 
-1. Fork the repository
-2. Create a feature branch
-3. Write tests (TDD preferred)
-4. Ensure `cargo test --workspace` passes
-5. Ensure `cargo clippy --workspace -- -D warnings` is clean
-6. Submit a pull request
+Format: `<type>(<crate>): <description>`
+
+Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+Example: `feat(api): wire WebSocket to orchestrator agent`
 
 ---
 
-## Roadmap
+## Contributing
 
-### v1.0 (Current)
-- [x] Core agent system (Orchestrator, Coder, Critic)
-- [x] AWS Bedrock provider
-- [x] Claude OAuth provider
-- [x] ChatGPT OAuth provider
-- [x] OpenAI API provider
-- [x] Google Gemini provider
-- [x] Moonshot/Kimi provider
-- [x] Zhipu/GLM provider
-- [x] MiniMax provider
-- [x] xAI/Grok provider
-- [x] Ollama provider
-- [x] Docker sandboxes
-- [x] Discord bot
-- [x] Web UI (Nuxt)
-- [x] TUI client
-- [x] GitHub integration
-- [x] Hashline editing
-- [x] Planner agent
-- [x] Explorer agent
-- [x] Librarian agent
-- [x] DevOps agent
+1. Fork the repository
+2. Read [CLAUDE.md](CLAUDE.md) for detailed architecture and fix priorities
+3. Create a feature branch
+4. Write tests (TDD preferred)
+5. Ensure `cargo test --workspace` passes
+6. Ensure `cargo clippy --workspace -- -D warnings` is clean
+7. Submit a pull request
 
-### v1.1 (Planned)
-- [ ] WASM sandbox option
-- [ ] Hook system for customization
-- [ ] Skill-embedded MCPs
+### Priority Areas
 
-### v2.0 (Future)
-- [ ] Code editor in WebUI
-- [ ] JetBrains plugin
-- [ ] Self-modifying prompts
-- [ ] RAG with vector embeddings
+These areas need the most attention:
+
+1. **Wire WebSocket to agents** - Core functionality gap
+2. **Complete TUI client** - Currently a stub
+3. **Add real-time log streaming** - WebUI expects it
+4. **Test provider connections** - Settings page stub
+
+---
+
+## Inspirations
+
+- **OmO / Sisyphus Labs**: Category-based routing, multi-agent orchestration
+- **OpenClaw**: Gateway control plane, multi-interface design
+- **Moltis**: Large Rust workspace patterns, zero unsafe
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
 <p align="center">
-  Made with 🦀 and 🐙
+  Made with Rust
 </p>

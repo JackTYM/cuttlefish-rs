@@ -13,6 +13,8 @@
 
 /// REST API route handlers.
 pub mod api_routes;
+/// Pending approval registry for safety workflow integration.
+pub mod approval_registry;
 /// API key authentication middleware (legacy).
 pub mod auth;
 /// Authentication API routes (registration, login, tokens, API keys).
@@ -33,6 +35,8 @@ pub mod routes;
 pub mod safety_routes;
 /// Sandbox management API endpoints.
 pub mod sandbox_routes;
+/// System configuration and status API.
+pub mod system_routes;
 /// Usage tracking and billing API endpoints.
 pub mod usage_routes;
 /// WebUI static file serving.
@@ -58,13 +62,18 @@ pub use memory_routes::{MemoryState, memory_router};
 pub use middleware::AuthConfig;
 pub use organization_routes::{OrganizationState, organization_router};
 pub use proxy::{ProxyRegistry, ProxyRoute};
-pub use routes::AppState;
+pub use routes::{AppState, ProjectSession};
 pub use safety_routes::{
     SafetyState, is_action_approved, queue_pending_action, safety_router, wait_for_approval,
 };
+pub use system_routes::{SystemState, system_router};
 pub use usage_routes::{UsageState, usage_router};
 pub use webui::{WebUiConfig, WebUiState, webui_router};
-pub use ws::{ClientMessage, ServerMessage};
+pub use ws::{ClientMessage, RiskFactor, ServerMessage, execute_with_safety};
+pub use approval_registry::{
+    ApprovalDecision, ApprovalRegistry, PendingApproval, SharedApprovalRegistry,
+    create_approval_registry, DEFAULT_APPROVAL_TIMEOUT_SECS,
+};
 
 /// Configuration for building the full API application.
 pub struct ApiConfig {
@@ -78,6 +87,8 @@ pub struct ApiConfig {
     pub projects_dir: PathBuf,
     /// Pricing configuration for usage tracking.
     pub pricing_config: PricingConfig,
+    /// Provider registry for model providers (optional, for testing).
+    pub provider_registry: Option<Arc<cuttlefish_providers::ProviderRegistry>>,
 }
 
 /// Build the axum application router with all routes.
@@ -114,6 +125,10 @@ pub fn build_full_app(config: ApiConfig) -> Router {
     let collab_state = CollaborationState::new((*config.pool).clone(), config.auth_config.clone());
     let org_state = OrganizationState::new((*config.pool).clone(), config.auth_config.clone());
     let auth_state = AuthState::new((*config.pool).clone(), config.auth_config.clone());
+    let mut system_state = SystemState::new(config.auth_config.clone());
+    if let Some(registry) = config.provider_registry.clone() {
+        system_state = system_state.with_provider_registry(registry);
+    }
 
     Router::new()
         .route("/health", get(routes::health_handler))
@@ -137,6 +152,7 @@ pub fn build_full_app(config: ApiConfig) -> Router {
         .merge(usage_router().with_state(usage_state))
         .merge(safety_router(safety_state))
         .merge(memory_router().with_state(memory_state))
+        .merge(system_router(system_state))
         .nest("/api", collaboration_router(collab_state))
         .nest("/api", organization_router(org_state))
         .nest("/api/auth", auth_routes::auth_router(auth_state))
@@ -203,6 +219,10 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
     let collab_state = CollaborationState::new((*config.pool).clone(), config.auth_config.clone());
     let org_state = OrganizationState::new((*config.pool).clone(), config.auth_config.clone());
     let auth_state = AuthState::new((*config.pool).clone(), config.auth_config.clone());
+    let mut system_state = SystemState::new(config.auth_config.clone());
+    if let Some(registry) = config.provider_registry.clone() {
+        system_state = system_state.with_provider_registry(registry);
+    }
 
     let api_router = Router::new()
         .route("/health", get(routes::health_handler))
@@ -226,6 +246,7 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
         .merge(usage_router().with_state(usage_state))
         .merge(safety_router(safety_state))
         .merge(memory_router().with_state(memory_state))
+        .merge(system_router(system_state))
         .nest("/api", collaboration_router(collab_state))
         .nest("/api", organization_router(org_state))
         .nest("/api/auth", auth_routes::auth_router(auth_state))

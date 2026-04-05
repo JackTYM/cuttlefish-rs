@@ -11,6 +11,8 @@
 pub mod api_client;
 /// Channel archival system for inactive projects.
 pub mod archival;
+/// Bot event handler and startup logic.
+pub mod bot;
 /// Discord channel management.
 pub mod channel_manager;
 /// Slash command handlers for the new command framework.
@@ -55,3 +57,4 @@ pub use formatter::{
     DISCORD_MESSAGE_LIMIT, format_code_block, format_diff, format_status, split_message,
 };
 pub use guild_config::{GuildConfig, GuildConfigStore};
+pub use bot::{BotConfig, start_bot, start_bot_background};
