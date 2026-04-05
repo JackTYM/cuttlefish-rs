@@ -1754,10 +1754,27 @@ download_binary() {
     
     tarball="cuttlefish-${os_name}-${arch}.tar.gz"
     download_url="https://github.com/JackTYM/cuttlefish-rs/releases/download/${version}/${tarball}"
-    
+
     info "Downloading Cuttlefish $version for ${os_name}-${arch}..."
-    
-    if ! curl -fSL "$download_url" -o "/tmp/$tarball" 2>/dev/null; then
+
+    # Retry download up to 3 times with delay (handles CI release race condition)
+    local max_retries=3
+    local retry_delay=10
+    local download_success=false
+
+    for ((i=1; i<=max_retries; i++)); do
+        if curl -fSL "$download_url" -o "/tmp/$tarball" 2>/dev/null; then
+            download_success=true
+            break
+        fi
+
+        if [[ $i -lt $max_retries ]]; then
+            info "Download failed, retrying in ${retry_delay}s... (attempt $i/$max_retries)"
+            sleep "$retry_delay"
+        fi
+    done
+
+    if [[ "$download_success" != "true" ]]; then
         warn "Binary not available for this platform, falling back to build from source"
         build_from_source
         return
