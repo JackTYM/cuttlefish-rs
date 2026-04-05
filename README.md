@@ -140,7 +140,7 @@ The agent system implements a Planner -> Coder -> Critic loop:
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | sudo bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
 ```
 
 This installs the latest release to `/opt/cuttlefish` and creates a `cuttlefish` command in your PATH.
