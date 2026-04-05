@@ -21,10 +21,22 @@ export interface PendingApprovalEvent {
   hasDiff: boolean
 }
 
+export interface LogEntry {
+  id: string
+  timestamp: string
+  agent: string
+  action: string
+  level: 'info' | 'warn' | 'error'
+  project: string
+  context?: string
+  stackTrace?: string
+}
+
 export function useWebSocket(apiKey?: string) {
   const config = useRuntimeConfig()
   const messages = ref<ChatMessage[]>([])
   const logLines = ref<string[]>([])
+  const logEntries = ref<LogEntry[]>([])
   const diffContent = ref('')
   const connected = ref(false)
   const pendingApprovals = ref<PendingApprovalEvent[]>([])
@@ -81,6 +93,24 @@ export function useWebSocket(apiKey?: string) {
             pendingApprovals.value = pendingApprovals.value.filter(
               p => p.id !== msg.action_id
             )
+          } else if (msg.type === 'log_entry') {
+            logEntries.value.push({
+              id: msg.id,
+              timestamp: msg.timestamp,
+              agent: msg.agent,
+              action: msg.action,
+              level: msg.level,
+              project: msg.project,
+              context: msg.context,
+              stackTrace: msg.stack_trace,
+            })
+            // Keep max 1000 log entries to prevent memory issues
+            if (logEntries.value.length > 1000) {
+              logEntries.value.splice(0, 100)
+            }
+          } else if (msg.type === 'error') {
+            console.error('[WebSocket] Server error:', msg.message)
+            // Could emit an event or store in a ref for UI display
           }
         } catch {}
       }
@@ -93,6 +123,30 @@ export function useWebSocket(apiKey?: string) {
     if (ws?.readyState === WebSocket.OPEN) {
       messages.value.push({ sender: 'user', content, type: 'chat', projectId, timestamp: Date.now() })
       ws.send(JSON.stringify({ type: 'chat', project_id: projectId, content }))
+    }
+  }
+
+  const approve = (actionId: string) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'approve', action_id: actionId }))
+    }
+  }
+
+  const reject = (actionId: string, reason?: string) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'reject', action_id: actionId, reason }))
+    }
+  }
+
+  const subscribe = (projectId: string) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'subscribe', project_id: projectId }))
+    }
+  }
+
+  const unsubscribe = (projectId: string) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'unsubscribe', project_id: projectId }))
     }
   }
   
@@ -109,12 +163,17 @@ export function useWebSocket(apiKey?: string) {
   onMounted(() => connect())
   onUnmounted(() => disconnect())
   
-  return { 
-    messages, 
-    logLines, 
-    diffContent, 
-    connected, 
+  return {
+    messages,
+    logLines,
+    logEntries,
+    diffContent,
+    connected,
     send,
+    approve,
+    reject,
+    subscribe,
+    unsubscribe,
     pendingApprovals,
     removePendingApproval,
   }

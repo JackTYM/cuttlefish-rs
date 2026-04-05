@@ -17,8 +17,8 @@ interface LogEntry {
   metadata?: Record<string, unknown>
 }
 
-// WebSocket integration
-const { connected } = useWebSocket()
+// WebSocket integration - get log entries from shared WebSocket
+const { connected, logEntries } = useWebSocket()
 
 // Filter state
 const selectedProject = ref('')
@@ -40,8 +40,8 @@ const itemHeight = 72 // Approximate height of each log item
 const containerHeight = ref(600)
 const overscan = 5
 
-// Real log entries - populated from WebSocket
-const allLogs = ref<LogEntry[]>([])
+// Use log entries from WebSocket (aliased for clarity)
+const allLogs = logEntries
 
 // Available filter options
 const projects = computed(() => {
