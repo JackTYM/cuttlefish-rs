@@ -159,10 +159,22 @@ impl ModelProvider for BedrockProvider {
             req_builder = req_builder.inference_config(inference_config);
         }
 
-        let response = req_builder
-            .send()
-            .await
-            .map_err(|e| ProviderError(format!("Bedrock API error: {e}")))?;
+        let response = req_builder.send().await.map_err(|e| {
+            let err_msg = format!("{e}");
+            let hint = if err_msg.contains("AccessDeniedException") {
+                " (Hint: Request model access in AWS Bedrock console)"
+            } else if err_msg.contains("ValidationException") {
+                " (Hint: Check model ID format, e.g., anthropic.claude-sonnet-4-6-20250514-v1:0)"
+            } else if err_msg.contains("ResourceNotFoundException") {
+                " (Hint: Model may not be available in this region)"
+            } else {
+                ""
+            };
+            ProviderError(format!(
+                "Bedrock API error for model '{}': {e}{hint}",
+                self.model_id
+            ))
+        })?;
 
         let mut content = String::new();
         let mut tool_calls = Vec::new();
