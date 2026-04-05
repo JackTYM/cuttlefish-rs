@@ -233,53 +233,54 @@ impl SystemState {
             .into_iter()
             .map(|name| {
                 // Determine provider type and models based on name
-                let (provider_type, models) = match name {
-                    "anthropic" => (
-                        "anthropic",
-                        vec![
-                            "claude-opus-4-6".to_string(),
-                            "claude-sonnet-4-6".to_string(),
-                            "claude-haiku-4-5".to_string(),
-                        ],
-                    ),
-                    "openai" => (
-                        "openai",
-                        vec![
-                            "gpt-4o".to_string(),
-                            "gpt-4-turbo".to_string(),
-                            "gpt-3.5-turbo".to_string(),
-                        ],
-                    ),
-                    "bedrock" => (
-                        "bedrock",
-                        vec![
-                            "anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
-                            "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
-                            "us.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
-                        ],
-                    ),
-                    "google" => (
-                        "google",
-                        vec![
-                            "gemini-2.0-flash".to_string(),
-                            "gemini-1.5-pro".to_string(),
-                        ],
-                    ),
-                    "ollama" => (
-                        "ollama",
-                        vec![
-                            "llama3.1".to_string(),
-                            "codellama".to_string(),
-                            "mistral".to_string(),
-                        ],
-                    ),
-                    _ => ("custom", vec!["default".to_string()]),
+                // Detect provider type from name (handles names like "bedrock-fast")
+                let base_type = if name.starts_with("bedrock") {
+                    "bedrock"
+                } else if name.starts_with("anthropic") {
+                    "anthropic"
+                } else if name.starts_with("openai") {
+                    "openai"
+                } else if name.starts_with("google") {
+                    "google"
+                } else if name.starts_with("ollama") {
+                    "ollama"
+                } else {
+                    "custom"
+                };
+
+                let models = match base_type {
+                    "anthropic" => vec![
+                        "claude-opus-4-6".to_string(),
+                        "claude-sonnet-4-6".to_string(),
+                        "claude-haiku-4-5".to_string(),
+                    ],
+                    "openai" => vec![
+                        "gpt-4o".to_string(),
+                        "gpt-4-turbo".to_string(),
+                        "gpt-3.5-turbo".to_string(),
+                    ],
+                    "bedrock" => vec![
+                        "anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
+                        "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+                        "anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        "us.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
+                    ],
+                    "google" => vec![
+                        "gemini-2.0-flash".to_string(),
+                        "gemini-1.5-pro".to_string(),
+                    ],
+                    "ollama" => vec![
+                        "llama3.1".to_string(),
+                        "codellama".to_string(),
+                        "mistral".to_string(),
+                    ],
+                    _ => vec!["default".to_string()],
                 };
 
                 ProviderConfig {
                     id: name.to_string(),
                     name: name.to_string(),
-                    provider_type: provider_type.to_string(),
+                    provider_type: base_type.to_string(),
                     enabled: true,
                     api_key: "****".to_string(), // Masked
                     model: models.first().cloned().unwrap_or_default(),
