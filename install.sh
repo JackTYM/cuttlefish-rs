@@ -1771,8 +1771,32 @@ download_binary() {
     chmod +x "$INSTALL_DIR/cuttlefish-rs"
     
     rm -f "/tmp/$tarball"
-    
+
     success "Installed Cuttlefish $version to $INSTALL_DIR"
+
+    # Download prompt files
+    download_prompts
+}
+
+download_prompts() {
+    info "Downloading agent prompt files..."
+
+    local prompts_dir="$INSTALL_DIR/prompts"
+    mkdir -p "$prompts_dir"
+
+    local prompts=("orchestrator" "coder" "critic" "planner" "explorer" "librarian" "devops")
+    local base_url="https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/prompts"
+
+    for prompt in "${prompts[@]}"; do
+        if curl -fsSL "$base_url/${prompt}.md" -o "$prompts_dir/${prompt}.md" 2>/dev/null; then
+            : # Success
+        else
+            warn "Failed to download ${prompt}.md prompt"
+        fi
+    done
+
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$prompts_dir"
+    success "Downloaded prompt files to $prompts_dir"
 }
 
 build_from_source() {
