@@ -431,11 +431,9 @@ fn print_help() {
     println!("    pricing set <PROVIDER> <MODEL> <INPUT> <OUTPUT>");
     println!("                           Set pricing (USD per million tokens)");
     println!();
-    println!("UPDATE SUBCOMMANDS:");
-    println!("    update                 Check for updates");
-    println!("    update check           Check if a new version is available");
-    println!("    update download        Download the latest version");
-    println!("    update apply           Apply the downloaded update (requires restart)");
+    println!("UPDATE:");
+    println!("    update                 Check, download, and apply update automatically");
+    println!("    update check           Just check if a new version is available");
     println!();
     println!("BRANCH SUBCOMMANDS:");
     println!("    branch list [PROJECT]  List all branches for a project");
@@ -1543,14 +1541,52 @@ async fn safety_command(args: &[String]) -> anyhow::Result<()> {
     std::process::exit(1);
 }
 
+/// Stop cuttlefish systemd service if running. Returns true if it was running.
+fn stop_cuttlefish_service() -> bool {
+    // Check if systemctl exists
+    if std::process::Command::new("systemctl")
+        .args(["--version"])
+        .output()
+        .is_err()
+    {
+        return false;
+    }
+
+    // Check if service is active
+    let is_active = std::process::Command::new("systemctl")
+        .args(["is-active", "--quiet", "cuttlefish"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if is_active {
+        println!("Stopping cuttlefish service...");
+        let _ = std::process::Command::new("systemctl")
+            .args(["stop", "cuttlefish"])
+            .status();
+        // Wait a moment for the process to fully stop
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        true
+    } else {
+        false
+    }
+}
+
+/// Start cuttlefish systemd service.
+fn start_cuttlefish_service() {
+    let _ = std::process::Command::new("systemctl")
+        .args(["start", "cuttlefish"])
+        .status();
+}
+
 async fn update_command(args: &[String]) -> anyhow::Result<()> {
     let config = UpdateConfig::default();
     let checker = UpdateChecker::new(config);
 
-    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("check");
+    let subcommand = args.first().map(|s| s.as_str()).unwrap_or("");
 
     match subcommand {
-        "check" | "" => {
+        "check" => {
             println!(
                 "Checking for updates... (current: v{})",
                 env!("CARGO_PKG_VERSION")
@@ -1573,7 +1609,7 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                         }
                     }
                     println!();
-                    println!("To download: cuttlefish update download");
+                    println!("To update: cuttlefish update");
                 }
                 Ok(None) => {
                     println!(
@@ -1585,6 +1621,126 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
                     eprintln!("✗ Failed to check for updates: {}", e);
                     std::process::exit(1);
                 }
+            }
+        }
+        "" => {
+            // Default: full automatic update
+            println!(
+                "Checking for updates... (current: v{})",
+                env!("CARGO_PKG_VERSION")
+            );
+
+            let update = match checker.check_for_update().await {
+                Ok(Some(update)) => update,
+                Ok(None) => {
+                    println!(
+                        "✓ You are running the latest version (v{})",
+                        env!("CARGO_PKG_VERSION")
+                    );
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("✗ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            println!();
+            println!(
+                "✓ Update available: v{} → v{}",
+                update.current_version, update.latest_version
+            );
+
+            let download_url = match update.download_url {
+                Some(url) => url,
+                None => {
+                    eprintln!(
+                        "✗ No download URL found for your platform ({})",
+                        get_platform_binary_name()
+                    );
+                    eprintln!("  Please download manually from GitHub releases.");
+                    std::process::exit(1);
+                }
+            };
+
+            // Download
+            let download_dir = dirs::cache_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("cuttlefish-updates");
+            std::fs::create_dir_all(&download_dir)?;
+
+            let binary_name = get_platform_binary_name();
+            let dest_path = download_dir.join(&binary_name);
+
+            println!("Downloading v{}...", update.latest_version);
+
+            let dl_config = DownloadConfig {
+                download_dir: download_dir.clone(),
+                verify_checksums: update.checksum_url.is_some(),
+            };
+            let downloader = BinaryDownloader::new(dl_config);
+
+            let progress_callback = |progress: cuttlefish_core::updater::DownloadProgress| {
+                if let Some(percent) = progress.percent {
+                    print!("\r  Progress: {:.1}%  ", percent);
+                    use std::io::Write;
+                    std::io::stdout().flush().ok();
+                }
+            };
+
+            if let Some(ref checksum_url) = update.checksum_url {
+                downloader
+                    .download_and_verify(
+                        &download_url,
+                        checksum_url,
+                        &dest_path,
+                        Some(&progress_callback),
+                    )
+                    .await?;
+            } else {
+                downloader
+                    .download_binary(&download_url, &dest_path, Some(&progress_callback))
+                    .await?;
+            }
+            println!("\r✓ Downloaded v{}         ", update.latest_version);
+
+            // Stop service if running
+            let service_was_running = stop_cuttlefish_service();
+
+            // Apply update
+            let current_exe = std::env::current_exe()?;
+            let backup_path = current_exe.with_extension("bak");
+
+            println!("Applying update...");
+
+            // Create backup
+            std::fs::copy(&current_exe, &backup_path)?;
+
+            // Copy new binary
+            std::fs::copy(&dest_path, &current_exe)?;
+
+            // Make executable on Unix
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = std::fs::metadata(&current_exe)?.permissions();
+                perms.set_mode(0o755);
+                std::fs::set_permissions(&current_exe, perms)?;
+            }
+
+            // Clean up downloaded file
+            std::fs::remove_file(&dest_path).ok();
+
+            println!("✓ Updated to v{}", update.latest_version);
+
+            // Restart service if it was running
+            if service_was_running {
+                println!("Restarting service...");
+                start_cuttlefish_service();
+                println!("✓ Service restarted");
+            } else {
+                println!();
+                println!("Restart cuttlefish to use the new version.");
             }
         }
         "download" => {

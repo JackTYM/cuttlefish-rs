@@ -26,3 +26,4 @@ regex = "1"
 tempfile = "3"
 cuttlefish-api = { path = "../cuttlefish-api" }
 cuttlefish-db = { path = "../cuttlefish-db" }
+dashmap = "6"

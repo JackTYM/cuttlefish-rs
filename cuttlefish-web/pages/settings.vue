@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * Settings Page - Configuration interface for Cuttlefish instance
- * Manages API keys, model providers, agent settings, and preferences
- * Persists to localStorage until API is ready
+ * Fetches real configuration from the server API
  */
 
 // =============================================================================
@@ -52,67 +51,19 @@ interface Settings {
 }
 
 // =============================================================================
-// Default Settings
+// API Composable
+// =============================================================================
+
+const config = useRuntimeConfig()
+const apiBase = config.public.apiBase || ''
+
+// =============================================================================
+// Default Settings (used as fallback when API unavailable)
 // =============================================================================
 
 const defaultSettings: Settings = {
   apiKey: '',
-  providers: [
-    {
-      id: 'anthropic',
-      name: 'Anthropic',
-      type: 'anthropic',
-      enabled: true,
-      apiKey: '',
-      model: 'claude-sonnet-4-6',
-      models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
-      connected: null,
-    },
-    {
-      id: 'openai',
-      name: 'OpenAI',
-      type: 'openai',
-      enabled: false,
-      apiKey: '',
-      model: 'gpt-5.4',
-      models: ['gpt-5.4', 'gpt-5-nano', 'gpt-4o'],
-      connected: null,
-    },
-    {
-      id: 'google',
-      name: 'Google Gemini',
-      type: 'google',
-      enabled: false,
-      apiKey: '',
-      model: 'gemini-2.0-flash',
-      models: ['gemini-2.0-flash', 'gemini-1.5-pro'],
-      connected: null,
-    },
-    {
-      id: 'bedrock',
-      name: 'AWS Bedrock',
-      type: 'bedrock',
-      enabled: false,
-      apiKey: '',
-      model: 'anthropic.claude-sonnet-4-6-20260101-v1:0',
-      models: [
-        'anthropic.claude-opus-4-6-20260101-v1:0',
-        'anthropic.claude-sonnet-4-6-20260101-v1:0',
-        'anthropic.claude-haiku-4-5-20260101-v1:0',
-      ],
-      connected: null,
-    },
-    {
-      id: 'ollama',
-      name: 'Ollama (Local)',
-      type: 'ollama',
-      enabled: false,
-      apiKey: '',
-      model: 'llama3.1',
-      models: ['llama3.1', 'llama3.2', 'codellama', 'mistral'],
-      connected: null,
-    },
-  ],
+  providers: [],
   agentSettings: {
     orchestrator: { category: 'deep' },
     coder: { category: 'deep' },
@@ -134,7 +85,7 @@ const defaultSettings: Settings = {
     maxConcurrent: 5,
   },
   tunnelConnected: false,
-  version: '0.1.0',
+  version: '0.0.0',
 }
 
 const categoryOptions = [
@@ -151,6 +102,7 @@ const categoryOptions = [
 // =============================================================================
 
 const settings = ref<Settings>(JSON.parse(JSON.stringify(defaultSettings)))
+const loading = ref(true)
 const saving = ref(false)
 const showSuccess = ref(false)
 const showError = ref(false)
@@ -169,28 +121,29 @@ const maskedApiKey = computed(() => {
 })
 
 // =============================================================================
-// Persistence
+// API Functions
 // =============================================================================
 
-const STORAGE_KEY = 'cuttlefish-settings'
-
-const loadSettings = () => {
-  if (typeof window === 'undefined') return
+const loadSettings = async () => {
+  loading.value = true
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      // Merge with defaults to handle new fields
+    const data = await $fetch<Settings>(`${apiBase}/api/system/config`)
+    if (data) {
       settings.value = {
         ...defaultSettings,
-        ...parsed,
-        sandbox: { ...defaultSettings.sandbox, ...parsed.sandbox },
-        notifications: { ...defaultSettings.notifications, ...parsed.notifications },
-        agentSettings: { ...defaultSettings.agentSettings, ...parsed.agentSettings },
+        ...data,
+        sandbox: { ...defaultSettings.sandbox, ...(data.sandbox || {}) },
+        notifications: { ...defaultSettings.notifications, ...(data.notifications || {}) },
+        agentSettings: { ...defaultSettings.agentSettings, ...(data.agentSettings || {}) },
       }
     }
   } catch (e) {
-    console.error('Failed to load settings:', e)
+    console.error('Failed to load settings from API:', e)
+    errorMessage.value = 'Failed to load settings from server'
+    showError.value = true
+    setTimeout(() => showError.value = false, 5000)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -199,13 +152,10 @@ const saveSettings = async () => {
   showError.value = false
   
   try {
-    // Simulate API call delay
-    await new Promise(r => setTimeout(r, 800))
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value))
-    }
+    await $fetch(`${apiBase}/api/system/config`, {
+      method: 'PUT',
+      body: settings.value,
+    })
     
     hasUnsavedChanges.value = false
     showSuccess.value = true
@@ -232,14 +182,19 @@ const copyApiKey = async () => {
   }
 }
 
-const regenerateApiKey = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let newKey = 'sk-'
-  for (let i = 0; i < 32; i++) {
-    newKey += chars.charAt(Math.floor(Math.random() * chars.length))
+const regenerateApiKey = async () => {
+  try {
+    const data = await $fetch<{ apiKey: string }>(`${apiBase}/api/system/api-key/regenerate`, {
+      method: 'POST',
+    })
+    if (data?.apiKey) {
+      settings.value.apiKey = data.apiKey
+      hasUnsavedChanges.value = false
+    }
+  } catch (e) {
+    showError.value = true
+    errorMessage.value = e instanceof Error ? e.message : 'Failed to regenerate API key'
   }
-  settings.value.apiKey = newKey
-  hasUnsavedChanges.value = true
   showRegenerateConfirm.value = false
 }
 
@@ -272,12 +227,11 @@ const testProviderConnection = async (providerId: string) => {
   provider.connected = null
   
   try {
-    // Simulate connection test
-    await new Promise(r => setTimeout(r, 1500))
-    
-    // Mock: 80% success rate for demo
-    provider.connected = Math.random() > 0.2
-  } catch (err) {
+    const data = await $fetch<{ connected: boolean }>(`${apiBase}/api/system/providers/${providerId}/test`, {
+      method: 'POST',
+    })
+    provider.connected = data?.connected ?? false
+  } catch {
     provider.connected = false
   } finally {
     testingProvider.value = null
@@ -349,6 +303,18 @@ watch(settings, () => {
       <p class="text-gray-400 text-sm sm:text-base">Configure your Cuttlefish instance</p>
     </header>
     
+    <!-- Loading State -->
+    <div v-if="loading" class="flex items-center justify-center py-20">
+      <div class="text-center">
+        <svg class="animate-spin w-8 h-8 mx-auto mb-4 text-cyan-400" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-gray-400">Loading settings...</p>
+      </div>
+    </div>
+    
+    <template v-else>
     <!-- Success Toast -->
     <Transition
       enter-active-class="transition ease-out duration-300"
@@ -840,5 +806,6 @@ watch(settings, () => {
         </div>
       </div>
     </Teleport>
+    </template>
   </div>
 </template>

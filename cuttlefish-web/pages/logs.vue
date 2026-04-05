@@ -40,24 +40,8 @@ const itemHeight = 72 // Approximate height of each log item
 const containerHeight = ref(600)
 const overscan = 5
 
-// Mock data - in production, this would come from WebSocket
-const allLogs = ref<LogEntry[]>([
-  { id: '1', timestamp: '2024-01-15T10:30:00Z', agent: 'orchestrator', project: 'my-app', action: 'Planning implementation', level: 'info' },
-  { id: '2', timestamp: '2024-01-15T10:31:00Z', agent: 'coder', project: 'my-app', action: 'Writing authentication middleware', level: 'info' },
-  { id: '3', timestamp: '2024-01-15T10:32:00Z', agent: 'coder', project: 'my-app', action: 'Created src/auth/middleware.rs', level: 'info' },
-  { id: '4', timestamp: '2024-01-15T10:33:00Z', agent: 'critic', project: 'my-app', action: 'Reviewing code changes', level: 'info' },
-  { id: '5', timestamp: '2024-01-15T10:34:00Z', agent: 'critic', project: 'my-app', action: 'Approved changes', level: 'info' },
-  { id: '6', timestamp: '2024-01-15T10:35:00Z', agent: 'coder', project: 'other-project', action: 'Refactoring database layer', level: 'info' },
-  { id: '7', timestamp: '2024-01-15T10:36:00Z', agent: 'coder', project: 'other-project', action: 'Warning: deprecated API usage', level: 'warn' },
-  { id: '8', timestamp: '2024-01-15T10:37:00Z', agent: 'planner', project: 'my-app', action: 'Analyzing requirements', level: 'info' },
-  { id: '9', timestamp: '2024-01-15T10:38:00Z', agent: 'explorer', project: 'my-app', action: 'Searching codebase for patterns', level: 'info' },
-  { id: '10', timestamp: '2024-01-15T10:39:00Z', agent: 'librarian', project: 'my-app', action: 'Fetching documentation', level: 'info' },
-  { id: '11', timestamp: '2024-01-15T10:40:00Z', agent: 'devops', project: 'my-app', action: 'Running deployment pipeline', level: 'info' },
-  { id: '12', timestamp: '2024-01-15T10:41:00Z', agent: 'coder', project: 'my-app', action: 'Error: compilation failed', level: 'error', stackTrace: 'error[E0425]: cannot find value `x` in this scope\n  --> src/main.rs:10:5\n   |\n10|     x\n   |     ^ not found in this scope' },
-  { id: '13', timestamp: '2024-01-15T10:42:00Z', agent: 'critic', project: 'my-app', action: 'Test suite passed (42 tests)', level: 'info' },
-  { id: '14', timestamp: '2024-01-15T10:43:00Z', agent: 'orchestrator', project: 'other-project', action: 'Task completed successfully', level: 'info' },
-  { id: '15', timestamp: '2024-01-15T10:44:00Z', agent: 'coder', project: 'my-app', action: 'Warning: unused variable', level: 'warn' },
-])
+// Real log entries - populated from WebSocket
+const allLogs = ref<LogEntry[]>([])
 
 // Available filter options
 const projects = computed(() => {
@@ -211,8 +195,8 @@ watch([filteredLogs, isLive], () => {
   }
 }, { deep: true })
 
-// Simulate real-time log updates (in production, this would come from WebSocket)
-let logInterval: ReturnType<typeof setInterval> | null = null
+// Simulated log generation removed - logs come from real WebSocket events
+// The WebSocket connection (useWebSocket composable) will push log entries
 
 onMounted(() => {
   // Update container height on resize
@@ -224,42 +208,10 @@ onMounted(() => {
   
   updateContainerHeight()
   window.addEventListener('resize', updateContainerHeight)
-  
-  // Simulate incoming logs
-  logInterval = setInterval(() => {
-    if (isLive.value && Math.random() > 0.7) {
-      const agents = ['orchestrator', 'coder', 'critic', 'explorer', 'librarian', 'devops'] as const
-      const levels: ('info' | 'warn' | 'error')[] = ['info', 'info', 'info', 'warn', 'error']
-      const actions = [
-        'Processing request...',
-        'Analyzing code structure',
-        'Running tests',
-        'Fetching documentation',
-        'Optimizing queries',
-        'Building Docker image',
-      ]
-      
-      const newLog: LogEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        agent: agents[Math.floor(Math.random() * agents.length)],
-        project: Math.random() > 0.5 ? 'my-app' : 'other-project',
-        action: actions[Math.floor(Math.random() * actions.length)],
-        level: levels[Math.floor(Math.random() * levels.length)],
-      }
-      
-      allLogs.value.push(newLog)
-      
-      // Keep only last 500 logs
-      if (allLogs.value.length > 500) {
-        allLogs.value = allLogs.value.slice(-500)
-      }
-    }
-  }, 2000)
 })
 
 onUnmounted(() => {
-  if (logInterval) clearInterval(logInterval)
+  // Cleanup handled by useWebSocket composable
 })
 
 // Clear filters
