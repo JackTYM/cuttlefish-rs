@@ -265,10 +265,7 @@ impl SystemState {
                         "anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
                         "us.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
                     ],
-                    "google" => vec![
-                        "gemini-2.0-flash".to_string(),
-                        "gemini-1.5-pro".to_string(),
-                    ],
+                    "google" => vec!["gemini-2.0-flash".to_string(), "gemini-1.5-pro".to_string()],
                     "ollama" => vec![
                         "llama3.1".to_string(),
                         "codellama".to_string(),

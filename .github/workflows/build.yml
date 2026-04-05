@@ -47,9 +47,42 @@ jobs:
             echo "Next version: $new_version"
           fi
 
+  build-webui:
+    name: Build WebUI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: cuttlefish-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: cuttlefish-web
+        run: npm ci
+
+      - name: Build WebUI
+        working-directory: cuttlefish-web
+        run: npm run build
+
+      - name: Package WebUI
+        run: |
+          cd cuttlefish-web/.output/public
+          tar czvf ../../../cuttlefish-webui.tar.gz .
+
+      - name: Upload WebUI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuttlefish-webui
+          path: cuttlefish-webui.tar.gz
+          retention-days: 7
+
   build:
     name: Build ${{ matrix.target }}
-    needs: determine-version
+    needs: [determine-version, build-webui]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -74,6 +107,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download WebUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cuttlefish-webui
+          path: .
 
       - name: Update version in Cargo.toml
         run: |
@@ -121,11 +160,14 @@ jobs:
         if: matrix.cross
         run: cross build --release --target ${{ matrix.target }}
 
-      - name: Package binary
+      - name: Package binary with WebUI
         shell: bash
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czvf ../../../cuttlefish-${{ matrix.name }}.tar.gz cuttlefish-rs
+          mkdir -p package/webui
+          cp target/${{ matrix.target }}/release/cuttlefish-rs package/
+          tar -xzf cuttlefish-webui.tar.gz -C package/webui
+          cd package
+          tar czvf ../cuttlefish-${{ matrix.name }}.tar.gz cuttlefish-rs webui
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
