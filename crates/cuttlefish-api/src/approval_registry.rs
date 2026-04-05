@@ -217,7 +217,9 @@ impl ApprovalRegistry {
     /// Returns `true` if the action was found and rejected, `false` if not found.
     pub fn reject(&self, action_id: &str, reason: Option<String>) -> bool {
         if let Some((_, state)) = self.pending.remove(action_id) {
-            let _ = state.decision_tx.send(ApprovalDecision::Rejected { reason });
+            let _ = state
+                .decision_tx
+                .send(ApprovalDecision::Rejected { reason });
             true
         } else {
             false
@@ -347,9 +349,8 @@ mod tests {
         // Spawn a task to wait for approval
         let registry_clone = Arc::new(registry);
         let registry_for_wait = Arc::clone(&registry_clone);
-        let wait_task = tokio::spawn(async move {
-            registry_for_wait.request_approval(approval).await
-        });
+        let wait_task =
+            tokio::spawn(async move { registry_for_wait.request_approval(approval).await });
 
         // Give the task time to register
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -369,9 +370,8 @@ mod tests {
         let action_id = approval.action_id.clone();
 
         let registry_for_wait = Arc::clone(&registry);
-        let wait_task = tokio::spawn(async move {
-            registry_for_wait.request_approval(approval).await
-        });
+        let wait_task =
+            tokio::spawn(async move { registry_for_wait.request_approval(approval).await });
 
         tokio::time::sleep(Duration::from_millis(10)).await;
 
