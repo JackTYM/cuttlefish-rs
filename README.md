@@ -137,13 +137,21 @@ The agent system implements a Planner -> Coder -> Critic loop:
 
 ## Installation
 
-### Prerequisites
+### One-Line Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | sudo bash
+```
+
+This installs the latest release to `/opt/cuttlefish` and creates a `cuttlefish` command in your PATH.
+
+### Prerequisites (for building from source)
 
 - Rust 1.94.0+ (`rustup install 1.94.0`)
 - Docker (for project sandboxes)
 - Git
 
-### Quick Start
+### Build from Source
 
 ```bash
 # Clone and build

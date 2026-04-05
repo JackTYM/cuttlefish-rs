@@ -83,6 +83,72 @@ jobs:
           path: cuttlefish-${{ matrix.name }}.tar.gz
           retention-days: 7
 
+  create-release:
+    name: Create Versioned Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          # Get base version from Cargo.toml
+          base=$(grep '^version = ' Cargo.toml | grep -v workspace | head -1 | sed 's/version = "\(.*\)"/\1/')
+          base_major=$(echo $base | cut -d. -f1)
+          base_minor=$(echo $base | cut -d. -f2)
+
+          # Find highest patch version for this major.minor
+          latest_patch=$(git tag -l "v${base_major}.${base_minor}.*" | sed "s/v${base_major}.${base_minor}.//" | sort -n | tail -1)
+
+          if [ -z "$latest_patch" ]; then
+            new_patch=1
+          else
+            new_patch=$((latest_patch + 1))
+          fi
+
+          new_version="${base_major}.${base_minor}.${new_patch}"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "Next version: $new_version"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -name '*.tar.gz' -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Create versioned release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: |
+            ## Cuttlefish v${{ steps.version.outputs.version }}
+
+            **Commit:** ${{ github.sha }}
+            **Built:** ${{ github.event.head_commit.timestamp }}
+
+            ### Installation
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | sudo bash
+            ```
+
+            Or download the binary for your platform below.
+          files: release/*
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   update-latest:
     name: Update Latest Release
     needs: build
@@ -118,10 +184,10 @@ jobs:
           name: Latest Build
           body: |
             Automated build from master branch.
-            
+
             **Commit:** ${{ github.sha }}
             **Built:** ${{ github.event.head_commit.timestamp }}
-            
+
             This release is automatically updated on every push to master.
             For stable releases, use tagged versions (v0.x.x).
           files: release/*
