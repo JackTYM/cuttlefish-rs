@@ -112,8 +112,15 @@ async fn main() -> anyhow::Result<()> {
                 println!("cuttlefish {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
-            _ => {
-                i += 1;
+            arg if arg.starts_with('-') => {
+                eprintln!("Unknown option: {}", arg);
+                eprintln!("Run 'cuttlefish --help' for usage information.");
+                std::process::exit(1);
+            }
+            arg => {
+                eprintln!("Unknown command: {}", arg);
+                eprintln!("Run 'cuttlefish --help' for usage information.");
+                std::process::exit(1);
             }
         }
     }
@@ -1749,26 +1756,31 @@ async fn update_command(args: &[String]) -> anyhow::Result<()> {
             // Stop service if running
             let service_was_running = stop_cuttlefish_service();
 
-            // Apply update
+            // Apply update using atomic rename (works even if binary is running)
             let current_exe = std::env::current_exe()?;
             let backup_path = current_exe.with_extension("bak");
+            let temp_path = current_exe.with_extension("new");
 
             println!("Applying update...");
 
-            // Create backup
+            // Create backup of current binary
             std::fs::copy(&current_exe, &backup_path)?;
 
-            // Copy new binary
-            std::fs::copy(&dest_path, &current_exe)?;
+            // Copy new binary to temp location
+            std::fs::copy(&dest_path, &temp_path)?;
 
             // Make executable on Unix
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let mut perms = std::fs::metadata(&current_exe)?.permissions();
+                let mut perms = std::fs::metadata(&temp_path)?.permissions();
                 perms.set_mode(0o755);
-                std::fs::set_permissions(&current_exe, perms)?;
+                std::fs::set_permissions(&temp_path, perms)?;
             }
+
+            // Atomic rename - this works even if the binary is running on Unix
+            // The running process keeps the old inode, but the path points to new file
+            std::fs::rename(&temp_path, &current_exe)?;
 
             // Clean up downloaded file
             std::fs::remove_file(&dest_path).ok();

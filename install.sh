@@ -2380,6 +2380,18 @@ main() {
                 download_binary
                 create_symlinks
 
+                # Restart service if systemd is available
+                if [[ "$HAS_SYSTEMD" == true ]]; then
+                    info "Restarting Cuttlefish service..."
+                    systemctl start cuttlefish 2>/dev/null || true
+                    sleep 1
+                    if systemctl is-active --quiet cuttlefish 2>/dev/null; then
+                        success "Cuttlefish service restarted!"
+                    else
+                        warn "Service not started. Run: sudo systemctl start cuttlefish"
+                    fi
+                fi
+
                 print_summary
                 return
                 ;;
@@ -2407,6 +2419,18 @@ main() {
                 create_directories
                 download_binary
                 create_symlinks
+
+                # Restart service if systemd is available
+                if [[ "$HAS_SYSTEMD" == true ]]; then
+                    info "Restarting Cuttlefish service..."
+                    systemctl start cuttlefish 2>/dev/null || true
+                    sleep 1
+                    if systemctl is-active --quiet cuttlefish 2>/dev/null; then
+                        success "Cuttlefish service restarted!"
+                    else
+                        warn "Service not started. Run: sudo systemctl start cuttlefish"
+                    fi
+                fi
 
                 print_summary
                 return
