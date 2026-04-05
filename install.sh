@@ -1638,16 +1638,22 @@ stop_running_service() {
         success "Service stopped"
         return 0
     fi
-    
-    if pgrep -f "cuttlefish-rs" >/dev/null 2>&1; then
+
+    # Find actual cuttlefish-rs binary processes (not bash scripts containing the name)
+    # Use pgrep with exact binary name match, excluding our own process tree
+    local pids
+    pids=$(pgrep -x "cuttlefish-rs" 2>/dev/null || true)
+
+    if [[ -n "$pids" ]]; then
         info "Stopping running Cuttlefish process..."
-        pkill -f "cuttlefish-rs" 2>/dev/null || true
+        # Kill only the exact binary, not scripts containing the name
+        pkill -x "cuttlefish-rs" 2>/dev/null || true
         sleep 1
         success "Process stopped"
         return 0
     fi
-    
-    return 1
+
+    return 0
 }
 
 get_latest_release() {
