@@ -530,7 +530,7 @@ async fn list_sandboxes(State(state): State<SandboxState>) -> Json<ListSandboxes
         None => {
             return Json(ListSandboxesResponse {
                 sandboxes: Vec::new(),
-            })
+            });
         }
     };
 
@@ -564,7 +564,7 @@ async fn sandbox_health(State(state): State<SandboxState>) -> Json<SandboxHealth
                 containers: 0,
                 volumes: 0,
                 images: HashMap::new(),
-            })
+            });
         }
     };
 

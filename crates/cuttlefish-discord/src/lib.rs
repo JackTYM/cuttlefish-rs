@@ -48,6 +48,7 @@ pub const ARCHIVED_CATEGORY_NAME: &str = "📦 Archived Projects";
 
 pub use api_client::{ApiClient, ApiClientConfig, ApiError, get_api_client, init_api_client};
 pub use archival::{ArchiveConfig, ChannelArchival};
+pub use bot::{BotConfig, start_bot, start_bot_background};
 pub use channel_manager::{ChannelManager, PendingAction, PendingActionType};
 pub use embeds::{
     AgentStatus, AgentStatusEmbed, AgentType, BuildProgressEmbed, ErrorEmbed, ProgressEmbed,
@@ -57,4 +58,3 @@ pub use formatter::{
     DISCORD_MESSAGE_LIMIT, format_code_block, format_diff, format_status, split_message,
 };
 pub use guild_config::{GuildConfig, GuildConfigStore};
-pub use bot::{BotConfig, start_bot, start_bot_background};

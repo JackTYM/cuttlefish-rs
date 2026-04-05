@@ -473,8 +473,8 @@ pub async fn execute_with_safety(
     diff: Option<String>,
     tx: mpsc::Sender<ServerMessage>,
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    use cuttlefish_agents::{ActionGate, ActionPreview, GateDecision};
     use crate::approval_registry::PendingApproval;
+    use cuttlefish_agents::{ActionGate, ActionPreview, GateDecision};
 
     let gate = ActionGate::with_defaults();
     let preview = ActionPreview::new(description, action_type);
@@ -484,16 +484,15 @@ pub async fn execute_with_safety(
             info!("Action auto-approved: {}", description);
             Ok(true)
         }
-        GateDecision::PromptUser { preview: _, confidence: conf } => {
+        GateDecision::PromptUser {
+            preview: _,
+            confidence: conf,
+        } => {
             info!("Action requires user approval: {}", description);
 
             // Create pending approval
-            let mut pending = PendingApproval::new(
-                project_id,
-                action_type,
-                description,
-                conf.clone(),
-            );
+            let mut pending =
+                PendingApproval::new(project_id, action_type, description, conf.clone());
 
             if let Some(p) = path.clone() {
                 pending = pending.with_path(p);
@@ -508,7 +507,8 @@ pub async fn execute_with_safety(
             let action_id = pending.action_id.clone();
 
             // Convert confidence factors to risk factor descriptions for the UI
-            let risk_factors: Vec<RiskFactor> = conf.factors()
+            let risk_factors: Vec<RiskFactor> = conf
+                .factors()
                 .iter()
                 .filter(|f| f.value() < 0.7) // Only include factors that reduce confidence
                 .map(|f| RiskFactor {
@@ -518,28 +518,32 @@ pub async fn execute_with_safety(
                 .collect();
 
             // Notify client about pending approval
-            let _ = tx.send(ServerMessage::PendingApproval {
-                action_id: action_id.clone(),
-                project_id: project_id.to_string(),
-                action_type: format!("{:?}", action_type),
-                description: description.to_string(),
-                path: pending.path.clone(),
-                command: pending.command.clone(),
-                confidence: conf.value(),
-                confidence_reasoning: conf.reasoning().to_string(),
-                risk_factors: if risk_factors.is_empty() { None } else { Some(risk_factors) },
-                created_at: chrono::Utc::now().to_rfc3339(),
-                timeout_secs: 300,
-                has_diff: diff.is_some(),
-            }).await;
+            let _ = tx
+                .send(ServerMessage::PendingApproval {
+                    action_id: action_id.clone(),
+                    project_id: project_id.to_string(),
+                    action_type: format!("{:?}", action_type),
+                    description: description.to_string(),
+                    path: pending.path.clone(),
+                    command: pending.command.clone(),
+                    confidence: conf.value(),
+                    confidence_reasoning: conf.reasoning().to_string(),
+                    risk_factors: if risk_factors.is_empty() {
+                        None
+                    } else {
+                        Some(risk_factors)
+                    },
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    timeout_secs: 300,
+                    has_diff: diff.is_some(),
+                })
+                .await;
 
             // Wait for user decision
             let decision = state.approval_registry.request_approval(pending).await;
 
             // Notify client that approval was resolved
-            let _ = tx.send(ServerMessage::ApprovalResolved {
-                action_id,
-            }).await;
+            let _ = tx.send(ServerMessage::ApprovalResolved { action_id }).await;
 
             match decision {
                 crate::approval_registry::ApprovalDecision::Approved => {
@@ -547,7 +551,10 @@ pub async fn execute_with_safety(
                     Ok(true)
                 }
                 crate::approval_registry::ApprovalDecision::Rejected { reason } => {
-                    info!("Action rejected by user: {} (reason: {:?})", description, reason);
+                    info!(
+                        "Action rejected by user: {} (reason: {:?})",
+                        description, reason
+                    );
                     Ok(false)
                 }
                 crate::approval_registry::ApprovalDecision::TimedOut => {
@@ -566,8 +573,10 @@ pub async fn execute_with_safety(
 /// Get the default provider from the registry.
 fn get_provider(
     state: &AppState,
-) -> Result<Arc<dyn cuttlefish_core::traits::provider::ModelProvider>, Box<dyn std::error::Error + Send + Sync>>
-{
+) -> Result<
+    Arc<dyn cuttlefish_core::traits::provider::ModelProvider>,
+    Box<dyn std::error::Error + Send + Sync>,
+> {
     // Try to get the default provider
     if let Some(ref default_name) = state.default_provider
         && let Some(provider) = state.provider_registry.get(default_name)

@@ -384,9 +384,7 @@ fn handle_server_message(app: &mut App, text: &str) {
     };
 
     match msg {
-        ServerMessage::Response {
-            agent, content, ..
-        } => {
+        ServerMessage::Response { agent, content, .. } => {
             app.add_message(&agent, &content);
         }
         ServerMessage::BuildLog { line, .. } => {
@@ -402,7 +400,10 @@ fn handle_server_message(app: &mut App, text: &str) {
         } => {
             app.add_message(
                 "system",
-                format!("Approval needed ({:.0}% confidence): {description}", confidence * 100.0),
+                format!(
+                    "Approval needed ({:.0}% confidence): {description}",
+                    confidence * 100.0
+                ),
             );
         }
         ServerMessage::LogEntry {

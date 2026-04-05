@@ -56,12 +56,14 @@ pub struct DatabaseConfig {
 /// Provider configuration.
 #[derive(Debug, Deserialize)]
 pub struct ProviderConfig {
-    /// Provider type (e.g., "openai", "anthropic").
+    /// Provider type (e.g., "openai", "anthropic", "bedrock", "google", "ollama").
     pub provider_type: String,
-    /// Model name.
-    pub model: String,
-    /// Region (optional).
+    /// Model name (optional, defaults vary by provider).
+    pub model: Option<String>,
+    /// Region (for Bedrock, optional).
     pub region: Option<String>,
+    /// Base URL (for Ollama, optional).
+    pub base_url: Option<String>,
 }
 
 /// Agent configuration.

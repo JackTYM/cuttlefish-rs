@@ -55,6 +55,10 @@ use cuttlefish_core::PricingConfig;
 use sqlx::SqlitePool;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
+pub use approval_registry::{
+    ApprovalDecision, ApprovalRegistry, DEFAULT_APPROVAL_TIMEOUT_SECS, PendingApproval,
+    SharedApprovalRegistry, create_approval_registry,
+};
 pub use auth::{auth_middleware, generate_api_key};
 pub use auth_routes::AuthState;
 pub use collaboration_routes::{CollaborationState, collaboration_router};
@@ -70,10 +74,6 @@ pub use system_routes::{SystemState, system_router};
 pub use usage_routes::{UsageState, usage_router};
 pub use webui::{WebUiConfig, WebUiState, webui_router};
 pub use ws::{ClientMessage, RiskFactor, ServerMessage, execute_with_safety};
-pub use approval_registry::{
-    ApprovalDecision, ApprovalRegistry, PendingApproval, SharedApprovalRegistry,
-    create_approval_registry, DEFAULT_APPROVAL_TIMEOUT_SECS,
-};
 
 /// Configuration for building the full API application.
 pub struct ApiConfig {

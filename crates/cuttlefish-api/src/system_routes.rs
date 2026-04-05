@@ -130,12 +130,24 @@ impl Default for SystemConfig {
             api_key: String::new(),
             providers: vec![],
             agent_settings: AgentSettings {
-                orchestrator: AgentCategoryConfig { category: "deep".into() },
-                coder: AgentCategoryConfig { category: "deep".into() },
-                critic: AgentCategoryConfig { category: "unspecified-high".into() },
-                planner: AgentCategoryConfig { category: "ultrabrain".into() },
-                explorer: AgentCategoryConfig { category: "quick".into() },
-                librarian: AgentCategoryConfig { category: "quick".into() },
+                orchestrator: AgentCategoryConfig {
+                    category: "deep".into(),
+                },
+                coder: AgentCategoryConfig {
+                    category: "deep".into(),
+                },
+                critic: AgentCategoryConfig {
+                    category: "unspecified-high".into(),
+                },
+                planner: AgentCategoryConfig {
+                    category: "ultrabrain".into(),
+                },
+                explorer: AgentCategoryConfig {
+                    category: "quick".into(),
+                },
+                librarian: AgentCategoryConfig {
+                    category: "quick".into(),
+                },
             },
             notifications: NotificationSettings {
                 project_created: true,
@@ -223,7 +235,7 @@ fn mask_api_key(key: &str) -> String {
     if key.len() < 8 {
         return key.to_string();
     }
-    format!("{}****{}", &key[..3], &key[key.len()-4..])
+    format!("{}****{}", &key[..3], &key[key.len() - 4..])
 }
 
 fn generate_api_key() -> String {
@@ -325,10 +337,10 @@ pub async fn test_provider(
 pub async fn regenerate_api_key(State(state): State<SystemState>) -> Json<ApiKeyResponse> {
     let new_key = generate_api_key();
     let masked = mask_api_key(&new_key);
-    
+
     let mut config = state.config.write().await;
     config.api_key = masked.clone();
-    
+
     tracing::info!("API key regenerated");
     Json(ApiKeyResponse { api_key: masked })
 }

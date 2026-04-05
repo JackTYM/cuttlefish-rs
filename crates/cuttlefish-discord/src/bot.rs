@@ -4,9 +4,9 @@
 //! - `Handler` - Serenity event handler for Discord events
 //! - `start_bot` - Start the Discord bot with the given token
 
+use serenity::Client;
 use serenity::all::{Context, EventHandler, GatewayIntents, GuildId, Interaction, Ready};
 use serenity::async_trait;
-use serenity::Client;
 use tracing::{error, info, warn};
 
 use crate::commands;
@@ -33,10 +33,7 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!(
-            "Discord bot connected as {}",
-            ready.user.tag()
-        );
+        info!("Discord bot connected as {}", ready.user.tag());
         info!("Connected to {} guild(s)", ready.guilds.len());
 
         // Register commands
@@ -70,7 +67,9 @@ impl EventHandler for Handler {
 
                 info!(
                     "Command '{}' from {} in guild {}",
-                    command_name, user.tag(), guild_id
+                    command_name,
+                    user.tag(),
+                    guild_id
                 );
 
                 if let Err(e) = commands::route_command(&ctx, &command).await {
