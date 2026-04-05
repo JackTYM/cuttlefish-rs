@@ -140,7 +140,7 @@ jobs:
 
             ### Installation
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh -o /tmp/install.sh && sudo bash /tmp/install.sh
+            curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh | sudo bash
             ```
 
             Or download the binary for your platform below.
