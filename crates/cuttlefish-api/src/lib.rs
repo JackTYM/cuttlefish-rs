@@ -131,12 +131,13 @@ pub fn build_full_app(config: ApiConfig) -> Router {
     }
 
     // Build usage router with auth middleware
-    let usage_router_with_auth = usage_router()
-        .with_state(usage_state)
-        .layer(axum::middleware::from_fn_with_state(
-            config.auth_config.clone(),
-            middleware::optional_auth,
-        ));
+    let usage_router_with_auth =
+        usage_router()
+            .with_state(usage_state)
+            .layer(axum::middleware::from_fn_with_state(
+                config.auth_config.clone(),
+                middleware::optional_auth,
+            ));
 
     Router::new()
         .route("/health", get(routes::health_handler))
@@ -233,12 +234,13 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
     }
 
     // Build usage router with auth middleware
-    let usage_router_with_auth = usage_router()
-        .with_state(usage_state)
-        .layer(axum::middleware::from_fn_with_state(
-            config.auth_config.clone(),
-            middleware::optional_auth,
-        ));
+    let usage_router_with_auth =
+        usage_router()
+            .with_state(usage_state)
+            .layer(axum::middleware::from_fn_with_state(
+                config.auth_config.clone(),
+                middleware::optional_auth,
+            ));
 
     let api_router = Router::new()
         .route("/health", get(routes::health_handler))
