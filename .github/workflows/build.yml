@@ -248,5 +248,6 @@ jobs:
             For stable releases, use tagged versions (v0.x.x).
           files: release/*
           prerelease: true
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
