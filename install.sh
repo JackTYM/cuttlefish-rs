@@ -1639,18 +1639,33 @@ stop_running_service() {
         return 0
     fi
 
-    # Find actual cuttlefish-rs binary processes (not bash scripts containing the name)
-    # Use pgrep with exact binary name match, excluding our own process tree
-    local pids
-    pids=$(pgrep -x "cuttlefish-rs" 2>/dev/null || true)
+    # Find cuttlefish-rs binary by looking at actual binary path, not command line
+    # This avoids killing bash scripts that contain "cuttlefish-rs" in their content
+    local my_pid=$$
+    local my_ppid=$PPID
+    local pids_to_kill=()
 
-    if [[ -n "$pids" ]]; then
-        info "Stopping running Cuttlefish process..."
-        # Kill only the exact binary, not scripts containing the name
-        pkill -x "cuttlefish-rs" 2>/dev/null || true
+    while IFS= read -r pid; do
+        [[ -z "$pid" ]] && continue
+        # Skip our own process tree
+        [[ "$pid" == "$my_pid" ]] && continue
+        [[ "$pid" == "$my_ppid" ]] && continue
+
+        # Check if this is actually the cuttlefish-rs binary (not a bash script)
+        local exe_path
+        exe_path=$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)
+        if [[ "$exe_path" == *"/cuttlefish-rs" ]]; then
+            pids_to_kill+=("$pid")
+        fi
+    done < <(pgrep -f "cuttlefish-rs" 2>/dev/null || true)
+
+    if [[ ${#pids_to_kill[@]} -gt 0 ]]; then
+        info "Stopping running Cuttlefish process (PIDs: ${pids_to_kill[*]})..."
+        for pid in "${pids_to_kill[@]}"; do
+            kill "$pid" 2>/dev/null || true
+        done
         sleep 1
         success "Process stopped"
-        return 0
     fi
 
     return 0
