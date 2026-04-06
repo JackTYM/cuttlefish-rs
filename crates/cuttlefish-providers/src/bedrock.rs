@@ -3,7 +3,10 @@
 use async_trait::async_trait;
 use aws_sdk_bedrockruntime::{
     Client,
-    types::{ContentBlock, ConversationRole, Message as BedrockMessage, SystemContentBlock},
+    types::{
+        ContentBlock, ContentBlockDelta, ConversationRole, ConverseStreamOutput,
+        Message as BedrockMessage, SystemContentBlock,
+    },
 };
 use aws_smithy_types::Document;
 use cuttlefish_core::{
@@ -12,8 +15,8 @@ use cuttlefish_core::{
         CompletionRequest, CompletionResponse, MessageRole, ModelProvider, StreamChunk, ToolCall,
     },
 };
-use futures::stream::{self, BoxStream, StreamExt};
-use tracing::{debug, instrument};
+use futures::stream::BoxStream;
+use tracing::{debug, instrument, warn};
 
 /// AWS Bedrock model provider supporting Claude models.
 ///
@@ -273,26 +276,145 @@ impl ModelProvider for BedrockProvider {
         &'a self,
         request: CompletionRequest,
     ) -> BoxStream<'a, Result<StreamChunk, ProviderError>> {
-        let fut = async move {
-            match self.complete(request).await {
-                Ok(response) => {
-                    let chunks: Vec<Result<StreamChunk, ProviderError>> = vec![
-                        Ok(StreamChunk::Text(response.content)),
-                        Ok(StreamChunk::Usage {
-                            input_tokens: response.input_tokens,
-                            output_tokens: response.output_tokens,
-                        }),
-                    ];
-                    stream::iter(chunks).boxed()
-                }
-                Err(e) => stream::iter(vec![Err(e)]).boxed(),
+        // Prepare messages outside the stream to handle errors cleanly
+        let prepare_result = self.prepare_stream_request(&request);
+
+        Box::pin(async_stream::try_stream! {
+            let (system_blocks, bedrock_messages): (Vec<SystemContentBlock>, Vec<BedrockMessage>) = prepare_result?;
+
+            debug!(
+                "Streaming {} messages to Bedrock model {}",
+                bedrock_messages.len(),
+                self.model_id
+            );
+
+            let mut req_builder = self
+                .client
+                .converse_stream()
+                .model_id(&self.model_id)
+                .set_messages(Some(bedrock_messages));
+
+            if !system_blocks.is_empty() {
+                req_builder = req_builder.set_system(Some(system_blocks));
             }
-        };
-        futures::stream::once(fut).flatten().boxed()
+
+            if let Some(max_tokens) = request.max_tokens {
+                let mut inference_builder =
+                    aws_sdk_bedrockruntime::types::InferenceConfiguration::builder()
+                        .max_tokens(max_tokens as i32);
+
+                if let Some(temp) = request.temperature {
+                    inference_builder = inference_builder.temperature(temp);
+                }
+
+                let inference_config = inference_builder.build();
+                req_builder = req_builder.inference_config(inference_config);
+            }
+
+            let response = req_builder.send().await.map_err(|e| {
+                ProviderError(format!("Bedrock streaming error for model '{}': {e}", self.model_id))
+            })?;
+
+            let mut event_stream = response.stream;
+
+            loop {
+                match event_stream.recv().await {
+                    Ok(Some(event)) => {
+                        match event {
+                            ConverseStreamOutput::ContentBlockDelta(delta_event) => {
+                                if let Some(delta) = delta_event.delta {
+                                    match delta {
+                                        ContentBlockDelta::Text(text) => {
+                                            yield StreamChunk::Text(text);
+                                        }
+                                        ContentBlockDelta::ToolUse(tool_delta) => {
+                                            // Tool use deltas contain partial input JSON
+                                            yield StreamChunk::ToolCallDelta {
+                                                id: String::new(), // ID comes in ContentBlockStart
+                                                name: String::new(),
+                                                input_delta: tool_delta.input,
+                                            };
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            ConverseStreamOutput::Metadata(metadata) => {
+                                if let Some(usage) = metadata.usage {
+                                    yield StreamChunk::Usage {
+                                        input_tokens: usage.input_tokens as u32,
+                                        output_tokens: usage.output_tokens as u32,
+                                    };
+                                }
+                            }
+                            ConverseStreamOutput::MessageStart(_) => {
+                                debug!("Stream message started");
+                            }
+                            ConverseStreamOutput::MessageStop(_) => {
+                                debug!("Stream message stopped");
+                            }
+                            ConverseStreamOutput::ContentBlockStart(_) => {}
+                            ConverseStreamOutput::ContentBlockStop(_) => {}
+                            _ => {}
+                        }
+                    }
+                    Ok(None) => {
+                        // Stream ended
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("Stream event error: {e}");
+                        Err(ProviderError(format!("Stream error: {e}")))?;
+                    }
+                }
+            }
+        })
     }
 
     async fn count_tokens(&self, text: &str) -> Result<usize, ProviderError> {
         Ok(text.len() / 4 + 1)
+    }
+}
+
+impl BedrockProvider {
+    /// Prepare request data for streaming (separates error handling from the stream).
+    fn prepare_stream_request(
+        &self,
+        request: &CompletionRequest,
+    ) -> Result<(Vec<SystemContentBlock>, Vec<BedrockMessage>), ProviderError> {
+        let (system_msgs, conv_msgs): (Vec<_>, Vec<_>) = request
+            .messages
+            .iter()
+            .partition(|m| m.role == MessageRole::System);
+
+        let mut system_blocks = Vec::new();
+        if let Some(sys) = &request.system {
+            system_blocks.push(SystemContentBlock::Text(sys.clone()));
+        }
+        for sys_msg in &system_msgs {
+            system_blocks.push(SystemContentBlock::Text(sys_msg.content.clone()));
+        }
+
+        // Bedrock requires conversation to start with a user message.
+        let first_user_idx = conv_msgs.iter().position(|m| m.role == MessageRole::User);
+
+        let bedrock_messages: Vec<BedrockMessage> = match first_user_idx {
+            Some(idx) => conv_msgs[idx..]
+                .iter()
+                .map(|m| convert_message(m))
+                .collect::<Result<Vec<_>, _>>()?,
+            None => {
+                vec![
+                    BedrockMessage::builder()
+                        .role(ConversationRole::User)
+                        .content(ContentBlock::Text("Please proceed.".to_string()))
+                        .build()
+                        .map_err(|e| ProviderError(format!("Failed to build message: {e}")))?,
+                ]
+            }
+        };
+
+        Ok((system_blocks, bedrock_messages))
     }
 }
 

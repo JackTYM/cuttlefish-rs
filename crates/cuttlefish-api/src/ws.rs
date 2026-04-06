@@ -147,6 +147,17 @@ pub enum ServerMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         stack_trace: Option<String>,
     },
+    /// Streaming text chunk from an agent.
+    StreamChunk {
+        /// Project ID.
+        project_id: String,
+        /// Agent name.
+        agent: String,
+        /// Text delta.
+        content: String,
+        /// Whether this is the final chunk.
+        done: bool,
+    },
     /// Pong response.
     Pong,
     /// Error message.

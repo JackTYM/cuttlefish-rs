@@ -19,6 +19,7 @@ aws-smithy-types = "1"
 # Async
 tokio = { workspace = true }
 async-trait = "0.1"
+async-stream = "0.3"
 futures = "0.3"
 
 # HTTP client for OAuth flow
