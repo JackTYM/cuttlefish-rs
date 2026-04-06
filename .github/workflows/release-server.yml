@@ -1,10 +1,22 @@
-name: Build Binaries
+name: Release Server
 
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
+    paths:
+      - 'src/**'
+      - 'crates/cuttlefish-core/**'
+      - 'crates/cuttlefish-db/**'
+      - 'crates/cuttlefish-providers/**'
+      - 'crates/cuttlefish-sandbox/**'
+      - 'crates/cuttlefish-vcs/**'
+      - 'crates/cuttlefish-agents/**'
+      - 'crates/cuttlefish-api/**'
+      - 'crates/cuttlefish-discord/**'
+      - 'crates/cuttlefish-tunnel/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      should_release: ${{ steps.version.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,29 +36,25 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Get base version from Cargo.toml
-          base=$(grep '^version = ' Cargo.toml | grep -v workspace | head -1 | sed 's/version = "\(.*\)"/\1/')
-          base_major=$(echo $base | cut -d. -f1)
-          base_minor=$(echo $base | cut -d. -f2)
+          # Find highest server version tag
+          latest_tag=$(git tag -l "server-v*" | sort -V | tail -1)
 
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # For PRs, use base version with -pr suffix
-            echo "version=${base}-pr${{ github.event.number }}" >> $GITHUB_OUTPUT
-            echo "Version for PR: ${base}-pr${{ github.event.number }}"
+          if [ -z "$latest_tag" ]; then
+            # No server tags yet, start at 0.1.0
+            new_version="0.1.0"
           else
-            # Find highest patch version for this major.minor
-            latest_patch=$(git tag -l "v${base_major}.${base_minor}.*" | sed "s/v${base_major}.${base_minor}.//" | sort -n | tail -1)
-
-            if [ -z "$latest_patch" ]; then
-              new_patch=1
-            else
-              new_patch=$((latest_patch + 1))
-            fi
-
-            new_version="${base_major}.${base_minor}.${new_patch}"
-            echo "version=$new_version" >> $GITHUB_OUTPUT
-            echo "Next version: $new_version"
+            # Extract version and increment patch
+            current=$(echo "$latest_tag" | sed 's/server-v//')
+            major=$(echo $current | cut -d. -f1)
+            minor=$(echo $current | cut -d. -f2)
+            patch=$(echo $current | cut -d. -f3)
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}"
           fi
+
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "Next server version: $new_version"
 
   build-webui:
     name: Build WebUI
@@ -71,8 +80,6 @@ jobs:
       - name: Package WebUI
         run: |
           cd cuttlefish-web/.output/public
-          echo "WebUI static files:"
-          ls -la
           tar czvf ../../../cuttlefish-webui.tar.gz .
 
       - name: Upload WebUI artifact
@@ -80,11 +87,12 @@ jobs:
         with:
           name: cuttlefish-webui
           path: cuttlefish-webui.tar.gz
-          retention-days: 7
+          retention-days: 1
 
   build:
     name: Build ${{ matrix.target }}
     needs: [determine-version, build-webui]
+    if: needs.determine-version.outputs.should_release == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -116,19 +124,6 @@ jobs:
           name: cuttlefish-webui
           path: .
 
-      - name: Update version in Cargo.toml
-        run: |
-          VERSION="${{ needs.determine-version.outputs.version }}"
-          echo "Setting version to $VERSION"
-          # Update root Cargo.toml
-          sed -i.bak "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" Cargo.toml
-          # Update all crate Cargo.toml files
-          for f in crates/*/Cargo.toml; do
-            sed -i.bak "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" "$f"
-          done
-          # Show the change
-          grep '^version = ' Cargo.toml
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -148,15 +143,13 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "build-${{ matrix.target }}"
+          shared-key: "server-${{ matrix.target }}"
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Extract WebUI for embedding
         run: |
           mkdir -p webui-embed
           tar -xzf cuttlefish-webui.tar.gz -C webui-embed
-          echo "WebUI files for embedding:"
-          ls -la webui-embed/
 
       - name: Build release binary (native)
         if: "!matrix.cross"
@@ -176,20 +169,19 @@ jobs:
           mkdir -p package
           cp target/${{ matrix.target }}/release/cuttlefish-rs package/
           cd package
-          tar czvf ../cuttlefish-${{ matrix.name }}.tar.gz cuttlefish-rs
+          tar czvf ../cuttlefish-server-${{ matrix.name }}.tar.gz cuttlefish-rs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cuttlefish-${{ matrix.name }}
-          path: cuttlefish-${{ matrix.name }}.tar.gz
-          retention-days: 7
+          name: server-${{ matrix.name }}
+          path: cuttlefish-server-${{ matrix.name }}.tar.gz
+          retention-days: 1
 
-  create-release:
-    name: Create Versioned Release
+  release:
+    name: Create Release
     needs: [determine-version, build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
       contents: write
     steps:
@@ -205,53 +197,41 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          find artifacts -name '*.tar.gz' -exec mv {} release/ \;
+          find artifacts -name 'cuttlefish-server-*.tar.gz' -exec mv {} release/ \;
           ls -la release/
 
       - name: Generate release notes
         run: |
-          VERSION="v${{ needs.determine-version.outputs.version }}"
-
-          # Get the previous version tag
-          PREV_TAG=$(git tag -l "v0.*" | sort -V | tail -2 | head -1)
+          VERSION="server-v${{ needs.determine-version.outputs.version }}"
+          PREV_TAG=$(git tag -l "server-v*" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
-            # No previous tag, get last 20 commits
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)")
           else
-            # Get commits since previous tag
-            COMMITS=$(git log ${PREV_TAG}..HEAD --oneline --pretty=format:"- %s (%h)")
+            COMMITS=$(git log ${PREV_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" -- src/ crates/ Cargo.toml Cargo.lock)
           fi
 
-          # Create release notes file
           cat > release_notes.md << EOF
-          ## Cuttlefish $VERSION
+          ## Cuttlefish Server $VERSION
 
           **Commit:** ${{ github.sha }}
-          **Built:** ${{ github.event.head_commit.timestamp }}
 
-          ### Changes since ${PREV_TAG:-initial commit}
+          ### Changes
           $COMMITS
 
           ### Installation
           \`\`\`bash
           sudo bash -c "\$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
           \`\`\`
-
-          Or download the binary for your platform below.
           EOF
 
-          echo "Generated release notes:"
-          cat release_notes.md
-
-      - name: Create versioned release
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.determine-version.outputs.version }}
-          name: v${{ needs.determine-version.outputs.version }}
+          tag_name: server-v${{ needs.determine-version.outputs.version }}
+          name: Server v${{ needs.determine-version.outputs.version }}
           body_path: release_notes.md
           files: release/*
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

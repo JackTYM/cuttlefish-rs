@@ -1,0 +1,190 @@
+name: Release TUI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'crates/cuttlefish-tui/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  determine-version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_release: ${{ steps.version.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          # Find highest TUI version tag
+          latest_tag=$(git tag -l "tui-v*" | sort -V | tail -1)
+
+          if [ -z "$latest_tag" ]; then
+            # No TUI tags yet, start at 0.1.0
+            new_version="0.1.0"
+          else
+            # Extract version and increment patch
+            current=$(echo "$latest_tag" | sed 's/tui-v//')
+            major=$(echo $current | cut -d. -f1)
+            minor=$(echo $current | cut -d. -f2)
+            patch=$(echo $current | cut -d. -f3)
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}"
+          fi
+
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "Next TUI version: $new_version"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [determine-version]
+    if: needs.determine-version.outputs.should_release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: linux-x86_64
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: linux-aarch64
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: darwin-x86_64
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: darwin-aarch64
+            cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        uses: taiki-e/install-action@cross
+
+      - name: Install OpenSSL (Linux native)
+        if: runner.os == 'Linux' && !matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "tui-${{ matrix.target }}"
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Build release binary (native)
+        if: "!matrix.cross"
+        run: cargo build --release -p cuttlefish-tui --target ${{ matrix.target }}
+
+      - name: Build release binary (cross)
+        if: matrix.cross
+        run: cross build --release -p cuttlefish-tui --target ${{ matrix.target }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p package
+          cp target/${{ matrix.target }}/release/cuttlefish-tui package/
+          cd package
+          tar czvf ../cuttlefish-tui-${{ matrix.name }}.tar.gz cuttlefish-tui
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tui-${{ matrix.name }}
+          path: cuttlefish-tui-${{ matrix.name }}.tar.gz
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: [determine-version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -name 'cuttlefish-tui-*.tar.gz' -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Generate release notes
+        run: |
+          VERSION="tui-v${{ needs.determine-version.outputs.version }}"
+          PREV_TAG=$(git tag -l "tui-v*" | sort -V | tail -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)" -- crates/cuttlefish-tui/)
+          else
+            COMMITS=$(git log ${PREV_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" -- crates/cuttlefish-tui/)
+          fi
+
+          cat > release_notes.md << EOF
+          ## Cuttlefish TUI $VERSION
+
+          **Commit:** ${{ github.sha }}
+
+          ### Changes
+          $COMMITS
+
+          ### Installation
+          Download the binary for your platform and add to PATH:
+          \`\`\`bash
+          # Linux x86_64
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-linux-x86_64.tar.gz | tar xz
+          sudo mv cuttlefish-tui /usr/local/bin/
+
+          # macOS (Apple Silicon)
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-darwin-aarch64.tar.gz | tar xz
+          sudo mv cuttlefish-tui /usr/local/bin/
+          \`\`\`
+
+          ### Usage
+          \`\`\`bash
+          cuttlefish-tui --server wss://your-server.com --api-key YOUR_KEY
+          \`\`\`
+          EOF
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tui-v${{ needs.determine-version.outputs.version }}
+          name: TUI v${{ needs.determine-version.outputs.version }}
+          body_path: release_notes.md
+          files: release/*
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

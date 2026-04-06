@@ -1727,29 +1727,27 @@ stop_running_service() {
 }
 
 get_latest_release() {
-    # First try to get the 'latest' pre-release (built on every push)
+    # Get the latest server release (server-v* tags)
     local response
-    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/tags/latest" 2>&1)
-    
-    if echo "$response" | grep -q '"tag_name"'; then
-        echo "latest"
-        return 0
-    fi
-    
-    # Fall back to actual latest release
-    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/latest" 2>&1) || {
+    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases" 2>&1) || {
         warn "Failed to fetch releases from GitHub API"
         return 1
     }
-    
+
+    # Find the latest server-v* tag
     local tag
-    tag=$(echo "$response" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    
+    tag=$(echo "$response" | grep '"tag_name":' | grep 'server-v' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+
     if [[ -z "$tag" ]]; then
-        warn "No releases found (repository may not have any releases yet)"
+        # Fall back to old v* tags for backwards compatibility
+        tag=$(echo "$response" | grep '"tag_name":' | grep -E '"v[0-9]' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+    fi
+
+    if [[ -z "$tag" ]]; then
+        warn "No server releases found"
         return 1
     fi
-    
+
     echo "$tag"
 }
 
@@ -1807,7 +1805,13 @@ download_binary() {
             ;;
     esac
     
-    tarball="cuttlefish-${os_name}-${arch}.tar.gz"
+    # Determine tarball name based on tag format
+    if [[ "$version" == server-v* ]]; then
+        tarball="cuttlefish-server-${os_name}-${arch}.tar.gz"
+    else
+        # Legacy v* releases
+        tarball="cuttlefish-${os_name}-${arch}.tar.gz"
+    fi
     download_url="https://github.com/JackTYM/cuttlefish-rs/releases/download/${version}/${tarball}"
 
     info "Downloading Cuttlefish $version for ${os_name}-${arch}..."

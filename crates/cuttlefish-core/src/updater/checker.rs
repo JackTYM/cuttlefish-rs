@@ -102,8 +102,9 @@ impl UpdateChecker {
 
     /// Checks GitHub for the latest release and returns update info if a newer version exists.
     pub async fn check_for_update(&self) -> Result<Option<UpdateAvailable>, UpdateError> {
+        // Fetch all releases to find the latest server-v* tag
         let url = format!(
-            "https://api.github.com/repos/{}/{}/releases/latest",
+            "https://api.github.com/repos/{}/{}/releases",
             self.config.owner, self.config.repo
         );
 
@@ -130,12 +131,31 @@ impl UpdateChecker {
             });
         }
 
-        let release: ReleaseInfo = response
+        let releases: Vec<ReleaseInfo> = response
             .json()
             .await
             .map_err(|e| UpdateError::Parse(e.to_string()))?;
 
-        let latest_version = release.tag_name.trim_start_matches('v').to_string();
+        // Find the latest server-v* release, falling back to v* for backwards compatibility
+        let release = releases
+            .iter()
+            .find(|r| r.tag_name.starts_with("server-v"))
+            .or_else(|| {
+                releases
+                    .iter()
+                    .find(|r| r.tag_name.starts_with('v') && !r.tag_name.starts_with("v0.0"))
+            })
+            .cloned()
+            .ok_or_else(|| UpdateError::NoRelease {
+                owner: self.config.owner.clone(),
+                repo: self.config.repo.clone(),
+            })?;
+
+        let latest_version = release
+            .tag_name
+            .trim_start_matches("server-v")
+            .trim_start_matches('v')
+            .to_string();
         let current_version = self.config.current_version.trim_start_matches('v');
 
         if !is_newer_version(current_version, &latest_version) {
@@ -214,9 +234,21 @@ impl UpdateChecker {
     fn find_asset_urls(&self, assets: &[ReleaseAsset]) -> (Option<String>, Option<String>) {
         let target = Self::current_target();
 
+        // Try new naming convention first (cuttlefish-server-*), then fall back to old (cuttlefish-*)
         let download_url = assets
             .iter()
-            .find(|a| a.name.contains(&target) && !a.name.ends_with(".sha256"))
+            .find(|a| {
+                a.name.contains(&target)
+                    && !a.name.ends_with(".sha256")
+                    && a.name.starts_with("cuttlefish-server-")
+            })
+            .or_else(|| {
+                assets.iter().find(|a| {
+                    a.name.contains(&target)
+                        && !a.name.ends_with(".sha256")
+                        && a.name.starts_with("cuttlefish-")
+                })
+            })
             .map(|a| a.browser_download_url.clone());
 
         let checksum_url = assets

@@ -17,6 +17,13 @@
   <a href="#contributing">Contributing</a>
 </p>
 
+<p align="center">
+  <strong>Downloads:</strong>
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases?q=server-">Server Releases</a> |
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases?q=tui-">TUI Releases</a> |
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases">All Releases</a>
+</p>
+
 ---
 
 ## Vision
