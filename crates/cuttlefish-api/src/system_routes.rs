@@ -193,6 +193,12 @@ pub struct ApiKeyResponse {
 pub struct ProviderTestResponse {
     /// Whether the provider is connected and responding.
     pub connected: bool,
+    /// Error message if connection failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// List of available provider IDs (when provider not found).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available_providers: Option<Vec<String>>,
 }
 
 /// State for system routes.
@@ -262,7 +268,7 @@ impl SystemState {
                     "bedrock" => vec![
                         "anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
                         "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
-                        "anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        "global.anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
                         "us.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
                     ],
                     "google" => vec!["gemini-2.0-flash".to_string(), "gemini-1.5-pro".to_string()],
@@ -358,13 +364,29 @@ pub async fn test_provider(
     // Check if we have a provider registry
     let Some(ref registry) = state.provider_registry else {
         tracing::warn!("No provider registry configured");
-        return Json(ProviderTestResponse { connected: false });
+        return Json(ProviderTestResponse {
+            connected: false,
+            error: Some("No provider registry configured".to_string()),
+            available_providers: None,
+        });
     };
 
     // Get the provider
+    let available: Vec<String> = registry.names().into_iter().map(String::from).collect();
     let Some(provider) = registry.get(&provider_id) else {
-        tracing::warn!(provider_id = %provider_id, "Provider not found in registry");
-        return Json(ProviderTestResponse { connected: false });
+        tracing::warn!(
+            provider_id = %provider_id,
+            available = ?available,
+            "Provider not found in registry"
+        );
+        return Json(ProviderTestResponse {
+            connected: false,
+            error: Some(format!(
+                "Provider '{}' not found. Did you mean one of: {:?}?",
+                provider_id, available
+            )),
+            available_providers: Some(available),
+        });
     };
 
     // Create a minimal test request
@@ -386,7 +408,11 @@ pub async fn test_provider(
                 tokens_used = response.input_tokens + response.output_tokens,
                 "Provider test successful"
             );
-            Json(ProviderTestResponse { connected: true })
+            Json(ProviderTestResponse {
+                connected: true,
+                error: None,
+                available_providers: None,
+            })
         }
         Err(e) => {
             tracing::warn!(
@@ -394,7 +420,11 @@ pub async fn test_provider(
                 error = %e,
                 "Provider test failed"
             );
-            Json(ProviderTestResponse { connected: false })
+            Json(ProviderTestResponse {
+                connected: false,
+                error: Some(e.to_string()),
+                available_providers: None,
+            })
         }
     }
 }

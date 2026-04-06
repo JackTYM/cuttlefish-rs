@@ -29,12 +29,12 @@ guild_ids = []
 
 [providers.claude]
 provider_type = "bedrock"
-model = "anthropic.claude-sonnet-4-6-20260101-v1:0"
+model = "anthropic.claude-sonnet-4-6-20250514-v1:0"
 region = "us-east-1"
 
 [providers.claude-fast]
 provider_type = "bedrock"
-model = "anthropic.claude-haiku-4-5-20260101-v1:0"
+model = "anthropic.claude-haiku-4-5-20251001-v1:0"
 region = "us-east-1"
 
 [agents.orchestrator]

@@ -411,7 +411,7 @@ async fn initialize_provider(
             let model = config
                 .model
                 .as_deref()
-                .unwrap_or("anthropic.claude-sonnet-4-6-20260101-v1:0");
+                .unwrap_or("anthropic.claude-sonnet-4-6-20250514-v1:0");
             let provider = bedrock::BedrockProvider::new(model)
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create Bedrock provider: {}", e))?;
