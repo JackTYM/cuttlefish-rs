@@ -1056,33 +1056,25 @@ configure_bedrock_models() {
 # Dependency Checks
 #######################################
 
-check_dependencies() {
+# Check only runtime dependencies (for binary download mode)
+check_runtime_dependencies() {
     echo ""
-    echo -e "${BOLD}Checking dependencies...${NC}"
+    echo -e "${BOLD}Checking runtime dependencies...${NC}"
     echo ""
-    
+
     local missing=()
     local docker_missing=false
     local docker_not_running=false
-    local build_tools_missing=false
-    local nodejs_missing=false
-    
-    for cmd in curl git; do
-        if command -v "$cmd" &> /dev/null; then
-            success "$cmd is installed"
-        else
-            missing+=("$cmd")
-            error "$cmd is not installed"
-        fi
-    done
-    
-    if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
-        success "C compiler is installed"
+
+    # curl is needed for downloading
+    if command -v curl &> /dev/null; then
+        success "curl is installed"
     else
-        error "C compiler (cc/gcc) is not installed"
-        build_tools_missing=true
+        missing+=("curl")
+        error "curl is not installed"
     fi
-    
+
+    # Docker is needed for sandboxes
     if command -v docker &> /dev/null; then
         success "docker is installed"
         if docker info &> /dev/null; then
@@ -1095,7 +1087,61 @@ check_dependencies() {
         error "docker is not installed"
         docker_missing=true
     fi
-    
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo ""
+        error "Missing dependencies: ${missing[*]}"
+        echo ""
+        info "Installing missing dependencies..."
+        install_dependencies "${missing[@]}"
+    fi
+
+    if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
+        install_docker_if_missing "$docker_missing"
+    fi
+}
+
+# Check all dependencies (for building from source)
+check_dependencies() {
+    echo ""
+    echo -e "${BOLD}Checking dependencies...${NC}"
+    echo ""
+
+    local missing=()
+    local docker_missing=false
+    local docker_not_running=false
+    local build_tools_missing=false
+    local nodejs_missing=false
+
+    for cmd in curl git; do
+        if command -v "$cmd" &> /dev/null; then
+            success "$cmd is installed"
+        else
+            missing+=("$cmd")
+            error "$cmd is not installed"
+        fi
+    done
+
+    if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
+        success "C compiler is installed"
+    else
+        error "C compiler (cc/gcc) is not installed"
+        build_tools_missing=true
+    fi
+
+    if command -v docker &> /dev/null; then
+        success "docker is installed"
+        if docker info &> /dev/null; then
+            success "Docker daemon is running"
+        else
+            error "Docker is installed but not running"
+            docker_not_running=true
+        fi
+    else
+        error "docker is not installed"
+        docker_missing=true
+    fi
+
     if command -v node &> /dev/null; then
         success "Node.js is installed ($(node --version))"
         if command -v pnpm &> /dev/null; then
@@ -1107,7 +1153,7 @@ check_dependencies() {
         warn "Node.js is not installed (required for WebUI)"
         nodejs_missing=true
     fi
-    
+
     if [[ ${#missing[@]} -gt 0 ]]; then
         echo ""
         error "Missing dependencies: ${missing[*]}"
@@ -1115,7 +1161,7 @@ check_dependencies() {
         info "Installing missing dependencies..."
         install_dependencies "${missing[@]}"
     fi
-    
+
     if [[ "$build_tools_missing" == true ]]; then
         echo ""
         info "Installing build tools (required for Rust compilation)..."
@@ -1128,7 +1174,7 @@ check_dependencies() {
                 ;;
         esac
     fi
-    
+
     if [[ "$nodejs_missing" == true ]]; then
         echo ""
         if prompt_yn "Install Node.js and pnpm for WebUI support?" "y"; then
@@ -1137,49 +1183,55 @@ check_dependencies() {
             warn "Skipping Node.js - WebUI will not be available"
         fi
     fi
-    
+
     if [[ "$docker_missing" == true || "$docker_not_running" == true ]]; then
-        echo ""
-        case "$PLATFORM" in
-            macos)
-                if [[ "$docker_missing" == true ]]; then
-                    warn "Docker is not installed on macOS"
-                    info "Installing Docker..."
-                    install_dependencies_macos "docker"
-                else
-                    warn "Docker is installed but not running"
-                    info "Starting Docker..."
-                    install_dependencies_macos "docker-running"
-                fi
-                ;;
-            wsl)
-                if [[ "$docker_missing" == true ]]; then
-                    warn "Docker is not available in WSL"
-                    info "Setting up Docker..."
-                    install_dependencies_wsl "docker"
-                else
-                    warn "Docker is installed but not running"
-                    info "Starting Docker..."
-                    install_dependencies_wsl "docker-running"
-                fi
-                ;;
-            linux)
-                if [[ "$docker_missing" == true ]]; then
-                    info "Installing Docker..."
-                    install_dependencies_linux "docker"
-                else
-                    info "Starting Docker..."
-                    install_dependencies_linux "docker-running"
-                fi
-                ;;
-        esac
-        
-        if ! docker info &>/dev/null; then
-            error "Docker is still not accessible. Please check your Docker installation."
-            exit 1
-        fi
-        success "Docker is now running"
+        install_docker_if_missing "$docker_missing"
     fi
+}
+
+# Helper to install/start Docker
+install_docker_if_missing() {
+    local docker_missing="${1:-false}"
+    echo ""
+    case "$PLATFORM" in
+        macos)
+            if [[ "$docker_missing" == true ]]; then
+                warn "Docker is not installed on macOS"
+                info "Installing Docker..."
+                install_dependencies_macos "docker"
+            else
+                warn "Docker is installed but not running"
+                info "Starting Docker..."
+                install_dependencies_macos "docker-running"
+            fi
+            ;;
+        wsl)
+            if [[ "$docker_missing" == true ]]; then
+                warn "Docker is not available in WSL"
+                info "Setting up Docker..."
+                install_dependencies_wsl "docker"
+            else
+                warn "Docker is installed but not running"
+                info "Starting Docker..."
+                install_dependencies_wsl "docker-running"
+            fi
+            ;;
+        linux)
+            if [[ "$docker_missing" == true ]]; then
+                info "Installing Docker..."
+                install_dependencies_linux "docker"
+            else
+                info "Starting Docker..."
+                install_dependencies_linux "docker-running"
+            fi
+            ;;
+    esac
+
+    if ! docker info &>/dev/null; then
+        error "Docker is still not accessible. Please check your Docker installation."
+        exit 1
+    fi
+    success "Docker is now running"
 }
 
 install_nodejs() {
@@ -1831,10 +1883,14 @@ build_from_source() {
     echo ""
     echo -e "${BOLD}=== Building Cuttlefish from Source ===${NC}"
     echo ""
-    
+
+    # Ensure build dependencies are installed
+    info "Checking build dependencies..."
+    check_dependencies
+
     local script_dir build_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
+
     if [[ -f "$script_dir/Cargo.toml" ]]; then
         info "Building from source directory: $script_dir"
         build_dir="$script_dir"
@@ -2430,8 +2486,7 @@ main() {
                 load_existing_env
                 detect_configured_providers
 
-                check_dependencies
-                install_rust
+                check_runtime_dependencies
 
                 create_user
                 create_directories
@@ -2441,8 +2496,8 @@ main() {
                 # Restart service if systemd is available
                 if [[ "$HAS_SYSTEMD" == true ]]; then
                     info "Restarting Cuttlefish service..."
-                    systemctl start cuttlefish 2>/dev/null || true
-                    sleep 1
+                    systemctl restart cuttlefish 2>/dev/null || systemctl start cuttlefish 2>/dev/null || true
+                    sleep 2
                     if systemctl is-active --quiet cuttlefish 2>/dev/null; then
                         success "Cuttlefish service restarted!"
                     else
@@ -2450,7 +2505,10 @@ main() {
                     fi
                 fi
 
-                print_summary
+                echo ""
+                success "Upgrade complete!"
+                echo "  Binary: $INSTALL_DIR/cuttlefish-rs"
+                echo "  Version: $($INSTALL_DIR/cuttlefish-rs --version 2>/dev/null || echo 'unknown')"
                 return
                 ;;
             2)
@@ -2470,8 +2528,7 @@ main() {
                 load_existing_env
                 detect_configured_providers
 
-                check_dependencies
-                install_rust
+                check_runtime_dependencies
 
                 create_user
                 create_directories
@@ -2481,8 +2538,8 @@ main() {
                 # Restart service if systemd is available
                 if [[ "$HAS_SYSTEMD" == true ]]; then
                     info "Restarting Cuttlefish service..."
-                    systemctl start cuttlefish 2>/dev/null || true
-                    sleep 1
+                    systemctl restart cuttlefish 2>/dev/null || systemctl start cuttlefish 2>/dev/null || true
+                    sleep 2
                     if systemctl is-active --quiet cuttlefish 2>/dev/null; then
                         success "Cuttlefish service restarted!"
                     else
@@ -2490,17 +2547,19 @@ main() {
                     fi
                 fi
 
-                print_summary
+                echo ""
+                success "Upgrade complete!"
+                echo "  Binary: $INSTALL_DIR/cuttlefish-rs"
+                echo "  Version: $($INSTALL_DIR/cuttlefish-rs --version 2>/dev/null || echo 'unknown')"
                 return
                 ;;
         esac
     fi
     
     select_deployment_mode
-    
-    check_dependencies
-    install_rust
-    
+
+    check_runtime_dependencies
+
     configure_server
     configure_database
     configure_sandbox
