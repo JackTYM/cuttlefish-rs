@@ -10,8 +10,8 @@ use cuttlefish_api::{
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::traits::provider::ModelProvider;
 use cuttlefish_core::updater::{
-    AutoUpdateConfig, AutoUpdater, BinaryDownloader, DownloadConfig, UpdateChecker, UpdateConfig,
-    get_platform_binary_name,
+    AutoUpdateConfig, AutoUpdater, BinaryDownloader, DownloadConfig, RestartState, UpdateChecker,
+    UpdateConfig, get_platform_binary_name,
 };
 use cuttlefish_core::{PricingConfig, TemplateRegistry, TimePeriod, UsageStats};
 use cuttlefish_db::Database;
@@ -23,7 +23,8 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tokio::sync::broadcast;
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -364,8 +365,50 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Server listening on {}", addr);
 
-    let serve_future = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
-    serve_future.await?;
+    // Create shutdown future that listens for both CTRL+C and auto-updater signals
+    let shutdown_fut = {
+        let updater_shutdown = auto_updater.as_ref().map(|(u, _)| u.shutdown_receiver());
+        async move {
+            tokio::select! {
+                _ = shutdown_signal() => {
+                    info!("CTRL+C shutdown");
+                    false // Normal shutdown
+                }
+                result = async {
+                    if let Some(mut rx) = updater_shutdown {
+                        rx.recv().await
+                    } else {
+                        std::future::pending::<Result<(), broadcast::error::RecvError>>().await
+                    }
+                } => {
+                    if result.is_ok() {
+                        info!("Auto-updater triggered shutdown for update");
+                        true // Update shutdown
+                    } else {
+                        false
+                    }
+                }
+            }
+        }
+    };
+
+    // Run server with shutdown future
+    let (shutdown_reason, _) = tokio::join!(shutdown_fut, axum::serve(listener, app));
+
+    // If shutdown was due to auto-update, apply it
+    if shutdown_reason && let Some((updater, _handle)) = &auto_updater {
+        info!("Applying update...");
+        let state = RestartState {
+            active_sessions: vec![],
+            pending_approvals: vec![],
+            saved_at: chrono::Utc::now().to_rfc3339(),
+            from_version: env!("CARGO_PKG_VERSION").to_string(),
+            to_version: "unknown".to_string(), // Will be filled by updater
+        };
+        if let Err(e) = updater.apply_update(state).await {
+            error!("Failed to apply update: {}", e);
+        }
+    }
 
     // Shutdown auto-updater if running
     if let Some((updater, _handle)) = auto_updater {
