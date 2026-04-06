@@ -221,21 +221,22 @@ jobs:
           \`\`\`
           EOF
 
-      - name: Create versioned release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: versions-tui-v${{ needs.determine-version.outputs.version }}
-          name: TUI v${{ needs.determine-version.outputs.version }}
-          body_path: release_notes.md
-          files: release/*
-          prerelease: false
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete old tui-latest tag
+      - name: Archive previous tui-latest to versioned release
         run: |
-          gh release delete tui-latest --yes --cleanup-tag || true
+          # Check if tui-latest exists
+          if gh release view tui-latest &>/dev/null; then
+            # Extract version from release name (e.g., "TUI Latest (v0.1.0)" -> "0.1.0")
+            PREV_VERSION=$(gh release view tui-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+            if [ -n "$PREV_VERSION" ]; then
+              echo "Archiving tui-latest (v${PREV_VERSION}) to versions-tui-v${PREV_VERSION}"
+              gh release edit tui-latest \
+                --tag "versions-tui-v${PREV_VERSION}" \
+                --title "TUI v${PREV_VERSION}" \
+                --latest=false
+            fi
+          else
+            echo "No existing tui-latest to archive"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

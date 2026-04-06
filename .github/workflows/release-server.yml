@@ -253,21 +253,22 @@ jobs:
           \`\`\`
           EOF
 
-      - name: Create versioned release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: versions-server-v${{ needs.determine-version.outputs.version }}
-          name: Server v${{ needs.determine-version.outputs.version }}
-          body_path: release_notes.md
-          files: release/*
-          prerelease: false
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete old server-latest tag
+      - name: Archive previous server-latest to versioned release
         run: |
-          gh release delete server-latest --yes --cleanup-tag || true
+          # Check if server-latest exists
+          if gh release view server-latest &>/dev/null; then
+            # Extract version from release name (e.g., "Server Latest (v0.1.0)" -> "0.1.0")
+            PREV_VERSION=$(gh release view server-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+            if [ -n "$PREV_VERSION" ]; then
+              echo "Archiving server-latest (v${PREV_VERSION}) to versions-server-v${PREV_VERSION}"
+              gh release edit server-latest \
+                --tag "versions-server-v${PREV_VERSION}" \
+                --title "Server v${PREV_VERSION}" \
+                --latest=false
+            fi
+          else
+            echo "No existing server-latest to archive"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
