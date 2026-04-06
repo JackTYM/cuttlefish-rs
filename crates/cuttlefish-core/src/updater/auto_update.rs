@@ -33,14 +33,23 @@ pub struct AutoUpdateConfig {
 
 impl Default for AutoUpdateConfig {
     fn default() -> Self {
-        let cache_dir = dirs::cache_dir().unwrap_or_else(std::env::temp_dir);
+        // Use /var/cache/cuttlefish for system services (created by install.sh)
+        // Fall back to user cache dir for local development
+        let download_dir = if PathBuf::from("/var/cache/cuttlefish").exists() {
+            PathBuf::from("/var/cache/cuttlefish")
+        } else {
+            dirs::cache_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("cuttlefish-updates")
+        };
+
         let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/var/lib/cuttlefish"));
 
         Self {
             enabled: false,
             poll_interval_secs: 3600, // 1 hour
             auto_apply: true,
-            download_dir: cache_dir.join("cuttlefish-updates"),
+            download_dir,
             state_file: data_dir.join("cuttlefish/restart_state.json"),
         }
     }
