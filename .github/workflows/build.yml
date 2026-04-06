@@ -66,11 +66,13 @@ jobs:
 
       - name: Build WebUI
         working-directory: cuttlefish-web
-        run: npm run build
+        run: npm run generate
 
       - name: Package WebUI
         run: |
           cd cuttlefish-web/.output/public
+          echo "WebUI static files:"
+          ls -la
           tar czvf ../../../cuttlefish-webui.tar.gz .
 
       - name: Upload WebUI artifact
