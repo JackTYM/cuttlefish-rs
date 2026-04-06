@@ -37,15 +37,15 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Find highest server release version tag
-          latest_tag=$(git tag -l "server-release-*" | grep -E "^server-release-[0-9]" | sort -V | tail -1)
+          # Find highest server version tag
+          latest_tag=$(git tag -l "versions-server-v*" | grep -E "^versions-server-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
-            # No server release tags yet, start at 0.1.0
+            # No server version tags yet, start at 0.1.0
             new_version="0.1.0"
           else
             # Extract version and increment patch
-            current=$(echo "$latest_tag" | sed 's/server-release-//')
+            current=$(echo "$latest_tag" | sed 's/versions-server-v//')
             major=$(echo $current | cut -d. -f1)
             minor=$(echo $current | cut -d. -f2)
             patch=$(echo $current | cut -d. -f3)
@@ -230,8 +230,8 @@ jobs:
 
       - name: Generate release notes
         run: |
-          VERSION="server-release-${{ needs.determine-version.outputs.version }}"
-          PREV_TAG=$(git tag -l "server-release-*" | grep -E "^server-release-[0-9]" | sort -V | tail -1)
+          VERSION="versions-server-v${{ needs.determine-version.outputs.version }}"
+          PREV_TAG=$(git tag -l "versions-server-v*" | grep -E "^versions-server-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)")
@@ -256,7 +256,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: server-release-${{ needs.determine-version.outputs.version }}
+          tag_name: versions-server-v${{ needs.determine-version.outputs.version }}
           name: Server v${{ needs.determine-version.outputs.version }}
           body_path: release_notes.md
           files: release/*
@@ -280,7 +280,7 @@ jobs:
             **Latest server release: v${{ needs.determine-version.outputs.version }}**
 
             This tag always points to the most recent server release.
-            For a specific version, use `server-release-*` tags.
+            For a specific version, use `versions-server-v*` tags.
 
             **Commit:** ${{ github.sha }}
 

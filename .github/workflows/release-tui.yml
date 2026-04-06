@@ -26,15 +26,15 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Find highest TUI release version tag
-          latest_tag=$(git tag -l "tui-release-*" | grep -E "^tui-release-[0-9]" | sort -V | tail -1)
+          # Find highest TUI version tag
+          latest_tag=$(git tag -l "versions-tui-v*" | grep -E "^versions-tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
-            # No TUI release tags yet, start at 0.1.0
+            # No TUI version tags yet, start at 0.1.0
             new_version="0.1.0"
           else
             # Extract version and increment patch
-            current=$(echo "$latest_tag" | sed 's/tui-release-//')
+            current=$(echo "$latest_tag" | sed 's/versions-tui-v//')
             major=$(echo $current | cut -d. -f1)
             minor=$(echo $current | cut -d. -f2)
             patch=$(echo $current | cut -d. -f3)
@@ -171,8 +171,8 @@ jobs:
 
       - name: Generate release notes
         run: |
-          VERSION="tui-release-${{ needs.determine-version.outputs.version }}"
-          PREV_TAG=$(git tag -l "tui-release-*" | grep -E "^tui-release-[0-9]" | sort -V | tail -1)
+          VERSION="versions-tui-v${{ needs.determine-version.outputs.version }}"
+          PREV_TAG=$(git tag -l "versions-tui-v*" | grep -E "^versions-tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)" -- crates/cuttlefish-tui/)
@@ -224,7 +224,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: tui-release-${{ needs.determine-version.outputs.version }}
+          tag_name: versions-tui-v${{ needs.determine-version.outputs.version }}
           name: TUI v${{ needs.determine-version.outputs.version }}
           body_path: release_notes.md
           files: release/*
@@ -248,7 +248,7 @@ jobs:
             **Latest TUI release: v${{ needs.determine-version.outputs.version }}**
 
             This tag always points to the most recent TUI release.
-            For a specific version, use `tui-release-*` tags.
+            For a specific version, use `versions-tui-v*` tags.
 
             **Commit:** ${{ github.sha }}
 
