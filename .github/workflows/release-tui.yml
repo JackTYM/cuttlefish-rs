@@ -26,8 +26,8 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Find highest TUI version tag (exclude tui-latest)
-          latest_tag=$(git tag -l "tui-v*" | grep -v "tui-latest" | sort -V | tail -1)
+          # Find highest TUI version tag (only match tui-v followed by a digit)
+          latest_tag=$(git tag -l "tui-v*" | grep -E "^tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
             # No TUI tags yet, start at 0.1.0
@@ -172,7 +172,7 @@ jobs:
       - name: Generate release notes
         run: |
           VERSION="tui-v${{ needs.determine-version.outputs.version }}"
-          PREV_TAG=$(git tag -l "tui-v*" | grep -v "tui-latest" | sort -V | tail -1)
+          PREV_TAG=$(git tag -l "tui-v*" | grep -E "^tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)" -- crates/cuttlefish-tui/)
