@@ -269,10 +269,21 @@ impl SystemState {
                         "gpt-3.5-turbo".to_string(),
                     ],
                     "bedrock" => vec![
+                        // Sonnet 4.6 - single region and cross-region
                         "anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
-                        "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
-                        "global.anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
                         "us.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
+                        "eu.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
+                        "global.anthropic.claude-sonnet-4-6-20250514-v1:0".to_string(),
+                        // Opus 4.5 - single region and cross-region
+                        "anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        "us.anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        "eu.anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        "global.anthropic.claude-opus-4-5-20251101-v1:0".to_string(),
+                        // Haiku 4.5 - single region and cross-region
+                        "anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+                        "us.anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+                        "eu.anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+                        "global.anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
                     ],
                     "google" => vec!["gemini-2.0-flash".to_string(), "gemini-1.5-pro".to_string()],
                     "ollama" => vec![
