@@ -1727,14 +1727,26 @@ stop_running_service() {
 }
 
 get_latest_release() {
-    # Get the latest server release (server-v* tags)
+    # Use server-latest tag which always points to the most recent server release
+    # Verify it exists by checking the release
     local response
+    response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases/tags/server-latest" 2>&1) || {
+        warn "Failed to fetch server-latest release from GitHub API"
+        return 1
+    }
+
+    # Check if we got a valid release (not a 404)
+    if echo "$response" | grep -q '"tag_name"'; then
+        echo "server-latest"
+        return 0
+    fi
+
+    # Fall back to finding the latest server-v* tag
     response=$(curl -sS "https://api.github.com/repos/JackTYM/cuttlefish-rs/releases" 2>&1) || {
         warn "Failed to fetch releases from GitHub API"
         return 1
     }
 
-    # Find the latest server-v* tag
     local tag
     tag=$(echo "$response" | grep '"tag_name":' | grep 'server-v' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
@@ -1806,7 +1818,8 @@ download_binary() {
     esac
     
     # Determine tarball name based on tag format
-    if [[ "$version" == server-v* ]]; then
+    if [[ "$version" == server-* ]]; then
+        # server-latest or server-v* releases use new naming
         tarball="cuttlefish-server-${os_name}-${arch}.tar.gz"
     else
         # Legacy v* releases
