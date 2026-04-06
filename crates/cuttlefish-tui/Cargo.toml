@@ -15,7 +15,7 @@ path = "src/main.rs"
 ratatui = "0.29"
 crossterm = "0.28"
 tokio = { workspace = true }
-tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 serde = { workspace = true }
