@@ -132,9 +132,7 @@ impl ModelProvider for BedrockProvider {
 
         // Bedrock requires conversation to start with a user message.
         // Find the first user message and skip any leading assistant messages.
-        let first_user_idx = conv_msgs
-            .iter()
-            .position(|m| m.role == MessageRole::User);
+        let first_user_idx = conv_msgs.iter().position(|m| m.role == MessageRole::User);
 
         let bedrock_messages: Vec<BedrockMessage> = match first_user_idx {
             Some(idx) => {
@@ -147,11 +145,13 @@ impl ModelProvider for BedrockProvider {
             None => {
                 // No user messages at all - create a synthetic one
                 // This happens when agents pass empty or assistant-only contexts
-                vec![BedrockMessage::builder()
-                    .role(ConversationRole::User)
-                    .content(ContentBlock::Text("Please proceed.".to_string()))
-                    .build()
-                    .map_err(|e| ProviderError(format!("Failed to build message: {e}")))?]
+                vec![
+                    BedrockMessage::builder()
+                        .role(ConversationRole::User)
+                        .content(ContentBlock::Text("Please proceed.".to_string()))
+                        .build()
+                        .map_err(|e| ProviderError(format!("Failed to build message: {e}")))?,
+                ]
             }
         };
 

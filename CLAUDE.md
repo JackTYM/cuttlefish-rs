@@ -227,9 +227,18 @@ pub enum ClientMessage {
 
 1. **Write the test first** (TDD)
 2. Implement minimally to make the test pass
-3. Run: `cargo clippy -p <crate> -- -D warnings` - must be clean
-4. Run: `cargo test -p <crate>` - all pass
-5. Commit: `<type>(<crate>): <description>`
+3. **Run CI checks locally before committing** (these match `.github/workflows/ci.yml`):
+   ```bash
+   cargo fmt --all -- --check      # Check formatting
+   cargo clippy --workspace -- -D warnings  # Lint entire workspace
+   cargo test --workspace          # Test entire workspace
+   cargo doc --workspace --no-deps # Check documentation builds
+   ```
+   Or use this one-liner:
+   ```bash
+   cargo fmt --all && cargo clippy --workspace -- -D warnings && cargo test --workspace
+   ```
+4. Commit: `<type>(<crate>): <description>`
 
 ### Commit Convention
 Format: `<type>(<crate>): <description>`
