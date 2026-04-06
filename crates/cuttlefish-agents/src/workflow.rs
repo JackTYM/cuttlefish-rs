@@ -269,7 +269,10 @@ impl WorkflowEngine {
             project_id,
             working_dir: std::path::PathBuf::from("/workspace"),
             available_tools: vec![],
-            messages: vec![],
+            messages: vec![cuttlefish_core::traits::provider::Message {
+                role: cuttlefish_core::traits::provider::MessageRole::User,
+                content: input.to_string(),
+            }],
         };
 
         let orch_output = self.orchestrator.execute(&mut orch_ctx, input).await?;
@@ -331,12 +334,21 @@ impl WorkflowEngine {
         for iteration in 0..self.max_iterations {
             iterations = iteration + 1;
             let coder_input = if iteration == 0 {
-                if let Some(ref plan) = planning_output {
+                let initial_input = if let Some(ref plan) = planning_output {
                     format!("{}\n\nImplementation Plan:\n{}", input, plan)
                 } else {
                     input.to_string()
-                }
+                };
+                // Add initial user message to context (required for Bedrock)
+                coder_ctx
+                    .messages
+                    .push(cuttlefish_core::traits::provider::Message {
+                        role: cuttlefish_core::traits::provider::MessageRole::User,
+                        content: initial_input.clone(),
+                    });
+                initial_input
             } else {
+                // On subsequent iterations, critic feedback was already added as user message
                 format!("{}\n\nPrevious critic feedback: {}", input, final_content)
             };
 
