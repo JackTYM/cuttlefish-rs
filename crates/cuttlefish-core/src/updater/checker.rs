@@ -136,10 +136,19 @@ impl UpdateChecker {
             .await
             .map_err(|e| UpdateError::Parse(e.to_string()))?;
 
-        // Find the latest server-v* release, falling back to v* for backwards compatibility
+        // Find the latest server release in order of preference:
+        // 1. server-archive-* (current format with version number)
+        // 2. server-v* (old format, backwards compat)
+        // 3. v* (very old format)
+        // Note: server-latest is skipped as it doesn't contain version in tag name
         let release = releases
             .iter()
-            .find(|r| r.tag_name.starts_with("server-v"))
+            .find(|r| r.tag_name.starts_with("server-archive-"))
+            .or_else(|| {
+                releases
+                    .iter()
+                    .find(|r| r.tag_name.starts_with("server-v"))
+            })
             .or_else(|| {
                 releases
                     .iter()
@@ -153,6 +162,7 @@ impl UpdateChecker {
 
         let latest_version = release
             .tag_name
+            .trim_start_matches("server-archive-")
             .trim_start_matches("server-v")
             .trim_start_matches('v')
             .to_string();
