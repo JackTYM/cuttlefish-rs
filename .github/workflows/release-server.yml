@@ -161,6 +161,17 @@ jobs:
           mkdir -p webui-embed
           tar -xzf cuttlefish-webui.tar.gz -C webui-embed
 
+      - name: Update Cargo.toml version
+        shell: bash
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          else
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          fi
+          echo "Updated Cargo.toml to version $VERSION"
+
       - name: Build release binary (native)
         if: "!matrix.cross"
         env:

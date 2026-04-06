@@ -106,6 +106,17 @@ jobs:
           shared-key: "tui-${{ matrix.target }}"
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
+      - name: Update Cargo.toml version
+        shell: bash
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" crates/cuttlefish-tui/Cargo.toml
+          else
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" crates/cuttlefish-tui/Cargo.toml
+          fi
+          echo "Updated crates/cuttlefish-tui/Cargo.toml to version $VERSION"
+
       - name: Build release binary (native)
         if: "!matrix.cross"
         run: cargo build --release -p cuttlefish-tui --target ${{ matrix.target }}
