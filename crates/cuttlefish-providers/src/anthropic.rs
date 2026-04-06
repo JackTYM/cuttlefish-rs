@@ -150,6 +150,10 @@ impl ModelProvider for AnthropicProvider {
         "anthropic"
     }
 
+    fn model(&self) -> Option<&str> {
+        Some(&self.model)
+    }
+
     #[instrument(skip(self, request), fields(model = %self.model))]
     async fn complete(
         &self,

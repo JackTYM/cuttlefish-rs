@@ -108,6 +108,10 @@ impl ModelProvider for BedrockProvider {
         "bedrock"
     }
 
+    fn model(&self) -> Option<&str> {
+        Some(&self.model_id)
+    }
+
     #[instrument(skip(self, request), fields(model = %self.model_id))]
     async fn complete(
         &self,

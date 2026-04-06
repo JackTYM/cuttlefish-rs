@@ -120,6 +120,10 @@ impl<P: ModelProvider + 'static> ModelProvider for TrackedProvider<P> {
         self.inner.name()
     }
 
+    fn model(&self) -> Option<&str> {
+        self.inner.model()
+    }
+
     async fn complete(&self, request: CompletionRequest) -> ProviderResult<CompletionResponse> {
         let start = Instant::now();
         let result = self.inner.complete(request).await;

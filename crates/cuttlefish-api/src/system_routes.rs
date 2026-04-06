@@ -199,6 +199,9 @@ pub struct ProviderTestResponse {
     /// List of available provider IDs (when provider not found).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub available_providers: Option<Vec<String>>,
+    /// The model that was actually tested (from config, not UI selection).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tested_model: Option<String>,
 }
 
 /// State for system routes.
@@ -368,6 +371,7 @@ pub async fn test_provider(
             connected: false,
             error: Some("No provider registry configured".to_string()),
             available_providers: None,
+            tested_model: None,
         });
     };
 
@@ -386,8 +390,12 @@ pub async fn test_provider(
                 provider_id, available
             )),
             available_providers: Some(available),
+            tested_model: None,
         });
     };
+
+    // Get the model being tested (from config, not UI selection)
+    let tested_model = provider.model().map(String::from);
 
     // Create a minimal test request
     let test_request = CompletionRequest {
@@ -412,6 +420,7 @@ pub async fn test_provider(
                 connected: true,
                 error: None,
                 available_providers: None,
+                tested_model: tested_model.clone(),
             })
         }
         Err(e) => {
@@ -424,6 +433,7 @@ pub async fn test_provider(
                 connected: false,
                 error: Some(e.to_string()),
                 available_providers: None,
+                tested_model,
             })
         }
     }

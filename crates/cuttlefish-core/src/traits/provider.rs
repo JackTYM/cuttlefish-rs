@@ -98,6 +98,12 @@ pub trait ModelProvider: Send + Sync {
     /// Provider name (e.g., "bedrock", "claude-oauth").
     fn name(&self) -> &str;
 
+    /// Model ID currently configured for this provider.
+    /// Returns None if the provider doesn't have a fixed model.
+    fn model(&self) -> Option<&str> {
+        None
+    }
+
     /// Complete a conversation with the model.
     async fn complete(&self, request: CompletionRequest) -> ProviderResult<CompletionResponse>;
 
