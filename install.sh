@@ -424,9 +424,15 @@ detect_platform() {
         source /etc/os-release
         DISTRO="${ID:-unknown}"
         # Check if systemd is the init system
-        if [[ -d /run/systemd/system ]] && command -v systemctl &>/dev/null; then
-            HAS_SYSTEMD=true
+        if [[ -d /run/systemd/system ]]; then
+            if command -v systemctl &>/dev/null; then
+                HAS_SYSTEMD=true
+            else
+                echo "DEBUG: /run/systemd/system exists but systemctl not found"
+                HAS_SYSTEMD=false
+            fi
         else
+            echo "DEBUG: /run/systemd/system does not exist"
             HAS_SYSTEMD=false
         fi
     else
