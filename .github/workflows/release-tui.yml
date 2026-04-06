@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - 'crates/cuttlefish-tui/**'
+      - '.github/workflows/release-tui.yml'
   workflow_dispatch:
 
 env:
