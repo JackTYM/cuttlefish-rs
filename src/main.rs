@@ -330,12 +330,17 @@ async fn main() -> anyhow::Result<()> {
 
     // Start auto-updater if enabled
     let auto_updater = if config.auto_update.enabled {
-        let auto_config = AutoUpdateConfig {
+        let mut auto_config = AutoUpdateConfig {
             enabled: true,
             poll_interval_secs: config.auto_update.poll_interval_secs,
             auto_apply: config.auto_update.auto_apply,
             ..AutoUpdateConfig::default()
         };
+
+        // Use custom download_dir from config if specified
+        if let Some(ref download_dir) = config.auto_update.download_dir {
+            auto_config.download_dir = download_dir.clone();
+        }
 
         let updater = Arc::new(AutoUpdater::new(auto_config));
 

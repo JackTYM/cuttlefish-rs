@@ -235,6 +235,12 @@ docker_socket = "unix:///var/run/docker.sock"
 memory_limit_mb = 2048
 cpu_limit = 2.0
 
+[auto_update]
+enabled = true
+poll_interval_secs = 3600  # Check every hour
+auto_apply = true
+download_dir = "/var/cache/cuttlefish"  # Must be writable by the service
+
 [providers.claude]
 provider_type = "bedrock"
 model = "anthropic.claude-sonnet-4-6-20260101-v1:0"
@@ -249,6 +255,21 @@ category = "deep"
 [agents.critic]
 category = "unspecified-high"
 ```
+
+### Manual Setup (Auto-Update)
+
+If installing manually (not using `install.sh`), create the cache directory for auto-updates:
+
+```bash
+# Create cache directory for auto-update downloads
+sudo mkdir -p /var/cache/cuttlefish
+sudo chown cuttlefish:cuttlefish /var/cache/cuttlefish
+
+# If using systemd, add to ReadWritePaths in service file:
+# ReadWritePaths=/var/lib/cuttlefish /var/log/cuttlefish /var/cache/cuttlefish
+```
+
+Without this, auto-updates will fail with "Permission denied" when downloading.
 
 ---
 

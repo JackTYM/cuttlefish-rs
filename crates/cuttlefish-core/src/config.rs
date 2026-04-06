@@ -46,6 +46,9 @@ pub struct AutoUpdateConfigToml {
     /// Whether to automatically apply updates.
     #[serde(default = "default_auto_apply")]
     pub auto_apply: bool,
+    /// Directory to store downloaded updates.
+    /// For systemd services, use /var/cache/cuttlefish.
+    pub download_dir: Option<PathBuf>,
 }
 
 impl Default for AutoUpdateConfigToml {
@@ -54,6 +57,7 @@ impl Default for AutoUpdateConfigToml {
             enabled: false,
             poll_interval_secs: default_poll_interval(),
             auto_apply: default_auto_apply(),
+            download_dir: None,
         }
     }
 }

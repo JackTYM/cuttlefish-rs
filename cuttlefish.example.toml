@@ -115,3 +115,7 @@ enabled = false
 poll_interval_secs = 3600
 # Automatically apply updates when found (if false, only notifies)
 auto_apply = true
+# Directory to download updates to (must be writable by the service)
+# For systemd services, use /var/cache/cuttlefish and ensure the directory
+# exists with proper permissions: sudo mkdir -p /var/cache/cuttlefish && sudo chown cuttlefish:cuttlefish /var/cache/cuttlefish
+download_dir = "/var/cache/cuttlefish"

@@ -57,6 +57,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/cuttlefish}"
 CONFIG_DIR="${CONFIG_DIR:-/etc/cuttlefish}"
 DATA_DIR="${DATA_DIR:-/var/lib/cuttlefish}"
 LOG_DIR="${LOG_DIR:-/var/log/cuttlefish}"
+CACHE_DIR="${CACHE_DIR:-/var/cache/cuttlefish}"
 RUST_VERSION="1.94.0"
 SERVICE_USER="cuttlefish"
 
@@ -1617,16 +1618,18 @@ create_user() {
 
 create_directories() {
     info "Creating directories..."
-    
+
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$CONFIG_DIR"
     mkdir -p "$DATA_DIR"
     mkdir -p "$LOG_DIR"
-    
+    mkdir -p "$CACHE_DIR"
+
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
-    
+    chown -R "$SERVICE_USER:$SERVICE_USER" "$CACHE_DIR"
+
     success "Created directories"
 }
 
@@ -1962,6 +1965,12 @@ max_concurrent = $MAX_CONCURRENT
 [webui]
 enabled = true
 static_dir = "$INSTALL_DIR/webui"
+
+[auto_update]
+enabled = true
+poll_interval_secs = 3600
+auto_apply = true
+download_dir = "$CACHE_DIR"
 EOF
 
     local first_deep_provider=""
@@ -2268,7 +2277,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=$DATA_DIR $LOG_DIR
+ReadWritePaths=$DATA_DIR $LOG_DIR $CACHE_DIR
 
 # Resource limits
 LimitNOFILE=65535
