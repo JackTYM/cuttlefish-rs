@@ -37,8 +37,8 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          # Find highest server version tag
-          latest_tag=$(git tag -l "server-v*" | sort -V | tail -1)
+          # Find highest server version tag (exclude server-latest)
+          latest_tag=$(git tag -l "server-v*" | grep -v "server-latest" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
             # No server tags yet, start at 0.1.0
@@ -231,7 +231,7 @@ jobs:
       - name: Generate release notes
         run: |
           VERSION="server-v${{ needs.determine-version.outputs.version }}"
-          PREV_TAG=$(git tag -l "server-v*" | sort -V | tail -1)
+          PREV_TAG=$(git tag -l "server-v*" | grep -v "server-latest" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)")
