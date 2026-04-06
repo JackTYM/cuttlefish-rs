@@ -207,8 +207,12 @@ pub struct ProviderTestResponse {
 /// State for system routes.
 #[derive(Clone)]
 pub struct SystemState {
-    /// System configuration.
+    /// System configuration (for API responses).
     pub config: Arc<RwLock<SystemConfig>>,
+    /// Path to the config file (for persistence).
+    pub config_path: Option<std::path::PathBuf>,
+    /// The actual TOML config (for reading/writing).
+    pub toml_config: Arc<RwLock<Option<cuttlefish_core::config::CuttlefishConfig>>>,
     /// Server start time.
     pub start_time: Instant,
     /// Auth configuration.
@@ -225,8 +229,16 @@ impl SystemState {
         if let Some(ref key) = auth_config.legacy_api_key {
             config.api_key = mask_api_key(key);
         }
+
+        // Try to find and load the config file
+        let config_path = cuttlefish_core::config::CuttlefishConfig::default_path();
+        let toml_config =
+            cuttlefish_core::config::CuttlefishConfig::load_from_path(&config_path).ok();
+
         Self {
             config: Arc::new(RwLock::new(config)),
+            config_path: Some(config_path),
+            toml_config: Arc::new(RwLock::new(toml_config)),
             start_time: Instant::now(),
             auth_config,
             provider_registry: None,
@@ -347,16 +359,76 @@ pub async fn get_config(State(state): State<SystemState>) -> Json<SystemConfig> 
 pub async fn update_config(
     State(state): State<SystemState>,
     Json(new_config): Json<SystemConfig>,
-) -> (StatusCode, Json<SystemConfig>) {
+) -> (StatusCode, Json<serde_json::Value>) {
+    // Update the in-memory API config
     let mut config = state.config.write().await;
-
-    config.providers = new_config.providers;
+    config.providers = new_config.providers.clone();
     config.agent_settings = new_config.agent_settings;
     config.notifications = new_config.notifications;
     config.sandbox = new_config.sandbox;
 
-    tracing::info!("System configuration updated");
-    (StatusCode::OK, Json(config.clone()))
+    // Also update the TOML config file if we have one
+    let mut toml_updated = false;
+    let mut restart_required = false;
+
+    if let Some(ref config_path) = state.config_path {
+        let mut toml_config_guard = state.toml_config.write().await;
+        if let Some(ref mut toml_config) = *toml_config_guard {
+            // Update provider models in the TOML config
+            for provider in &new_config.providers {
+                if let Some(toml_provider) = toml_config.providers.get_mut(&provider.id) {
+                    let new_model = Some(provider.model.clone());
+                    if toml_provider.model != new_model {
+                        toml_provider.model = new_model;
+                        restart_required = true;
+                    }
+                }
+            }
+
+            // Update sandbox settings
+            toml_config.sandbox.memory_limit_mb = config.sandbox.memory_limit_mb as u64;
+            toml_config.sandbox.cpu_limit = config.sandbox.cpu_limit as f64;
+            toml_config.sandbox.disk_limit_gb = config.sandbox.disk_limit_gb as u64;
+            toml_config.sandbox.max_concurrent = config.sandbox.max_concurrent as usize;
+
+            // Save to file
+            match toml_config.save_to_file(config_path) {
+                Ok(()) => {
+                    toml_updated = true;
+                    tracing::info!("Config file updated: {}", config_path.display());
+                }
+                Err(e) => {
+                    tracing::error!("Failed to save config file: {}", e);
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to save config: {}", e)
+                        })),
+                    );
+                }
+            }
+        }
+    }
+
+    tracing::info!(
+        toml_updated = toml_updated,
+        restart_required = restart_required,
+        "System configuration updated"
+    );
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "success": true,
+            "toml_updated": toml_updated,
+            "restart_required": restart_required,
+            "message": if restart_required {
+                "Config saved. Restart required for provider changes to take effect."
+            } else {
+                "Config saved successfully."
+            }
+        })),
+    )
 }
 
 /// Get the current system status.

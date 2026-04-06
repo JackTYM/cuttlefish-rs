@@ -2,12 +2,12 @@
 
 use crate::error::ConfigError;
 use crate::routing::RoutingConfig;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Main configuration for Cuttlefish.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CuttlefishConfig {
     /// Server configuration.
     pub server: ServerConfig,
@@ -35,7 +35,7 @@ pub struct CuttlefishConfig {
 }
 
 /// Auto-update configuration from TOML.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoUpdateConfigToml {
     /// Whether auto-update is enabled.
     #[serde(default)]
@@ -67,7 +67,7 @@ fn default_auto_apply() -> bool {
 }
 
 /// Server configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     /// Host to bind to.
     #[serde(default = "default_host")]
@@ -81,7 +81,7 @@ pub struct ServerConfig {
 }
 
 /// Database configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     /// Path to the database file.
     #[serde(default = "default_db_path")]
@@ -89,7 +89,7 @@ pub struct DatabaseConfig {
 }
 
 /// Provider configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
     /// Provider type (e.g., "openai", "anthropic", "bedrock", "google", "ollama").
     pub provider_type: String,
@@ -102,7 +102,7 @@ pub struct ProviderConfig {
 }
 
 /// Agent configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
     /// Agent category.
     pub category: String,
@@ -111,7 +111,7 @@ pub struct AgentConfig {
 }
 
 /// Discord configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscordConfig {
     /// Environment variable name for Discord bot token.
     #[serde(default = "default_discord_token_env")]
@@ -122,7 +122,7 @@ pub struct DiscordConfig {
 }
 
 /// Sandbox configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SandboxConfig {
     /// Docker socket path.
     #[serde(default = "default_docker_socket")]
@@ -142,7 +142,7 @@ pub struct SandboxConfig {
 }
 
 /// WebUI configuration from TOML.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebUiConfigToml {
     /// Whether WebUI serving is enabled.
     #[serde(default = "default_webui_enabled")]
@@ -257,6 +257,48 @@ impl CuttlefishConfig {
     /// Load from a specific file path
     pub fn load_from_path(path: &std::path::Path) -> Result<Self, ConfigError> {
         Self::load_from_file(path)
+    }
+
+    /// Get the default config file path (first existing or default location).
+    pub fn default_path() -> PathBuf {
+        let local_path = PathBuf::from("cuttlefish.toml");
+        if local_path.exists() {
+            return local_path;
+        }
+
+        let system_path = PathBuf::from("/etc/cuttlefish/cuttlefish.toml");
+        if system_path.exists() {
+            return system_path;
+        }
+
+        if let Ok(home) = std::env::var("HOME") {
+            let config_path = PathBuf::from(home)
+                .join(".config")
+                .join("cuttlefish")
+                .join("config.toml");
+            if config_path.exists() {
+                return config_path;
+            }
+        }
+
+        // Default to system path if nothing exists
+        system_path
+    }
+
+    /// Save configuration to a file.
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), ConfigError> {
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| ConfigError(format!("Failed to serialize config: {}", e)))?;
+        std::fs::write(path, content)
+            .map_err(|e| ConfigError(format!("Failed to write config file: {}", e)))?;
+        Ok(())
+    }
+
+    /// Update a provider's model in the config.
+    pub fn set_provider_model(&mut self, provider_name: &str, model: &str) {
+        if let Some(provider) = self.providers.get_mut(provider_name) {
+            provider.model = Some(model.to_string());
+        }
     }
 }
 
