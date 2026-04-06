@@ -4,6 +4,7 @@ export interface ChatMessage {
   type: 'chat' | 'log' | 'diff'
   projectId: string
   timestamp: number
+  isStreaming?: boolean
 }
 
 export interface PendingApprovalEvent {
@@ -40,7 +41,10 @@ export function useWebSocket(apiKey?: string) {
   const diffContent = ref('')
   const connected = ref(false)
   const pendingApprovals = ref<PendingApprovalEvent[]>([])
-  
+
+  // Track streaming messages by project_id + agent
+  const streamingMessages = new Map<string, number>() // key -> message index
+
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   
@@ -107,6 +111,37 @@ export function useWebSocket(apiKey?: string) {
             // Keep max 1000 log entries to prevent memory issues
             if (logEntries.value.length > 1000) {
               logEntries.value.splice(0, 100)
+            }
+          } else if (msg.type === 'stream_chunk') {
+            // Handle streaming chunks - accumulate into a message
+            const streamKey = `${msg.project_id}:${msg.agent}`
+
+            if (msg.done) {
+              // Final chunk - mark message as complete
+              const msgIdx = streamingMessages.get(streamKey)
+              if (msgIdx !== undefined && messages.value[msgIdx]) {
+                messages.value[msgIdx].isStreaming = false
+              }
+              streamingMessages.delete(streamKey)
+            } else if (msg.content) {
+              // Accumulate content
+              const existingIdx = streamingMessages.get(streamKey)
+              if (existingIdx !== undefined && messages.value[existingIdx]) {
+                // Append to existing streaming message
+                messages.value[existingIdx].content += msg.content
+              } else {
+                // Create new streaming message
+                const newIdx = messages.value.length
+                messages.value.push({
+                  sender: msg.agent || 'assistant',
+                  content: msg.content,
+                  type: 'chat',
+                  projectId: msg.project_id || '',
+                  timestamp: Date.now(),
+                  isStreaming: true,
+                })
+                streamingMessages.set(streamKey, newIdx)
+              }
             }
           } else if (msg.type === 'error') {
             console.error('[WebSocket] Server error:', msg.message)
