@@ -154,9 +154,18 @@ This installs the latest release to `/opt/cuttlefish` and creates a `cuttlefish`
 ### Build from Source
 
 ```bash
-# Clone and build
+# Clone
 git clone https://github.com/JackTYM/cuttlefish-rs.git
 cd cuttlefish-rs
+
+# Build WebUI (requires Node.js 18+)
+cd cuttlefish-web
+npm install
+npm run generate
+cd ..
+
+# Build with embedded WebUI
+export WEBUI_DIR="$(pwd)/cuttlefish-web/.output/public"
 cargo build --release
 
 # Configure
@@ -168,13 +177,12 @@ export CUTTLEFISH_API_KEY="your-secure-api-key"
 ./target/release/cuttlefish-rs
 ```
 
-### Build WebUI (Optional)
+### Build without WebUI
 
 ```bash
-cd cuttlefish-web
-npm install
-npm run build
-# Built files go to .output/public/, served automatically by the server
+# If you don't need the WebUI, just build without setting WEBUI_DIR
+cargo build --release
+# The server will run API-only mode
 ```
 
 ### Docker Deployment
