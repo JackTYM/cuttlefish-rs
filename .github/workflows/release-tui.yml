@@ -221,25 +221,13 @@ jobs:
           \`\`\`
           EOF
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: versions-tui-v${{ needs.determine-version.outputs.version }}
-          name: TUI v${{ needs.determine-version.outputs.version }}
-          body_path: release_notes.md
-          files: release/*
-          prerelease: false
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update tui-latest tag
+      - name: Delete old tui-latest tag
         run: |
           gh release delete tui-latest --yes --cleanup-tag || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create tui-latest release
+      - name: Create tui-latest release first
         uses: softprops/action-gh-release@v2
         with:
           tag_name: tui-latest
@@ -279,6 +267,18 @@ jobs:
             iwr -Uri "https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-windows-x86_64.zip" -OutFile "$env:TEMP\cuttlefish-tui.zip"; Expand-Archive "$env:TEMP\cuttlefish-tui.zip" -DestinationPath "$env:LOCALAPPDATA\Programs\cuttlefish" -Force
             ```
             Then add `%LOCALAPPDATA%\Programs\cuttlefish` to your PATH.
+          files: release/*
+          prerelease: false
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create versioned release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: versions-tui-v${{ needs.determine-version.outputs.version }}
+          name: TUI v${{ needs.determine-version.outputs.version }}
+          body_path: release_notes.md
           files: release/*
           prerelease: false
           make_latest: false

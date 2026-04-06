@@ -253,25 +253,13 @@ jobs:
           \`\`\`
           EOF
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: versions-server-v${{ needs.determine-version.outputs.version }}
-          name: Server v${{ needs.determine-version.outputs.version }}
-          body_path: release_notes.md
-          files: release/*
-          prerelease: false
-          make_latest: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update server-latest tag
+      - name: Delete old server-latest tag
         run: |
           gh release delete server-latest --yes --cleanup-tag || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create server-latest release
+      - name: Create server-latest release first
         uses: softprops/action-gh-release@v2
         with:
           tag_name: server-latest
@@ -319,5 +307,17 @@ jobs:
           files: release/*
           prerelease: false
           make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create versioned release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: versions-server-v${{ needs.determine-version.outputs.version }}
+          name: Server v${{ needs.determine-version.outputs.version }}
+          body_path: release_notes.md
+          files: release/*
+          prerelease: false
+          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
