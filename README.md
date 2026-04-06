@@ -21,8 +21,8 @@
   <strong>Downloads:</strong>
   <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/server-latest">Server Latest</a> |
   <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/tui-latest">TUI Latest</a> |
-  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=server-v">All Server Releases</a> |
-  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=tui-v">All TUI Releases</a>
+  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=server-release">All Server Releases</a> |
+  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=tui-release">All TUI Releases</a>
 </p>
 
 ---
