@@ -160,19 +160,53 @@ impl ModelProvider for BedrockProvider {
         }
 
         let response = req_builder.send().await.map_err(|e| {
-            let err_msg = format!("{e}");
-            let hint = if err_msg.contains("AccessDeniedException") {
-                " (Hint: Request model access in AWS Bedrock console)"
-            } else if err_msg.contains("ValidationException") {
-                " (Hint: Check model ID format, e.g., anthropic.claude-sonnet-4-6-20250514-v1:0)"
-            } else if err_msg.contains("ResourceNotFoundException") {
-                " (Hint: Model may not be available in this region)"
-            } else {
-                ""
+            // Extract detailed error information from the AWS SDK error
+            let (error_code, error_message) = match &e {
+                aws_sdk_bedrockruntime::error::SdkError::ServiceError(service_err) => {
+                    let err = service_err.err();
+                    let code = err
+                        .meta()
+                        .code()
+                        .unwrap_or("UnknownError")
+                        .to_string();
+                    let msg = err
+                        .meta()
+                        .message()
+                        .unwrap_or("No message provided")
+                        .to_string();
+                    (code, msg)
+                }
+                aws_sdk_bedrockruntime::error::SdkError::ConstructionFailure(err) => {
+                    ("ConstructionFailure".to_string(), format!("{err:?}"))
+                }
+                aws_sdk_bedrockruntime::error::SdkError::TimeoutError(_) => {
+                    ("TimeoutError".to_string(), "Request timed out".to_string())
+                }
+                aws_sdk_bedrockruntime::error::SdkError::DispatchFailure(err) => {
+                    ("DispatchFailure".to_string(), format!("{err:?}"))
+                }
+                _ => ("UnknownError".to_string(), format!("{e}")),
             };
+
+            let hint = match error_code.as_str() {
+                "AccessDeniedException" => {
+                    " (Hint: Request model access in AWS Bedrock console)"
+                }
+                "ValidationException" => {
+                    " (Hint: Check model ID format, e.g., anthropic.claude-sonnet-4-6-20250514-v1:0)"
+                }
+                "ResourceNotFoundException" => {
+                    " (Hint: Model may not be available in this region)"
+                }
+                "ThrottlingException" => " (Hint: Rate limited, try again later)",
+                "ModelNotReadyException" => " (Hint: Model is still warming up, try again)",
+                "ModelStreamErrorException" => " (Hint: Streaming error, try non-streaming)",
+                _ => "",
+            };
+
             ProviderError(format!(
-                "Bedrock API error for model '{}': {e}{hint}",
-                self.model_id
+                "Bedrock API error for model '{}': [{}] {}{hint}",
+                self.model_id, error_code, error_message
             ))
         })?;
 
