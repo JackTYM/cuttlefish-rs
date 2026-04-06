@@ -6,6 +6,7 @@
 mod app;
 mod mascot;
 mod ui;
+mod updater;
 
 use std::time::Duration;
 
@@ -37,6 +38,18 @@ struct Cli {
     /// Project ID to connect to (creates new if not specified).
     #[arg(long)]
     project: Option<String>,
+
+    /// Check for updates and exit.
+    #[arg(long)]
+    check_update: bool,
+
+    /// Download and install the latest update.
+    #[arg(long)]
+    update: bool,
+
+    /// Skip the automatic update check on startup.
+    #[arg(long)]
+    no_update_check: bool,
 }
 
 /// Outbound message to server.
@@ -120,9 +133,25 @@ enum ServerMessage {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    // Handle update commands first (before setting up terminal)
+    if cli.check_update {
+        return handle_check_update().await;
+    }
+
+    if cli.update {
+        return handle_update().await;
+    }
+
     // Set up logging
     tracing::subscriber::set_global_default(tracing_subscriber::fmt().compact().finish())
         .expect("failed to set tracing subscriber");
+
+    // Check for updates in background (unless disabled)
+    let update_info = if !cli.no_update_check {
+        updater::check_for_update().await
+    } else {
+        None
+    };
 
     tracing::info!("Cuttlefish TUI starting, connecting to {}", cli.server);
 
@@ -139,6 +168,17 @@ async fn main() -> anyhow::Result<()> {
     // Create app state
     let mut app = App::new();
     app.project_id = cli.project.clone();
+
+    // Show update notification if available
+    if let Some(ref info) = update_info {
+        app.add_message(
+            "system",
+            format!(
+                "Update available: v{} -> v{} (run with --update to install)",
+                info.current_version, info.latest_version
+            ),
+        );
+    }
 
     // Run the app
     let result = run_app(&mut terminal, &mut app, ws_url).await;
@@ -374,6 +414,52 @@ where
             return Ok(());
         }
     }
+}
+
+/// Handle --check-update flag.
+async fn handle_check_update() -> anyhow::Result<()> {
+    println!("Checking for updates...");
+
+    match updater::check_for_update().await {
+        Some(info) => {
+            println!(
+                "Update available: v{} -> v{}",
+                info.current_version, info.latest_version
+            );
+            println!("Run with --update to install");
+        }
+        None => {
+            println!(
+                "You are running the latest version (v{})",
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle --update flag.
+async fn handle_update() -> anyhow::Result<()> {
+    println!("Checking for updates...");
+
+    match updater::check_for_update().await {
+        Some(info) => {
+            println!(
+                "Update available: v{} -> v{}",
+                info.current_version, info.latest_version
+            );
+            updater::apply_update(&info).await?;
+        }
+        None => {
+            println!(
+                "You are already running the latest version (v{})",
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// Handle a server message and update app state.
