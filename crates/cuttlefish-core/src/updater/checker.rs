@@ -377,7 +377,9 @@ mod tests {
                 assert_eq!(repo, "nonexistent-repo-67890");
             }
             Err(UpdateError::Http(_)) => {}
-            _ => panic!("Expected NoRelease or Http error"),
+            Err(UpdateError::RateLimited { .. }) => {}
+            Err(UpdateError::Parse(_)) => {}
+            _ => panic!("Expected NoRelease, Http, RateLimited, or Parse error"),
         }
     }
 
