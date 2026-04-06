@@ -2333,7 +2333,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=$DATA_DIR $LOG_DIR $CACHE_DIR
+ReadWritePaths=$INSTALL_DIR $DATA_DIR $LOG_DIR $CACHE_DIR
 
 # Resource limits
 LimitNOFILE=65535
