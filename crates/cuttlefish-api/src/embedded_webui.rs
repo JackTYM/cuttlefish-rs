@@ -4,11 +4,11 @@
 //! Falls back to file-based serving if embedded assets are not available.
 
 use axum::{
+    Router,
     body::Body,
-    http::{header, HeaderValue, StatusCode, Uri},
+    http::{HeaderValue, StatusCode, Uri, header},
     response::Response,
     routing::get,
-    Router,
 };
 use rust_embed::Embed;
 
@@ -45,23 +45,31 @@ fn serve_embedded(path: &str) -> Response {
 
         return Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, HeaderValue::from_str(&mime).unwrap_or(HeaderValue::from_static("application/octet-stream")))
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_str(&mime)
+                    .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+            )
             .header(header::CACHE_CONTROL, "public, max-age=31536000")
             .body(Body::from(content.data.into_owned()))
-            .unwrap_or_else(|_| Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from("Internal error"))
-                .expect("valid response"));
+            .unwrap_or_else(|_| {
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from("Internal error"))
+                    .expect("valid response")
+            });
     }
 
     // Not found
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("Not found"))
-        .unwrap_or_else(|_| Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("Not found"))
-            .expect("valid response"))
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from("Not found"))
+                .expect("valid response")
+        })
 }
 
 /// Handler for embedded WebUI requests.
@@ -82,20 +90,24 @@ async fn embedded_handler(uri: Uri) -> Response {
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
             .body(Body::from(content.data.into_owned()))
-            .unwrap_or_else(|_| Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from("Internal error"))
-                .expect("valid response"));
+            .unwrap_or_else(|_| {
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from("Internal error"))
+                    .expect("valid response")
+            });
     }
 
     // File not found
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .body(Body::from("Not found"))
-        .unwrap_or_else(|_| Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("Not found"))
-            .expect("valid response"))
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from("Not found"))
+                .expect("valid response")
+        })
 }
 
 /// Check if embedded WebUI assets are available.
@@ -137,8 +149,6 @@ mod tests {
         let uri: Uri = "/".parse().expect("valid uri");
         let response = embedded_handler(uri).await;
         // Will be 404 if no assets embedded, OK if they are
-        assert!(
-            response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND
-        );
+        assert!(response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND);
     }
 }

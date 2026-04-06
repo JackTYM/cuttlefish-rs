@@ -6,7 +6,8 @@ fn main() {
     // If WEBUI_DIR is not set, use the placeholder directory
     // This allows development builds to compile without the WebUI
     if std::env::var("WEBUI_DIR").is_err() {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR should be set");
+        let manifest_dir =
+            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR should be set");
         let placeholder = format!("{}/webui-placeholder", manifest_dir);
         println!("cargo::rustc-env=WEBUI_DIR={}", placeholder);
     }
