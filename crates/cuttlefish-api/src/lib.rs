@@ -141,7 +141,7 @@ pub fn build_full_app(config: ApiConfig) -> Router {
                 middleware::optional_auth,
             ));
 
-    Router::new()
+    let router = Router::new()
         .route("/health", get(routes::health_handler))
         .route("/ws", any(ws::ws_handler))
         .route("/api/templates", get(api_routes::list_templates))
@@ -167,9 +167,16 @@ pub fn build_full_app(config: ApiConfig) -> Router {
         .nest("/api", collaboration_router(collab_state))
         .nest("/api", organization_router(org_state))
         .nest("/api/auth", auth_routes::auth_router(auth_state))
-        .fallback(routes::not_found_handler)
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(CorsLayer::permissive());
+
+    // Try embedded WebUI as fallback (for single-binary deployment)
+    if let Some(embedded_router) = embedded_webui::embedded_webui_router() {
+        tracing::info!("Using embedded WebUI (compiled into binary)");
+        router.merge(embedded_router)
+    } else {
+        router.fallback(routes::not_found_handler)
+    }
 }
 
 /// Build the axum application router with WebUI static file serving.
