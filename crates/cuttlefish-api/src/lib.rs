@@ -21,6 +21,8 @@ pub mod auth;
 pub mod auth_routes;
 /// Collaboration API routes (sharing, invites, handoffs, activity).
 pub mod collaboration_routes;
+/// Embedded WebUI serving (compiled into binary).
+pub mod embedded_webui;
 /// Memory, decisions, and branching API endpoints.
 pub mod memory_routes;
 /// Authentication middleware (JWT, API key validation).
@@ -39,7 +41,7 @@ pub mod sandbox_routes;
 pub mod system_routes;
 /// Usage tracking and billing API endpoints.
 pub mod usage_routes;
-/// WebUI static file serving.
+/// WebUI static file serving (file-based fallback).
 pub mod webui;
 /// WebSocket handler and message protocol.
 pub mod ws;
@@ -196,26 +198,34 @@ pub fn build_app_with_webui(state: AppState, webui_config: WebUiConfig) -> Route
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    if !webui_config.enabled || !webui_config.is_valid() {
-        if webui_config.enabled {
-            tracing::warn!(
-                static_dir = %webui_config.static_dir.display(),
-                "WebUI static directory not found or missing index.html"
-            );
-        }
-        return api_router.fallback(routes::not_found_handler);
+    // Priority 1: Try embedded WebUI (compiled into binary)
+    if let Some(embedded_router) = embedded_webui::embedded_webui_router() {
+        tracing::info!("Using embedded WebUI (compiled into binary)");
+        return api_router.merge(embedded_router);
     }
 
-    tracing::info!(
-        static_dir = %webui_config.static_dir.display(),
-        "WebUI serving enabled"
-    );
+    // Priority 2: Try file-based WebUI
+    if webui_config.enabled && webui_config.is_valid() {
+        tracing::info!(
+            static_dir = %webui_config.static_dir.display(),
+            "Using file-based WebUI"
+        );
 
-    let index_html = webui_config.static_dir.join("index.html");
-    let serve_dir = ServeDir::new(&webui_config.static_dir)
-        .not_found_service(tower_http::services::ServeFile::new(&index_html));
+        let index_html = webui_config.static_dir.join("index.html");
+        let serve_dir = ServeDir::new(&webui_config.static_dir)
+            .not_found_service(tower_http::services::ServeFile::new(&index_html));
 
-    api_router.fallback_service(serve_dir)
+        return api_router.fallback_service(serve_dir);
+    }
+
+    // No WebUI available
+    if webui_config.enabled {
+        tracing::warn!(
+            static_dir = %webui_config.static_dir.display(),
+            "WebUI requested but neither embedded nor file-based available"
+        );
+    }
+    api_router.fallback(routes::not_found_handler)
 }
 
 /// Build the full API application with WebUI and all modular routers.
@@ -271,24 +281,32 @@ pub fn build_full_app_with_webui(config: ApiConfig, webui_config: WebUiConfig) -
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
 
-    if !webui_config.enabled || !webui_config.is_valid() {
-        if webui_config.enabled {
-            tracing::warn!(
-                static_dir = %webui_config.static_dir.display(),
-                "WebUI static directory not found or missing index.html"
-            );
-        }
-        return api_router.fallback(routes::not_found_handler);
+    // Priority 1: Try embedded WebUI (compiled into binary)
+    if let Some(embedded_router) = embedded_webui::embedded_webui_router() {
+        tracing::info!("Using embedded WebUI (compiled into binary)");
+        return api_router.merge(embedded_router);
     }
 
-    tracing::info!(
-        static_dir = %webui_config.static_dir.display(),
-        "WebUI serving enabled"
-    );
+    // Priority 2: Try file-based WebUI
+    if webui_config.enabled && webui_config.is_valid() {
+        tracing::info!(
+            static_dir = %webui_config.static_dir.display(),
+            "Using file-based WebUI"
+        );
 
-    let index_html = webui_config.static_dir.join("index.html");
-    let serve_dir = ServeDir::new(&webui_config.static_dir)
-        .not_found_service(tower_http::services::ServeFile::new(&index_html));
+        let index_html = webui_config.static_dir.join("index.html");
+        let serve_dir = ServeDir::new(&webui_config.static_dir)
+            .not_found_service(tower_http::services::ServeFile::new(&index_html));
 
-    api_router.fallback_service(serve_dir)
+        return api_router.fallback_service(serve_dir);
+    }
+
+    // No WebUI available
+    if webui_config.enabled {
+        tracing::warn!(
+            static_dir = %webui_config.static_dir.display(),
+            "WebUI requested but neither embedded nor file-based available"
+        );
+    }
+    api_router.fallback(routes::not_found_handler)
 }

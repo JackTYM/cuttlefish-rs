@@ -152,22 +152,32 @@ jobs:
             target
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Extract WebUI for embedding
+        run: |
+          mkdir -p webui-embed
+          tar -xzf cuttlefish-webui.tar.gz -C webui-embed
+          echo "WebUI files for embedding:"
+          ls -la webui-embed/
+
       - name: Build release binary (native)
         if: "!matrix.cross"
+        env:
+          WEBUI_DIR: ${{ github.workspace }}/webui-embed
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Build release binary (cross)
         if: matrix.cross
+        env:
+          WEBUI_DIR: ${{ github.workspace }}/webui-embed
         run: cross build --release --target ${{ matrix.target }}
 
-      - name: Package binary with WebUI
+      - name: Package binary
         shell: bash
         run: |
-          mkdir -p package/webui
+          mkdir -p package
           cp target/${{ matrix.target }}/release/cuttlefish-rs package/
-          tar -xzf cuttlefish-webui.tar.gz -C package/webui
           cd package
-          tar czvf ../cuttlefish-${{ matrix.name }}.tar.gz cuttlefish-rs webui
+          tar czvf ../cuttlefish-${{ matrix.name }}.tar.gz cuttlefish-rs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -1780,24 +1780,19 @@ download_binary() {
         return
     fi
     
-    info "Extracting binary and WebUI..."
+    info "Extracting binary..."
     mkdir -p /tmp/cuttlefish-extract
     tar -xzf "/tmp/$tarball" -C /tmp/cuttlefish-extract
 
-    # Install binary
+    # Install binary (WebUI is embedded in the binary)
     mv /tmp/cuttlefish-extract/cuttlefish-rs "$INSTALL_DIR/"
     chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/cuttlefish-rs"
     chmod +x "$INSTALL_DIR/cuttlefish-rs"
 
-    # Install WebUI if present in tarball
-    if [[ -d "/tmp/cuttlefish-extract/webui" ]]; then
-        info "Installing bundled WebUI..."
-        # Clear old WebUI files to ensure clean install
+    # Clean up old external WebUI files (no longer needed - embedded in binary)
+    if [[ -d "$INSTALL_DIR/webui" ]]; then
+        info "Removing old external WebUI files (now embedded in binary)..."
         rm -rf "$INSTALL_DIR/webui"
-        mkdir -p "$INSTALL_DIR/webui"
-        cp -r /tmp/cuttlefish-extract/webui/* "$INSTALL_DIR/webui/"
-        chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/webui"
-        success "WebUI installed to $INSTALL_DIR/webui"
     fi
 
     rm -rf "/tmp/$tarball" /tmp/cuttlefish-extract
