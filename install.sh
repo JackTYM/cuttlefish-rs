@@ -412,8 +412,8 @@ detect_platform() {
     elif grep -qi microsoft /proc/version 2>/dev/null; then
         PLATFORM="wsl"
         DISTRO=""
-        # Check if systemctl exists and can communicate with systemd (even if degraded)
-        if command -v systemctl &>/dev/null && systemctl --version &>/dev/null 2>&1; then
+        # Check if systemd is the init system
+        if [[ -d /run/systemd/system ]] && command -v systemctl &>/dev/null; then
             HAS_SYSTEMD=true
         else
             HAS_SYSTEMD=false
@@ -423,8 +423,8 @@ detect_platform() {
         # shellcheck source=/dev/null
         source /etc/os-release
         DISTRO="${ID:-unknown}"
-        # Check if systemctl exists and can communicate with systemd (even if degraded)
-        if command -v systemctl &>/dev/null && systemctl --version &>/dev/null 2>&1; then
+        # Check if systemd is the init system
+        if [[ -d /run/systemd/system ]] && command -v systemctl &>/dev/null; then
             HAS_SYSTEMD=true
         else
             HAS_SYSTEMD=false
