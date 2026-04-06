@@ -163,11 +163,8 @@ cargo build --release
 cp cuttlefish.example.toml cuttlefish.toml
 # Edit cuttlefish.toml with your settings
 
-# Set required environment variables
+# Run (set env vars for your configured providers)
 export CUTTLEFISH_API_KEY="your-secure-api-key"
-# Add provider API keys as needed (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
-
-# Run
 ./target/release/cuttlefish-rs
 ```
 
