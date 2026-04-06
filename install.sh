@@ -1792,6 +1792,8 @@ download_binary() {
     # Install WebUI if present in tarball
     if [[ -d "/tmp/cuttlefish-extract/webui" ]]; then
         info "Installing bundled WebUI..."
+        # Clear old WebUI files to ensure clean install
+        rm -rf "$INSTALL_DIR/webui"
         mkdir -p "$INSTALL_DIR/webui"
         cp -r /tmp/cuttlefish-extract/webui/* "$INSTALL_DIR/webui/"
         chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/webui"
