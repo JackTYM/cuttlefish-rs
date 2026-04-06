@@ -147,19 +147,41 @@ const loadSettings = async () => {
   }
 }
 
+interface SaveResponse {
+  success: boolean
+  toml_updated?: boolean
+  restart_required?: boolean
+  message?: string
+  error?: string
+}
+
+const showRestartRequired = ref(false)
+const restartMessage = ref('')
+
 const saveSettings = async () => {
   saving.value = true
   showError.value = false
-  
+  showRestartRequired.value = false
+
   try {
-    await $fetch(`${apiBase}/api/system/config`, {
+    const response = await $fetch<SaveResponse>(`${apiBase}/api/system/config`, {
       method: 'PUT',
       body: settings.value,
     })
-    
+
     hasUnsavedChanges.value = false
-    showSuccess.value = true
-    setTimeout(() => showSuccess.value = false, 3000)
+
+    if (response.error) {
+      showError.value = true
+      errorMessage.value = response.error
+    } else if (response.restart_required) {
+      showRestartRequired.value = true
+      restartMessage.value = response.message || 'Restart required for changes to take effect'
+      setTimeout(() => showRestartRequired.value = false, 10000)
+    } else {
+      showSuccess.value = true
+      setTimeout(() => showSuccess.value = false, 3000)
+    }
   } catch (e) {
     showError.value = true
     errorMessage.value = e instanceof Error ? e.message : 'Failed to save settings'
@@ -345,8 +367,8 @@ watch(settings, () => {
       leave-from-class="opacity-100 transform translate-y-0"
       leave-to-class="opacity-0 transform -translate-y-2"
     >
-      <div 
-        v-if="showError" 
+      <div
+        v-if="showError"
         class="fixed top-4 right-4 z-50 p-4 bg-red-900/90 border border-red-700 rounded-lg text-red-400 flex items-center gap-2 shadow-lg"
         role="alert"
       >
@@ -356,7 +378,31 @@ watch(settings, () => {
         <span class="text-sm font-medium">{{ errorMessage || 'Failed to save settings' }}</span>
       </div>
     </Transition>
-    
+
+    <!-- Restart Required Toast -->
+    <Transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="opacity-0 transform -translate-y-2"
+      enter-to-class="opacity-100 transform translate-y-0"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 transform translate-y-0"
+      leave-to-class="opacity-0 transform -translate-y-2"
+    >
+      <div
+        v-if="showRestartRequired"
+        class="fixed top-4 right-4 z-50 p-4 bg-amber-900/90 border border-amber-700 rounded-lg text-amber-400 flex items-center gap-2 shadow-lg max-w-md"
+        role="alert"
+      >
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <div class="flex flex-col">
+          <span class="text-sm font-medium">Config saved</span>
+          <span class="text-xs opacity-80">{{ restartMessage }}</span>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Unsaved Changes Indicator -->
     <div 
       v-if="hasUnsavedChanges" 
