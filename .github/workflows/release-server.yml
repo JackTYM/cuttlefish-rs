@@ -26,6 +26,8 @@ jobs:
   determine-version:
     name: Determine Version
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       should_release: ${{ steps.version.outputs.should_release }}
@@ -34,10 +36,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Archive previous server-latest to versioned tag
+        run: |
+          # Check if server-latest release exists
+          if gh release view server-latest &>/dev/null; then
+            # Extract version from release name (e.g., "Server Latest (v0.1.0)" -> "0.1.0")
+            PREV_VERSION=$(gh release view server-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+            if [ -n "$PREV_VERSION" ]; then
+              # Check if this versioned tag already exists
+              if ! gh release view "server-v${PREV_VERSION}" &>/dev/null; then
+                echo "Archiving server-latest (v${PREV_VERSION}) to server-v${PREV_VERSION}"
+                gh release edit server-latest \
+                  --tag "server-v${PREV_VERSION}" \
+                  --title "Server v${PREV_VERSION}" \
+                  --latest=false
+              else
+                echo "server-v${PREV_VERSION} already exists, deleting old server-latest"
+                gh release delete server-latest --yes --cleanup-tag || true
+              fi
+            fi
+          else
+            echo "No existing server-latest to archive"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Determine next version
         id: version
         run: |
-          # Find highest server version tag
+          # Find highest server version tag (after archiving)
           latest_tag=$(git tag -l "server-v*" | grep -E "^server-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
@@ -263,25 +290,6 @@ jobs:
           sudo bash -c "\$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
           \`\`\`
           EOF
-
-      - name: Archive previous server-latest to versioned release
-        run: |
-          # Check if server-latest exists
-          if gh release view server-latest &>/dev/null; then
-            # Extract version from release name (e.g., "Server Latest (v0.1.0)" -> "0.1.0")
-            PREV_VERSION=$(gh release view server-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
-            if [ -n "$PREV_VERSION" ]; then
-              echo "Archiving server-latest (v${PREV_VERSION}) to server-v${PREV_VERSION}"
-              gh release edit server-latest \
-                --tag "server-v${PREV_VERSION}" \
-                --title "Server v${PREV_VERSION}" \
-                --latest=false
-            fi
-          else
-            echo "No existing server-latest to archive"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create server-latest release
         uses: softprops/action-gh-release@v2

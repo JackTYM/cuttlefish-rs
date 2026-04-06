@@ -15,6 +15,8 @@ jobs:
   determine-version:
     name: Determine Version
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       should_release: ${{ steps.version.outputs.should_release }}
@@ -23,10 +25,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Archive previous tui-latest to versioned tag
+        run: |
+          # Check if tui-latest release exists
+          if gh release view tui-latest &>/dev/null; then
+            # Extract version from release name (e.g., "TUI Latest (v0.1.0)" -> "0.1.0")
+            PREV_VERSION=$(gh release view tui-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+            if [ -n "$PREV_VERSION" ]; then
+              # Check if this versioned tag already exists
+              if ! gh release view "tui-v${PREV_VERSION}" &>/dev/null; then
+                echo "Archiving tui-latest (v${PREV_VERSION}) to tui-v${PREV_VERSION}"
+                gh release edit tui-latest \
+                  --tag "tui-v${PREV_VERSION}" \
+                  --title "TUI v${PREV_VERSION}" \
+                  --latest=false
+              else
+                echo "tui-v${PREV_VERSION} already exists, deleting old tui-latest"
+                gh release delete tui-latest --yes --cleanup-tag || true
+              fi
+            fi
+          else
+            echo "No existing tui-latest to archive"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Determine next version
         id: version
         run: |
-          # Find highest TUI version tag
+          # Find highest TUI version tag (after archiving)
           latest_tag=$(git tag -l "tui-v*" | grep -E "^tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
@@ -231,25 +258,6 @@ jobs:
           cuttlefish-tui --server wss://your-server.com --api-key YOUR_KEY
           \`\`\`
           EOF
-
-      - name: Archive previous tui-latest to versioned release
-        run: |
-          # Check if tui-latest exists
-          if gh release view tui-latest &>/dev/null; then
-            # Extract version from release name (e.g., "TUI Latest (v0.1.0)" -> "0.1.0")
-            PREV_VERSION=$(gh release view tui-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
-            if [ -n "$PREV_VERSION" ]; then
-              echo "Archiving tui-latest (v${PREV_VERSION}) to tui-v${PREV_VERSION}"
-              gh release edit tui-latest \
-                --tag "tui-v${PREV_VERSION}" \
-                --title "TUI v${PREV_VERSION}" \
-                --latest=false
-            fi
-          else
-            echo "No existing tui-latest to archive"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create tui-latest release
         uses: softprops/action-gh-release@v2
