@@ -120,15 +120,23 @@ export function useWebSocket(apiKey?: string) {
               // Final chunk - mark message as complete
               const msgIdx = streamingMessages.get(streamKey)
               if (msgIdx !== undefined && messages.value[msgIdx]) {
-                messages.value[msgIdx].isStreaming = false
+                // Replace object to trigger reactivity
+                messages.value[msgIdx] = {
+                  ...messages.value[msgIdx],
+                  isStreaming: false,
+                }
               }
               streamingMessages.delete(streamKey)
             } else if (msg.content) {
               // Accumulate content
               const existingIdx = streamingMessages.get(streamKey)
               if (existingIdx !== undefined && messages.value[existingIdx]) {
-                // Append to existing streaming message
-                messages.value[existingIdx].content += msg.content
+                // Replace object to trigger Vue reactivity
+                const existing = messages.value[existingIdx]
+                messages.value[existingIdx] = {
+                  ...existing,
+                  content: existing.content + msg.content,
+                }
               } else {
                 // Create new streaming message
                 const newIdx = messages.value.length
