@@ -27,14 +27,14 @@ jobs:
         id: version
         run: |
           # Find highest TUI version tag
-          latest_tag=$(git tag -l "versions-tui-v*" | grep -E "^versions-tui-v[0-9]" | sort -V | tail -1)
+          latest_tag=$(git tag -l "tui-v*" | grep -E "^tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$latest_tag" ]; then
             # No TUI version tags yet, start at 0.1.0
             new_version="0.1.0"
           else
             # Extract version and increment patch
-            current=$(echo "$latest_tag" | sed 's/versions-tui-v//')
+            current=$(echo "$latest_tag" | sed 's/tui-v//')
             major=$(echo $current | cut -d. -f1)
             minor=$(echo $current | cut -d. -f2)
             patch=$(echo $current | cut -d. -f3)
@@ -171,8 +171,8 @@ jobs:
 
       - name: Generate release notes
         run: |
-          VERSION="versions-tui-v${{ needs.determine-version.outputs.version }}"
-          PREV_TAG=$(git tag -l "versions-tui-v*" | grep -E "^versions-tui-v[0-9]" | sort -V | tail -1)
+          VERSION="tui-v${{ needs.determine-version.outputs.version }}"
+          PREV_TAG=$(git tag -l "tui-v*" | grep -E "^tui-v[0-9]" | sort -V | tail -1)
 
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline -20 --pretty=format:"- %s (%h)" -- crates/cuttlefish-tui/)
@@ -228,9 +228,9 @@ jobs:
             # Extract version from release name (e.g., "TUI Latest (v0.1.0)" -> "0.1.0")
             PREV_VERSION=$(gh release view tui-latest --json name -q '.name' | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
             if [ -n "$PREV_VERSION" ]; then
-              echo "Archiving tui-latest (v${PREV_VERSION}) to versions-tui-v${PREV_VERSION}"
+              echo "Archiving tui-latest (v${PREV_VERSION}) to tui-v${PREV_VERSION}"
               gh release edit tui-latest \
-                --tag "versions-tui-v${PREV_VERSION}" \
+                --tag "tui-v${PREV_VERSION}" \
                 --title "TUI v${PREV_VERSION}" \
                 --latest=false
             fi
@@ -249,7 +249,7 @@ jobs:
             **Latest TUI release: v${{ needs.determine-version.outputs.version }}**
 
             This tag always points to the most recent TUI release.
-            For a specific version, use `versions-tui-v*` tags.
+            For a specific version, use `tui-v*` tags.
 
             **Commit:** ${{ github.sha }}
 

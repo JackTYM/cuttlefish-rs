@@ -19,10 +19,9 @@
 
 <p align="center">
   <strong>Downloads:</strong>
-  <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/server-latest">Server Latest</a> |
-  <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/tui-latest">TUI Latest</a> |
-  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=versions-server">All Server Releases</a> |
-  <a href="https://github.com/JackTYM/cuttlefish-rs/tags?q=versions-tui">All TUI Releases</a>
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/server-latest">Server</a> |
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases/tag/tui-latest">TUI</a> |
+  <a href="https://github.com/JackTYM/cuttlefish-rs/releases">All Releases</a>
 </p>
 
 ---
