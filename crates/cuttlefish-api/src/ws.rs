@@ -10,6 +10,8 @@ use axum::{
     response::Response,
 };
 use cuttlefish_agents::{TokioMessageBus, WorkflowEngine};
+use cuttlefish_core::traits::provider::{CompletionRequest, Message, MessageRole};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -242,24 +244,19 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             })
                             .await;
 
-                        // Execute the workflow
-                        match execute_workflow(&state, &project_id, &content, tx.clone()).await {
-                            Ok(response) => {
-                                if tx.send(response).await.is_err() {
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                error!("Workflow execution error: {}", e);
-                                if tx
-                                    .send(ServerMessage::Error {
-                                        message: e.to_string(),
-                                    })
-                                    .await
-                                    .is_err()
-                                {
-                                    break;
-                                }
+                        // Execute streaming response for real-time token display
+                        if let Err(e) =
+                            execute_streaming(&state, &project_id, &content, tx.clone()).await
+                        {
+                            error!("Streaming execution error: {}", e);
+                            if tx
+                                .send(ServerMessage::Error {
+                                    message: e.to_string(),
+                                })
+                                .await
+                                .is_err()
+                            {
+                                break;
                             }
                         }
                     }
@@ -371,7 +368,120 @@ fn remove_client_from_session(state: &AppState, project_id: &str) {
     }
 }
 
-/// Execute the agent workflow for a chat message.
+/// Execute streaming chat - streams tokens directly from the provider.
+///
+/// This provides real-time token-by-token streaming for a responsive UI.
+async fn execute_streaming(
+    state: &AppState,
+    project_id: &str,
+    input: &str,
+    tx: mpsc::Sender<ServerMessage>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let provider = get_provider(state)?;
+
+    // Send log entry about starting
+    let _ = tx
+        .send(ServerMessage::LogEntry {
+            id: Uuid::new_v4().to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            agent: "assistant".to_string(),
+            action: "Starting streaming response".to_string(),
+            level: "info".to_string(),
+            project: project_id.to_string(),
+            context: None,
+            stack_trace: None,
+        })
+        .await;
+
+    // Build the completion request
+    let request = CompletionRequest {
+        messages: vec![Message {
+            role: MessageRole::User,
+            content: input.to_string(),
+        }],
+        max_tokens: Some(4096),
+        temperature: Some(0.7),
+        system: Some("You are a helpful AI coding assistant. Be concise and helpful.".to_string()),
+    };
+
+    // Stream the response
+    let mut stream = provider.stream(request);
+    let mut full_content = String::new();
+
+    while let Some(chunk_result) = stream.next().await {
+        match chunk_result {
+            Ok(chunk) => {
+                use cuttlefish_core::traits::provider::StreamChunk;
+                match chunk {
+                    StreamChunk::Text(text) => {
+                        full_content.push_str(&text);
+                        let _ = tx
+                            .send(ServerMessage::StreamChunk {
+                                project_id: project_id.to_string(),
+                                agent: "assistant".to_string(),
+                                content: text,
+                                done: false,
+                            })
+                            .await;
+                    }
+                    StreamChunk::Usage {
+                        input_tokens,
+                        output_tokens,
+                    } => {
+                        debug!(
+                            "Streaming complete: {} input, {} output tokens",
+                            input_tokens, output_tokens
+                        );
+                        // Send final chunk marker
+                        let _ = tx
+                            .send(ServerMessage::StreamChunk {
+                                project_id: project_id.to_string(),
+                                agent: "assistant".to_string(),
+                                content: String::new(),
+                                done: true,
+                            })
+                            .await;
+                    }
+                    StreamChunk::ToolCallDelta { .. } => {
+                        // Tool calls not yet supported in streaming UI
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Stream error: {}", e);
+                let _ = tx
+                    .send(ServerMessage::Error {
+                        message: format!("Stream error: {e}"),
+                    })
+                    .await;
+                return Err(Box::new(std::io::Error::other(e.to_string())));
+            }
+        }
+    }
+
+    // Send log entry about completion
+    let _ = tx
+        .send(ServerMessage::LogEntry {
+            id: Uuid::new_v4().to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            agent: "assistant".to_string(),
+            action: "Streaming response complete".to_string(),
+            level: "info".to_string(),
+            project: project_id.to_string(),
+            context: Some(format!("{} characters", full_content.len())),
+            stack_trace: None,
+        })
+        .await;
+
+    Ok(())
+}
+
+/// Execute the agent workflow for a chat message (non-streaming).
+///
+/// Use this for complex multi-agent tasks that require orchestration.
+/// Currently unused in favor of direct streaming, but kept for future
+/// multi-agent workflow support.
+#[allow(dead_code)]
 async fn execute_workflow(
     state: &AppState,
     project_id: &str,
