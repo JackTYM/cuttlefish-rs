@@ -2510,8 +2510,17 @@ main() {
                 download_binary
                 create_symlinks
 
-                # Restart service if systemd is available
+                # Create/update systemd service if systemd is available
                 if [[ "$HAS_SYSTEMD" == true ]]; then
+                    # Create service file if it doesn't exist
+                    if [[ ! -f /etc/systemd/system/cuttlefish.service ]]; then
+                        info "Creating systemd service..."
+                        write_systemd_service
+                    fi
+
+                    info "Reloading systemd daemon..."
+                    systemctl daemon-reload
+
                     info "Restarting Cuttlefish service..."
                     systemctl restart cuttlefish 2>/dev/null || systemctl start cuttlefish 2>/dev/null || true
                     sleep 2
@@ -2552,8 +2561,17 @@ main() {
                 download_binary
                 create_symlinks
 
-                # Restart service if systemd is available
+                # Create/update systemd service if systemd is available
                 if [[ "$HAS_SYSTEMD" == true ]]; then
+                    # Create service file if it doesn't exist
+                    if [[ ! -f /etc/systemd/system/cuttlefish.service ]]; then
+                        info "Creating systemd service..."
+                        write_systemd_service
+                    fi
+
+                    info "Reloading systemd daemon..."
+                    systemctl daemon-reload
+
                     info "Restarting Cuttlefish service..."
                     systemctl restart cuttlefish 2>/dev/null || systemctl start cuttlefish 2>/dev/null || true
                     sleep 2
