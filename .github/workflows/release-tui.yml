@@ -59,18 +59,27 @@ jobs:
             os: ubuntu-latest
             name: linux-x86_64
             cross: false
+            ext: ""
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             name: linux-aarch64
             cross: true
+            ext: ""
           - target: x86_64-apple-darwin
             os: macos-latest
             name: darwin-x86_64
             cross: false
+            ext: ""
           - target: aarch64-apple-darwin
             os: macos-latest
             name: darwin-aarch64
             cross: false
+            ext: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: windows-x86_64
+            cross: false
+            ext: ".exe"
 
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +114,8 @@ jobs:
         if: matrix.cross
         run: cross build --release -p cuttlefish-tui --target ${{ matrix.target }}
 
-      - name: Package binary
+      - name: Package binary (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p package
@@ -113,11 +123,28 @@ jobs:
           cd package
           tar czvf ../cuttlefish-tui-${{ matrix.name }}.tar.gz cuttlefish-tui
 
-      - name: Upload artifact
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package
+          Copy-Item "target/${{ matrix.target }}/release/cuttlefish-tui.exe" -Destination "package/"
+          Compress-Archive -Path "package/cuttlefish-tui.exe" -DestinationPath "cuttlefish-tui-${{ matrix.name }}.zip"
+
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: tui-${{ matrix.name }}
           path: cuttlefish-tui-${{ matrix.name }}.tar.gz
+          retention-days: 1
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tui-${{ matrix.name }}
+          path: cuttlefish-tui-${{ matrix.name }}.zip
           retention-days: 1
 
   release:
@@ -139,7 +166,7 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          find artifacts -name 'cuttlefish-tui-*.tar.gz' -exec mv {} release/ \;
+          find artifacts -name 'cuttlefish-tui-*.*' -exec mv {} release/ \;
           ls -la release/
 
       - name: Generate release notes
@@ -162,15 +189,30 @@ jobs:
           $COMMITS
 
           ### Installation
-          Download the binary for your platform and add to PATH:
-          \`\`\`bash
-          # Linux x86_64
-          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-linux-x86_64.tar.gz | tar xz
-          sudo mv cuttlefish-tui /usr/local/bin/
 
-          # macOS (Apple Silicon)
-          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-darwin-aarch64.tar.gz | tar xz
-          sudo mv cuttlefish-tui /usr/local/bin/
+          **Linux (x86_64)**
+          \`\`\`bash
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-linux-x86_64.tar.gz | sudo tar xz -C /usr/local/bin
+          \`\`\`
+
+          **Linux (ARM64)**
+          \`\`\`bash
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-linux-aarch64.tar.gz | sudo tar xz -C /usr/local/bin
+          \`\`\`
+
+          **macOS (Apple Silicon)**
+          \`\`\`bash
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-darwin-aarch64.tar.gz | sudo tar xz -C /usr/local/bin
+          \`\`\`
+
+          **macOS (Intel)**
+          \`\`\`bash
+          curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-darwin-x86_64.tar.gz | sudo tar xz -C /usr/local/bin
+          \`\`\`
+
+          **Windows (PowerShell)**
+          \`\`\`powershell
+          Invoke-WebRequest -Uri "https://github.com/JackTYM/cuttlefish-rs/releases/download/${VERSION}/cuttlefish-tui-windows-x86_64.zip" -OutFile "\$env:TEMP\\cuttlefish-tui.zip"; Expand-Archive -Path "\$env:TEMP\\cuttlefish-tui.zip" -DestinationPath "\$env:LOCALAPPDATA\\Programs\\cuttlefish" -Force; \$env:PATH += ";\$env:LOCALAPPDATA\\Programs\\cuttlefish"
           \`\`\`
 
           ### Usage
@@ -210,15 +252,32 @@ jobs:
             **Commit:** ${{ github.sha }}
 
             ### Installation
-            ```bash
-            # Linux x86_64
-            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-linux-x86_64.tar.gz | tar xz
-            sudo mv cuttlefish-tui /usr/local/bin/
 
-            # macOS (Apple Silicon)
-            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-darwin-aarch64.tar.gz | tar xz
-            sudo mv cuttlefish-tui /usr/local/bin/
+            **Linux (x86_64)**
+            ```bash
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-linux-x86_64.tar.gz | sudo tar xz -C /usr/local/bin
             ```
+
+            **Linux (ARM64)**
+            ```bash
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-linux-aarch64.tar.gz | sudo tar xz -C /usr/local/bin
+            ```
+
+            **macOS (Apple Silicon)**
+            ```bash
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-darwin-aarch64.tar.gz | sudo tar xz -C /usr/local/bin
+            ```
+
+            **macOS (Intel)**
+            ```bash
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-darwin-x86_64.tar.gz | sudo tar xz -C /usr/local/bin
+            ```
+
+            **Windows (PowerShell)**
+            ```powershell
+            iwr -Uri "https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-windows-x86_64.zip" -OutFile "$env:TEMP\cuttlefish-tui.zip"; Expand-Archive "$env:TEMP\cuttlefish-tui.zip" -DestinationPath "$env:LOCALAPPDATA\Programs\cuttlefish" -Force
+            ```
+            Then add `%LOCALAPPDATA%\Programs\cuttlefish` to your PATH.
           files: release/*
           prerelease: true
         env:
