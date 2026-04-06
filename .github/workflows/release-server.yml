@@ -316,6 +316,6 @@ jobs:
             ```
             Then add `%LOCALAPPDATA%\Programs\cuttlefish` to your PATH.
           files: release/*
-          prerelease: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
