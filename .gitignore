@@ -48,3 +48,4 @@ cuttlefish-web/node_modules/
 cuttlefish-web/.nuxt/
 cuttlefish-web/.output/
 cuttlefish-web/dist/
+.claude/worktrees/
