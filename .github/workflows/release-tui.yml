@@ -189,3 +189,37 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update tui-latest tag
+        run: |
+          gh release delete tui-latest --yes --cleanup-tag || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create tui-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tui-latest
+          name: TUI Latest (v${{ needs.determine-version.outputs.version }})
+          body: |
+            **Latest TUI release: v${{ needs.determine-version.outputs.version }}**
+
+            This tag always points to the most recent TUI release.
+            For a specific version, use `tui-v*` tags.
+
+            **Commit:** ${{ github.sha }}
+
+            ### Installation
+            ```bash
+            # Linux x86_64
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-linux-x86_64.tar.gz | tar xz
+            sudo mv cuttlefish-tui /usr/local/bin/
+
+            # macOS (Apple Silicon)
+            curl -fsSL https://github.com/JackTYM/cuttlefish-rs/releases/download/tui-latest/cuttlefish-tui-darwin-aarch64.tar.gz | tar xz
+            sudo mv cuttlefish-tui /usr/local/bin/
+            ```
+          files: release/*
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

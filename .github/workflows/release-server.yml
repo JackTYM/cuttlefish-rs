@@ -236,3 +236,31 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update server-latest tag
+        run: |
+          gh release delete server-latest --yes --cleanup-tag || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create server-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: server-latest
+          name: Server Latest (v${{ needs.determine-version.outputs.version }})
+          body: |
+            **Latest server release: v${{ needs.determine-version.outputs.version }}**
+
+            This tag always points to the most recent server release.
+            For a specific version, use `server-v*` tags.
+
+            **Commit:** ${{ github.sha }}
+
+            ### Installation
+            ```bash
+            sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/install.sh)"
+            ```
+          files: release/*
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
