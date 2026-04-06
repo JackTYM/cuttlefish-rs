@@ -153,6 +153,12 @@ sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-
 
 This installs the latest release to `/opt/cuttlefish` and creates a `cuttlefish` command in your PATH.
 
+### Uninstall
+
+```bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackTYM/cuttlefish-rs/master/uninstall.sh)"
+```
+
 ### Prerequisites (for building from source)
 
 - Rust 1.94.0+ (`rustup install 1.94.0`)
