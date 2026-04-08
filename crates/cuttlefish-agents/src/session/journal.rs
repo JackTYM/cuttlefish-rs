@@ -98,10 +98,7 @@ impl SessionJournal {
             std::fs::create_dir_all(parent)?;
         }
 
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
 
         Ok(Self {
             path,
@@ -200,7 +197,9 @@ impl SessionJournal {
         self.writer = None;
 
         // Delete oldest rotation if at limit
-        let oldest = self.path.with_extension(format!("jsonl.{}", self.max_rotations));
+        let oldest = self
+            .path
+            .with_extension(format!("jsonl.{}", self.max_rotations));
         if oldest.exists() {
             std::fs::remove_file(&oldest)?;
         }
@@ -237,10 +236,10 @@ impl SessionJournal {
 
 impl Drop for SessionJournal {
     fn drop(&mut self) {
-        if let Some(writer) = &mut self.writer {
-            if let Err(e) = writer.flush() {
-                error!(error = %e, "Failed to flush journal on drop");
-            }
+        if let Some(writer) = &mut self.writer
+            && let Err(e) = writer.flush()
+        {
+            error!(error = %e, "Failed to flush journal on drop");
         }
     }
 }

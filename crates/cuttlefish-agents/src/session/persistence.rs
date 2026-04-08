@@ -29,7 +29,7 @@ impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
             journal_dir: std::path::PathBuf::from("data/journals"),
-            journal_max_size: 1024 * 1024,  // 1MB
+            journal_max_size: 1024 * 1024, // 1MB
             journal_max_rotations: 10,
             sync_on_each_message: true,
             sliding_window_size: 100,
@@ -67,7 +67,11 @@ impl ConversationPersistence {
             config.journal_max_rotations,
         )?;
 
-        Ok(Self { db, journal, config })
+        Ok(Self {
+            db,
+            journal,
+            config,
+        })
     }
 
     /// Create with a specific journal path (for testing or custom setups).
@@ -82,7 +86,11 @@ impl ConversationPersistence {
             config.journal_max_rotations,
         )?;
 
-        Ok(Self { db, journal, config })
+        Ok(Self {
+            db,
+            journal,
+            config,
+        })
     }
 
     /// Save a message to both database and journal.
@@ -184,37 +192,36 @@ impl ConversationPersistence {
                     token_count,
                     model_used,
                 } = entry.event
+                    && !db_message_ids.contains(&message_id)
                 {
-                    if !db_message_ids.contains(&message_id) {
-                        // This message was journaled but not committed to DB
-                        crash_recovery = true;
-                        from_journal += 1;
+                    // This message was journaled but not committed to DB
+                    crash_recovery = true;
+                    from_journal += 1;
 
-                        // Replay to database
-                        if let Err(e) = self
-                            .db
-                            .insert_message(
-                                &message_id,
-                                project_id,
-                                &role,
-                                &content,
-                                model_used.as_deref(),
-                                token_count,
-                            )
-                            .await
-                        {
-                            warn!(
-                                message_id = %message_id,
-                                error = %e,
-                                "Failed to replay journaled message to database"
-                            );
-                        } else {
-                            messages.push(Message {
-                                role: string_to_role(&role),
-                                content,
-                            });
-                            info!(message_id = %message_id, "Recovered message from journal");
-                        }
+                    // Replay to database
+                    if let Err(e) = self
+                        .db
+                        .insert_message(
+                            &message_id,
+                            project_id,
+                            &role,
+                            &content,
+                            model_used.as_deref(),
+                            token_count,
+                        )
+                        .await
+                    {
+                        warn!(
+                            message_id = %message_id,
+                            error = %e,
+                            "Failed to replay journaled message to database"
+                        );
+                    } else {
+                        messages.push(Message {
+                            role: string_to_role(&role),
+                            content,
+                        });
+                        info!(message_id = %message_id, "Recovered message from journal");
                     }
                 }
             }

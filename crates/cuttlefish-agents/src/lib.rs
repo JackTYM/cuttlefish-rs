@@ -66,7 +66,9 @@ pub use safety::{
     DiffHunk, DiffLine, DiffStats, FileDiff, GateConfig, GateDecision, MAX_DIFF_FILE_SIZE,
     QuickDecision, RiskFactor, ThresholdOverride, detect_language,
 };
-pub use session::{ConversationPersistence, JournalEntry, PersistenceConfig, RestoreResult, SessionJournal};
+pub use session::{
+    ConversationPersistence, JournalEntry, PersistenceConfig, RestoreResult, SessionJournal,
+};
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowConfig, WorkflowEngine, WorkflowResult};
 

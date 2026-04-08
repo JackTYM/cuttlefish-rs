@@ -1,0 +1,23 @@
+[package]
+name = "cuttlefish-lsp"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94.0"
+description = "LSP client for Cuttlefish code intelligence"
+
+[lints]
+workspace = true
+
+[dependencies]
+cuttlefish-core = { path = "../cuttlefish-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+tracing = { workspace = true }
+thiserror = { workspace = true }
+async-trait = "0.1"
+lsp-types = "0.97"
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
