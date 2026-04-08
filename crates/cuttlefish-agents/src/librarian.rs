@@ -67,7 +67,7 @@ impl Agent for LibrarianAgent {
 
         let system_prompt = self
             .prompt_registry
-            .load("librarian")
+            .load_with_system("librarian")
             .map(|p| p.body)
             .unwrap_or_else(|_| Self::DEFAULT_SYSTEM_PROMPT.to_string());
 

@@ -61,10 +61,7 @@ pub async fn apply_update(info: &UpdateInfo) -> anyhow::Result<()> {
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
 
-    println!(
-        "Downloading cuttlefish-tui v{}...",
-        info.latest_version
-    );
+    println!("Downloading cuttlefish-tui v{}...", info.latest_version);
 
     let response = client.get(&info.download_url).send().await?;
 

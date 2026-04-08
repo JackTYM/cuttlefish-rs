@@ -1220,6 +1220,8 @@ dependencies = [
  "cuttlefish-providers",
  "cuttlefish-sandbox",
  "dashmap 6.1.0",
+ "globset",
+ "ignore",
  "regex",
  "serde",
  "serde_json",
@@ -1229,6 +1231,7 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+ "walkdir",
 ]
 
 [[package]]

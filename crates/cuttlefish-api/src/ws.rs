@@ -9,7 +9,7 @@ use axum::{
     },
     response::Response,
 };
-use cuttlefish_agents::{TokioMessageBus, WorkflowEngine};
+use cuttlefish_agents::{PromptRegistry, TokioMessageBus, WorkflowEngine};
 use cuttlefish_core::traits::provider::{CompletionRequest, Message, MessageRole};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -371,6 +371,8 @@ fn remove_client_from_session(state: &AppState, project_id: &str) {
 /// Execute streaming chat - streams tokens directly from the provider.
 ///
 /// This provides real-time token-by-token streaming for a responsive UI.
+/// Maintains conversation history with automatic context compaction.
+/// Messages are persisted to database for crash recovery.
 async fn execute_streaming(
     state: &AppState,
     project_id: &str,
@@ -379,13 +381,81 @@ async fn execute_streaming(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let provider = get_provider(state)?;
 
+    // Create user message
+    let user_message = Message {
+        role: MessageRole::User,
+        content: input.to_string(),
+    };
+
+    // Estimate token count for the user message
+    let user_token_count = (input.len() / 4).max(1) as i64;
+
+    // Save user message to persistence (if available)
+    if let Some(ref persistence) = state.persistence {
+        let mut p = persistence.lock().await;
+        match p.save_message(project_id, &user_message, user_token_count, None).await {
+            Ok(msg_id) => debug!("User message persisted: {}", msg_id),
+            Err(e) => warn!("Failed to persist user message: {}", e),
+        }
+    }
+
+    // Get or create session and update history
+    let (messages, token_count, compacted) = {
+        let mut session_entry = state
+            .active_sessions
+            .entry(project_id.to_string())
+            .or_insert_with(|| ProjectSession::new(project_id.to_string()));
+
+        // Add user message to history
+        session_entry.messages.push(user_message);
+
+        // Compact history if needed
+        // Take messages out temporarily to avoid borrow conflict
+        let mut messages = std::mem::take(&mut session_entry.messages);
+        let needs_compaction = session_entry.compactor.needs_compaction(&messages);
+        let compacted = if needs_compaction {
+            let result = session_entry.compactor.compact(&mut messages);
+            info!(
+                "Context compacted: {} -> {} tokens, {} messages removed",
+                result.tokens_before, result.tokens_after, result.messages_removed
+            );
+
+            // Record compaction in persistence
+            if let Some(ref persistence) = state.persistence {
+                let mut p = persistence.lock().await;
+                let _ = p.record_compaction(
+                    project_id,
+                    result.messages_removed,
+                    result.tokens_before,
+                    result.tokens_after,
+                );
+            }
+
+            true
+        } else {
+            false
+        };
+
+        // Put messages back and get a copy for the request
+        let token_count = session_entry.compactor.current_tokens(&messages);
+        let messages_for_request = messages.clone();
+        session_entry.messages = messages;
+
+        (messages_for_request, token_count, compacted)
+    }; // Session lock released here
+
     // Send log entry about starting
     let _ = tx
         .send(ServerMessage::LogEntry {
             id: Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             agent: "assistant".to_string(),
-            action: "Starting streaming response".to_string(),
+            action: format!(
+                "Starting streaming response (context: {} tokens, {} messages{})",
+                token_count,
+                messages.len(),
+                if compacted { ", compacted" } else { "" }
+            ),
             level: "info".to_string(),
             project: project_id.to_string(),
             context: None,
@@ -393,15 +463,19 @@ async fn execute_streaming(
         })
         .await;
 
-    // Build the completion request
+    // Load system prompt from prompts directory
+    let registry = PromptRegistry::new(&state.prompts_dir);
+    let system_prompt = registry
+        .load_with_system("coder")
+        .map(|p| p.body)
+        .unwrap_or_else(|_| "You are a helpful AI coding assistant.".to_string());
+
+    // Build the completion request with full history
     let request = CompletionRequest {
-        messages: vec![Message {
-            role: MessageRole::User,
-            content: input.to_string(),
-        }],
+        messages,
         max_tokens: Some(4096),
         temperature: Some(0.7),
-        system: Some("You are a helpful AI coding assistant. Be concise and helpful.".to_string()),
+        system: Some(system_prompt),
     };
 
     // Stream the response
@@ -455,6 +529,34 @@ async fn execute_streaming(
                     })
                     .await;
                 return Err(Box::new(std::io::Error::other(e.to_string())));
+            }
+        }
+    }
+
+    // Add assistant response to session history and persist
+    if !full_content.is_empty() {
+        let assistant_message = Message {
+            role: MessageRole::Assistant,
+            content: full_content.clone(),
+        };
+
+        // Save to session
+        if let Some(mut session) = state.active_sessions.get_mut(project_id) {
+            session.add_message(assistant_message.clone());
+        }
+
+        // Persist to database
+        let assistant_token_count = (full_content.len() / 4).max(1) as i64;
+        if let Some(ref persistence) = state.persistence {
+            let mut p = persistence.lock().await;
+            match p.save_message(
+                project_id,
+                &assistant_message,
+                assistant_token_count,
+                state.default_provider.as_deref(),
+            ).await {
+                Ok(msg_id) => debug!("Assistant message persisted: {}", msg_id),
+                Err(e) => warn!("Failed to persist assistant message: {}", e),
             }
         }
     }

@@ -11,10 +11,10 @@ use ratatui::{
     widgets::Widget,
 };
 
-/// 16x16 pixel art grid for the cuttlefish mascot.
+/// 16x16 pixel art grid for the cuttlefish mascot (mouth closed).
 ///
 /// Each character maps to a color in the palette.
-const GRID: [&str; 16] = [
+const GRID_CLOSED: [&str; 16] = [
     "...1222222221...", // 0 - top of head
     "..123444444321..", // 1
     "..12E444444E21..", // 2 - eyes
@@ -33,6 +33,30 @@ const GRID: [&str; 16] = [
     ".......vv.......", // 15
 ];
 
+/// 16x16 pixel art grid for the cuttlefish mascot (mouth open).
+const GRID_OPEN: [&str; 16] = [
+    "...1222222221...", // 0 - top of head
+    "..123444444321..", // 1
+    "..12E444444E21..", // 2 - eyes
+    "..12344HH44321..", // 3 - highlight (smile)
+    ".b12ss2MM2ss21b.", // 4 - mouth OPEN in stripe area
+    ".ab2344444432ba.", // 5 - fins
+    "..123444444321..", // 6
+    "...1233333321...", // 7 - taper
+    "................", // 8 - gap
+    "...t.t.tt.t.t...", // 9 - tentacles
+    "...t.t.tt.t.t...", // 10
+    "...u.u.tt.u.u...", // 11
+    ".....u.uu.u.....", // 12
+    ".....v.uu.v.....", // 13
+    ".......vv.......", // 14
+    ".......vv.......", // 15
+];
+
+/// Alias for tests
+#[cfg(test)]
+const GRID: [&str; 16] = GRID_CLOSED;
+
 /// Color palette mapping characters to RGB colors.
 const PALETTE: &[(char, (u8, u8, u8))] = &[
     ('.', (10, 22, 40)),    // background (dark blue)
@@ -42,6 +66,7 @@ const PALETTE: &[(char, (u8, u8, u8))] = &[
     ('4', (234, 170, 114)), // body inner
     ('H', (245, 195, 140)), // highlight
     ('E', (26, 26, 46)),    // eyes (dark)
+    ('M', (60, 30, 30)),    // mouth (dark red/maroon)
     ('s', (160, 80, 20)),   // stripe
     ('a', (100, 58, 22)),   // fin dark
     ('b', (140, 82, 30)),   // fin light
@@ -50,59 +75,111 @@ const PALETTE: &[(char, (u8, u8, u8))] = &[
     ('v', (95, 50, 15)),    // tentacle 3
 ];
 
-/// Minimum columns required to display the mascot.
-const MIN_COLS: u16 = 34;
-
-/// Minimum rows required to display the mascot.
-const MIN_ROWS: u16 = 18;
+/// Background character (transparent).
+const BG_CHAR: char = '.';
 
 /// Look up a color from the palette by character.
 ///
-/// Returns the background color if the character is not found.
-fn color_for_char(c: char) -> Color {
+/// Returns None for background/transparent pixels.
+fn color_for_char(c: char) -> Option<Color> {
+    if c == BG_CHAR {
+        return None;
+    }
     for &(palette_char, (r, g, b)) in PALETTE {
         if palette_char == c {
-            return Color::Rgb(r, g, b);
+            return Some(Color::Rgb(r, g, b));
         }
     }
-    // Default to background color
-    Color::Rgb(10, 22, 40)
+    None
+}
+
+/// Rendering mode for the mascot.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MascotMode {
+    /// Standard mode: 2 chars wide × 1 char tall per pixel (32x16 chars for 16x16 grid).
+    #[default]
+    Standard,
+    /// Compact mode using half-block characters: 1 char = 2 vertical pixels (16x8 chars).
+    HalfBlock,
 }
 
 /// A widget that renders the cuttlefish mascot.
 ///
 /// The mascot scales to fill the available area while maintaining aspect ratio.
-/// Each pixel renders as 2 characters wide × 1 line tall for a square appearance.
-#[derive(Debug, Clone, Default)]
-pub struct MascotWidget;
+#[derive(Debug, Clone)]
+pub struct MascotWidget {
+    mode: MascotMode,
+    mouth_open: bool,
+}
+
+impl Default for MascotWidget {
+    fn default() -> Self {
+        Self {
+            mode: MascotMode::Standard,
+            mouth_open: false,
+        }
+    }
+}
 
 impl MascotWidget {
-    /// Create a new mascot widget.
+    /// Create a new mascot widget (standard mode).
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Create a compact mascot widget using half-block characters.
+    /// This renders 16x16 pixels in just 16x8 character cells.
+    #[must_use]
+    pub fn compact() -> Self {
+        Self {
+            mode: MascotMode::HalfBlock,
+            mouth_open: false,
+        }
+    }
+
+    /// Set mouth state (open/closed) for animation.
+    #[must_use]
+    pub fn with_mouth_open(mut self, open: bool) -> Self {
+        self.mouth_open = open;
+        self
+    }
+
+    /// Get the grid to use based on mouth state.
+    fn grid(&self) -> &'static [&'static str; 16] {
+        if self.mouth_open {
+            &GRID_OPEN
+        } else {
+            &GRID_CLOSED
+        }
+    }
+
+    /// Get base dimensions at scale 1.
+    fn base_dimensions(&self) -> (u16, u16) {
+        match self.mode {
+            MascotMode::Standard => (32, 16), // 2 chars wide per pixel
+            MascotMode::HalfBlock => (16, 8), // 1 char wide, 2 pixels per char height
+        }
     }
 
     /// Calculate the scale factor based on available area.
-    ///
-    /// Returns `None` if the area is too small.
     fn calculate_scale(&self, area: Rect) -> Option<u16> {
-        // Each pixel is 2 chars wide, 1 line tall
-        // Grid is 16x16 pixels = 32 chars wide, 16 lines tall at scale 1
-        let max_scale_by_width = area.width / 32;
-        let max_scale_by_height = area.height / 16;
+        let (base_w, base_h) = self.base_dimensions();
+        let max_scale_by_width = area.width / base_w;
+        let max_scale_by_height = area.height / base_h;
 
         let scale = max_scale_by_width.min(max_scale_by_height);
-
         if scale >= 1 { Some(scale) } else { None }
     }
 }
 
 impl Widget for MascotWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let (base_w, base_h) = self.base_dimensions();
+
         // Check if terminal is too small
-        if area.width < MIN_COLS || area.height < MIN_ROWS {
-            let msg = "Terminal too small";
+        if area.width < base_w || area.height < base_h {
+            let msg = "Too small";
             let msg_len = msg.len() as u16;
             let x = area.x + (area.width.saturating_sub(msg_len) / 2);
             let y = area.y + (area.height / 2);
@@ -118,31 +195,90 @@ impl Widget for MascotWidget {
         let scale = self.calculate_scale(area).unwrap_or(1);
 
         // Calculate centered position
-        let scaled_width = 32 * scale; // 16 pixels * 2 chars each
-        let scaled_height = 16 * scale;
+        let scaled_width = base_w * scale;
+        let scaled_height = base_h * scale;
 
         let offset_x = (area.width.saturating_sub(scaled_width)) / 2;
         let offset_y = (area.height.saturating_sub(scaled_height)) / 2;
 
-        // Render each pixel
-        for (row_idx, row) in GRID.iter().enumerate() {
-            for (col_idx, pixel_char) in row.chars().enumerate() {
-                let color = color_for_char(pixel_char);
+        let grid = self.grid();
+        match self.mode {
+            MascotMode::Standard => {
+                // Standard mode: 2 chars wide × 1 char tall per pixel
+                for (row_idx, row) in grid.iter().enumerate() {
+                    for (col_idx, pixel_char) in row.chars().enumerate() {
+                        // Skip background/transparent pixels
+                        let Some(color) = color_for_char(pixel_char) else {
+                            continue;
+                        };
+                        let base_x = area.x + offset_x + (col_idx as u16 * 2 * scale);
+                        let base_y = area.y + offset_y + (row_idx as u16 * scale);
 
-                // Calculate the top-left position of this scaled pixel
-                let base_x = area.x + offset_x + (col_idx as u16 * 2 * scale);
-                let base_y = area.y + offset_y + (row_idx as u16 * scale);
+                        for dy in 0..scale {
+                            for dx in 0..(2 * scale) {
+                                let x = base_x + dx;
+                                let y = base_y + dy;
+                                if x < area.right() && y < area.bottom() {
+                                    let cell = &mut buf[(x, y)];
+                                    cell.set_char(' ');
+                                    cell.set_bg(color);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            MascotMode::HalfBlock => {
+                // Half-block mode: use ▀/▄ to pack 2 vertical pixels per char
+                for row_pair in 0..8 {
+                    let top_row = &grid[row_pair * 2];
+                    let bottom_row = &grid[row_pair * 2 + 1];
 
-                // Fill the scaled pixel area
-                for dy in 0..scale {
-                    for dx in 0..(2 * scale) {
-                        let x = base_x + dx;
-                        let y = base_y + dy;
+                    for col_idx in 0..16 {
+                        let top_char = top_row.chars().nth(col_idx).unwrap_or(BG_CHAR);
+                        let bottom_char = bottom_row.chars().nth(col_idx).unwrap_or(BG_CHAR);
 
-                        if x < area.right() && y < area.bottom() {
-                            let cell = &mut buf[(x, y)];
-                            cell.set_char(' ');
-                            cell.set_bg(color);
+                        let top_color = color_for_char(top_char);
+                        let bottom_color = color_for_char(bottom_char);
+
+                        // Skip if both pixels are transparent
+                        if top_color.is_none() && bottom_color.is_none() {
+                            continue;
+                        }
+
+                        let base_x = area.x + offset_x + (col_idx as u16 * scale);
+                        let base_y = area.y + offset_y + (row_pair as u16 * scale);
+
+                        for dy in 0..scale {
+                            for dx in 0..scale {
+                                let x = base_x + dx;
+                                let y = base_y + dy;
+                                if x < area.right() && y < area.bottom() {
+                                    let cell = &mut buf[(x, y)];
+
+                                    match (top_color, bottom_color) {
+                                        (Some(top), Some(bot)) => {
+                                            // Both pixels colored: ▀ with fg=top, bg=bottom
+                                            cell.set_char('▀');
+                                            cell.set_fg(top);
+                                            cell.set_bg(bot);
+                                        }
+                                        (Some(top), None) => {
+                                            // Only top pixel: ▀ with fg=top, default bg
+                                            cell.set_char('▀');
+                                            cell.set_fg(top);
+                                        }
+                                        (None, Some(bot)) => {
+                                            // Only bottom pixel: ▄ with fg=bottom, default bg
+                                            cell.set_char('▄');
+                                            cell.set_fg(bot);
+                                        }
+                                        (None, None) => {
+                                            // Already handled above
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -166,27 +302,28 @@ mod tests {
 
     #[test]
     fn test_color_lookup_background() {
+        // Background character returns None (transparent)
         let color = color_for_char('.');
-        assert_eq!(color, Color::Rgb(10, 22, 40));
+        assert_eq!(color, None);
     }
 
     #[test]
     fn test_color_lookup_body() {
         let color = color_for_char('4');
-        assert_eq!(color, Color::Rgb(234, 170, 114));
+        assert_eq!(color, Some(Color::Rgb(234, 170, 114)));
     }
 
     #[test]
     fn test_color_lookup_eyes() {
         let color = color_for_char('E');
-        assert_eq!(color, Color::Rgb(26, 26, 46));
+        assert_eq!(color, Some(Color::Rgb(26, 26, 46)));
     }
 
     #[test]
     fn test_color_lookup_unknown() {
-        // Unknown characters should return background color
+        // Unknown characters should return None (transparent)
         let color = color_for_char('X');
-        assert_eq!(color, Color::Rgb(10, 22, 40));
+        assert_eq!(color, None);
     }
 
     #[test]

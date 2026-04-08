@@ -43,6 +43,16 @@ pub struct App {
     pub project_id: Option<String>,
     /// Connection status.
     pub connected: bool,
+    /// Whether we're currently receiving a streaming response.
+    pub streaming: bool,
+    /// Counter for mouth animation (increments with each token chunk).
+    pub token_count: u32,
+    /// Scroll offset for chat view.
+    pub chat_scroll: u16,
+    /// Scroll offset for log view.
+    pub log_scroll: u16,
+    /// Scroll offset for diff view.
+    pub diff_scroll: u16,
 }
 
 impl App {
@@ -57,6 +67,11 @@ impl App {
             diff_content: String::new(),
             project_id: None,
             connected: false,
+            streaming: false,
+            token_count: 0,
+            chat_scroll: 0,
+            log_scroll: 0,
+            diff_scroll: 0,
         }
     }
 
@@ -88,6 +103,72 @@ impl App {
         // Keep last 2000 lines
         if self.log_lines.len() > 2000 {
             self.log_lines.drain(..100);
+        }
+    }
+
+    /// Append content to the last message (for streaming).
+    /// If there's no message or the last message is from a different sender,
+    /// creates a new message instead.
+    pub fn append_to_message(&mut self, sender: impl Into<String>, content: &str) {
+        let sender = sender.into();
+        // Increment token counter for mouth animation
+        self.token_count = self.token_count.wrapping_add(1);
+
+        if let Some(last) = self.messages.back_mut()
+            && last.sender == sender
+        {
+            last.content.push_str(content);
+            return;
+        }
+        // No existing message to append to, create new one
+        self.add_message(sender, content);
+    }
+
+    /// Returns whether the mascot's mouth should be open (for animation).
+    /// Alternates based on token count during streaming.
+    pub fn mouth_open(&self) -> bool {
+        self.streaming && (self.token_count % 4 < 2)
+    }
+
+    /// Scroll up in the current view.
+    pub fn scroll_up(&mut self, amount: u16) {
+        match self.view {
+            AppView::Chat => {
+                self.chat_scroll = self.chat_scroll.saturating_add(amount);
+            }
+            AppView::Diff => {
+                self.diff_scroll = self.diff_scroll.saturating_add(amount);
+            }
+            AppView::Log => {
+                self.log_scroll = self.log_scroll.saturating_add(amount);
+            }
+            AppView::Mascot => {}
+        }
+    }
+
+    /// Scroll down in the current view.
+    pub fn scroll_down(&mut self, amount: u16) {
+        match self.view {
+            AppView::Chat => {
+                self.chat_scroll = self.chat_scroll.saturating_sub(amount);
+            }
+            AppView::Diff => {
+                self.diff_scroll = self.diff_scroll.saturating_sub(amount);
+            }
+            AppView::Log => {
+                self.log_scroll = self.log_scroll.saturating_sub(amount);
+            }
+            AppView::Mascot => {}
+        }
+    }
+
+    /// Reset scroll to bottom (most recent).
+    pub fn scroll_to_bottom(&mut self) {
+        match self.view {
+            AppView::Chat => self.chat_scroll = 0,
+            AppView::Diff => self.diff_scroll = 0,
+            AppView::Log => self.log_scroll = 0,
+            AppView::Mascot => {}
         }
     }
 }

@@ -4,13 +4,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{http::StatusCode, response::Json};
-use cuttlefish_agents::{TokioMessageBus, WorkflowEngine};
+use cuttlefish_agents::{
+    CompactionConfig, ContextCompactor, ConversationPersistence, PersistenceConfig,
+    TokioMessageBus, WorkflowEngine,
+};
 use cuttlefish_core::TemplateRegistry;
+use cuttlefish_core::traits::provider::Message;
 use cuttlefish_db::Database;
 use cuttlefish_providers::ProviderRegistry;
 use dashmap::DashMap;
 use serde::Serialize;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 use crate::approval_registry::SharedApprovalRegistry;
 use crate::ws::ServerMessage;
@@ -25,6 +29,10 @@ pub struct ProjectSession {
     pub clients: Vec<mpsc::Sender<ServerMessage>>,
     /// When the session was created.
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Conversation message history.
+    pub messages: Vec<Message>,
+    /// Context compactor for managing history size.
+    pub compactor: ContextCompactor,
 }
 
 impl ProjectSession {
@@ -35,7 +43,38 @@ impl ProjectSession {
             workflow: None,
             clients: Vec::new(),
             created_at: chrono::Utc::now(),
+            messages: Vec::new(),
+            compactor: ContextCompactor::new(),
         }
+    }
+
+    /// Create a session with custom compaction config.
+    pub fn with_compaction_config(project_id: String, config: CompactionConfig) -> Self {
+        Self {
+            project_id,
+            workflow: None,
+            clients: Vec::new(),
+            created_at: chrono::Utc::now(),
+            messages: Vec::new(),
+            compactor: ContextCompactor::with_config(config),
+        }
+    }
+
+    /// Add a message to the conversation history.
+    pub fn add_message(&mut self, message: Message) {
+        self.messages.push(message);
+    }
+
+    /// Compact the conversation history if needed.
+    pub fn compact_if_needed(&mut self) {
+        if self.compactor.needs_compaction(&self.messages) {
+            self.compactor.compact(&mut self.messages);
+        }
+    }
+
+    /// Get current token count estimate.
+    pub fn token_count(&self) -> usize {
+        self.compactor.current_tokens(&self.messages)
     }
 }
 
@@ -60,6 +99,10 @@ pub struct AppState {
     pub default_provider: Option<String>,
     /// Approval registry for safety workflow integration.
     pub approval_registry: SharedApprovalRegistry,
+    /// Session persistence for crash recovery.
+    pub persistence: Option<Arc<Mutex<ConversationPersistence>>>,
+    /// Persistence configuration.
+    pub persistence_config: PersistenceConfig,
 }
 
 /// Health check response.

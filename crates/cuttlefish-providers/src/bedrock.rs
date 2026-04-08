@@ -282,10 +282,17 @@ impl ModelProvider for BedrockProvider {
         Box::pin(async_stream::try_stream! {
             let (system_blocks, bedrock_messages): (Vec<SystemContentBlock>, Vec<BedrockMessage>) = prepare_result?;
 
+            let system_chars: usize = system_blocks.iter().map(|b| {
+                match b {
+                    SystemContentBlock::Text(t) => t.len(),
+                    _ => 0,
+                }
+            }).sum();
             debug!(
-                "Streaming {} messages to Bedrock model {}",
+                "Streaming {} messages to Bedrock model {} (system prompt: {} chars)",
                 bedrock_messages.len(),
-                self.model_id
+                self.model_id,
+                system_chars
             );
 
             let mut req_builder = self
@@ -312,7 +319,12 @@ impl ModelProvider for BedrockProvider {
             }
 
             let response = req_builder.send().await.map_err(|e| {
-                ProviderError(format!("Bedrock streaming error for model '{}': {e}", self.model_id))
+                // Extract more details from the SDK error
+                let details = format!("{e:?}");
+                ProviderError(format!(
+                    "Bedrock streaming error for model '{}': {e}\nDetails: {details}",
+                    self.model_id
+                ))
             })?;
 
             let mut event_stream = response.stream;

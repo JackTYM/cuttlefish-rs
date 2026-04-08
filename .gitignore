@@ -8,9 +8,11 @@ Cargo.lock.bak
 *.sqlite3
 *.db-shm
 *.db-wal
+data/
 
 # User configuration (contains secrets/personal settings)
 cuttlefish.toml
+cuttlefish.dev.toml
 
 # Environment files
 .env

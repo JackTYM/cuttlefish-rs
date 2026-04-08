@@ -64,7 +64,7 @@ impl Agent for PlannerAgent {
 
         let system_prompt = self
             .prompt_registry
-            .load("planner")
+            .load_with_system("planner")
             .map(|p| p.body)
             .unwrap_or_else(|_| Self::DEFAULT_SYSTEM_PROMPT.to_string());
 

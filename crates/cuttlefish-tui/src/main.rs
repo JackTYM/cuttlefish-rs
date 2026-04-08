@@ -86,6 +86,17 @@ enum ServerMessage {
         /// Content.
         content: String,
     },
+    /// Streaming chunk from an agent.
+    StreamChunk {
+        /// Project ID.
+        project_id: String,
+        /// Agent name.
+        agent: String,
+        /// Content chunk.
+        content: String,
+        /// Whether this is the final chunk.
+        done: bool,
+    },
     /// Streaming build log line.
     BuildLog {
         /// Project ID.
@@ -278,6 +289,15 @@ async fn run_disconnected(
                         app.add_message("system", "Not connected to server");
                     }
                 }
+                KeyCode::Up | KeyCode::PageUp => {
+                    let amount = if key.code == KeyCode::PageUp { 10 } else { 1 };
+                    app.scroll_up(amount);
+                }
+                KeyCode::Down | KeyCode::PageDown => {
+                    let amount = if key.code == KeyCode::PageDown { 10 } else { 1 };
+                    app.scroll_down(amount);
+                }
+                KeyCode::Home => app.scroll_to_bottom(),
                 KeyCode::Esc => return Ok(()),
                 _ => {}
             }
@@ -355,6 +375,15 @@ where
                                     let _ = tx.send(msg).await;
                                 }
                             }
+                            KeyCode::Up | KeyCode::PageUp => {
+                                let amount = if key.code == KeyCode::PageUp { 10 } else { 1 };
+                                app.scroll_up(amount);
+                            }
+                            KeyCode::Down | KeyCode::PageDown => {
+                                let amount = if key.code == KeyCode::PageDown { 10 } else { 1 };
+                                app.scroll_down(amount);
+                            }
+                            KeyCode::Home => app.scroll_to_bottom(),
                             KeyCode::Esc => return Ok(()),
                             _ => {}
                         }
@@ -467,7 +496,26 @@ fn handle_server_message(app: &mut App, text: &str) {
 
     match msg {
         ServerMessage::Response { agent, content, .. } => {
+            app.streaming = false;
             app.add_message(&agent, &content);
+        }
+        ServerMessage::StreamChunk {
+            agent,
+            content,
+            done,
+            ..
+        } => {
+            if !app.streaming {
+                // First chunk - start new message
+                app.streaming = true;
+                app.add_message(&agent, &content);
+            } else {
+                // Subsequent chunks - append to existing message
+                app.append_to_message(&agent, &content);
+            }
+            if done {
+                app.streaming = false;
+            }
         }
         ServerMessage::BuildLog { line, .. } => {
             app.add_log_line(&line);

@@ -6,6 +6,8 @@
 pub mod bus;
 /// Coder agent that writes code, runs builds, and executes tests.
 pub mod coder;
+/// Context management: token counting and automatic compaction.
+pub mod context;
 /// Critic agent that reviews code changes and provides structured feedback.
 pub mod critic;
 /// DevOps agent that handles builds, deployments, and infrastructure.
@@ -22,10 +24,14 @@ pub mod orchestrator;
 pub mod planner;
 /// Runtime prompt loading from YAML frontmatter markdown files.
 pub mod prompt_registry;
+/// Prompt template engine with placeholder replacement and section overrides.
+pub mod prompt_template;
 /// Agent execution runner with tool calling and timeout enforcement.
 pub mod runner;
 /// Safety system: confidence scoring, action gates, and diff generation.
 pub mod safety;
+/// Session persistence: database storage and crash recovery journaling.
+pub mod session;
 /// Tool registry and built-in tool definitions.
 pub mod tools;
 /// Workflow engine: Orchestrator→Coder→Critic loop.
@@ -33,6 +39,9 @@ pub mod workflow;
 
 pub use bus::TokioMessageBus;
 pub use coder::CoderAgent;
+pub use context::{
+    CompactionConfig, CompactionResult, ContextCompactor, MessageCategory, TokenCounter,
+};
 pub use critic::{CriticAgent, ReviewResult, ReviewVerdict};
 pub use devops::DevOpsAgent;
 pub use explorer::ExplorerAgent;
@@ -47,6 +56,7 @@ pub use memory::{
 pub use orchestrator::OrchestratorAgent;
 pub use planner::PlannerAgent;
 pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
+pub use prompt_template::{PromptContext, PromptTemplate, load_system_template};
 pub use runner::{
     AgentRunner, DEFAULT_TIMEOUT_SECS, MAX_ITERATIONS, RunnerConfig, ToolExecutionResult,
     ToolExecutor,
@@ -56,6 +66,7 @@ pub use safety::{
     DiffHunk, DiffLine, DiffStats, FileDiff, GateConfig, GateDecision, MAX_DIFF_FILE_SIZE,
     QuickDecision, RiskFactor, ThresholdOverride, detect_language,
 };
+pub use session::{ConversationPersistence, JournalEntry, PersistenceConfig, RestoreResult, SessionJournal};
 pub use tools::{ToolDefinition, ToolRegistry};
 pub use workflow::{WorkflowConfig, WorkflowEngine, WorkflowResult};
 

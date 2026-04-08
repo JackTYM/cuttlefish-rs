@@ -2,7 +2,7 @@
 //!
 //! Entry point that wires together all crates and starts the HTTP/WebSocket server.
 
-use cuttlefish_agents::TokioMessageBus;
+use cuttlefish_agents::{ConversationPersistence, PersistenceConfig, TokioMessageBus};
 use cuttlefish_api::{
     ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui,
     create_approval_registry, routes::AppState,
@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{Mutex, broadcast};
 use tracing::{error, info, warn};
 
 #[tokio::main]
@@ -136,25 +136,35 @@ async fn main() -> anyhow::Result<()> {
             })
         }
         None => CuttlefishConfig::load().unwrap_or_else(|_| {
-            tracing::warn!(
-                "No cuttlefish.toml found, using defaults. Copy cuttlefish.example.toml to get started."
-            );
-            CuttlefishConfig {
-                server: cuttlefish_core::config::ServerConfig {
-                    host: "127.0.0.1".to_string(),
-                    port: 8080,
-                    api_key: std::env::var("CUTTLEFISH_API_KEY").ok(),
-                },
-                database: cuttlefish_core::config::DatabaseConfig {
-                    path: PathBuf::from("cuttlefish.db"),
-                },
-                providers: HashMap::new(),
-                agents: HashMap::new(),
-                discord: None,
-                sandbox: cuttlefish_core::config::SandboxConfig::default(),
-                routing: cuttlefish_core::RoutingConfig::default(),
-                webui: None,
-                auto_update: cuttlefish_core::config::AutoUpdateConfigToml::default(),
+            // Try loading from environment variables
+            match CuttlefishConfig::from_env() {
+                Ok(config) => {
+                    info!("No config file found, loaded configuration from environment variables");
+                    config
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "No cuttlefish.toml found and no env config. Using minimal defaults."
+                    );
+                    tracing::warn!("Set CUTTLEFISH_PROVIDER_* env vars or create a config file.");
+                    CuttlefishConfig {
+                        server: cuttlefish_core::config::ServerConfig {
+                            host: "127.0.0.1".to_string(),
+                            port: 8080,
+                            api_key: std::env::var("CUTTLEFISH_API_KEY").ok(),
+                        },
+                        database: cuttlefish_core::config::DatabaseConfig {
+                            path: PathBuf::from("cuttlefish.db"),
+                        },
+                        providers: HashMap::new(),
+                        agents: HashMap::new(),
+                        discord: None,
+                        sandbox: cuttlefish_core::config::SandboxConfig::default(),
+                        routing: cuttlefish_core::RoutingConfig::default(),
+                        webui: None,
+                        auto_update: cuttlefish_core::config::AutoUpdateConfigToml::default(),
+                    }
+                }
             }
         }),
     };
@@ -245,6 +255,25 @@ async fn main() -> anyhow::Result<()> {
     let active_sessions = Arc::new(DashMap::new());
     let approval_registry = create_approval_registry();
 
+    // Initialize session persistence
+    let persistence_config = PersistenceConfig {
+        journal_dir: config.database.path.parent()
+            .map(|p| p.join("journals"))
+            .unwrap_or_else(|| PathBuf::from("data/journals")),
+        ..PersistenceConfig::default()
+    };
+
+    let persistence = match ConversationPersistence::new(db.clone(), persistence_config.clone()) {
+        Ok(p) => {
+            info!("Session persistence initialized");
+            Some(Arc::new(Mutex::new(p)))
+        }
+        Err(e) => {
+            warn!("Failed to initialize session persistence: {}. Messages will not be persisted.", e);
+            None
+        }
+    };
+
     let state = AppState {
         api_key: api_key.clone(),
         template_registry,
@@ -255,6 +284,8 @@ async fn main() -> anyhow::Result<()> {
         prompts_dir,
         default_provider,
         approval_registry,
+        persistence,
+        persistence_config,
     };
 
     let jwt_secret = std::env::var("CUTTLEFISH_JWT_SECRET")

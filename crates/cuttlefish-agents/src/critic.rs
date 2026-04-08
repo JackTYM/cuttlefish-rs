@@ -131,7 +131,7 @@ impl Agent for CriticAgent {
 
         let prompt = self
             .prompt_registry
-            .load("critic")
+            .load_with_system("critic")
             .map_err(|e| AgentError(format!("Failed to load critic prompt: {e}")))?;
 
         let request = CompletionRequest {

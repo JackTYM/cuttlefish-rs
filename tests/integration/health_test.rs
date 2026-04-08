@@ -4,7 +4,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use cuttlefish_agents::TokioMessageBus;
+use cuttlefish_agents::{PersistenceConfig, TokioMessageBus};
 use cuttlefish_api::{build_app, routes::AppState};
 use cuttlefish_core::TemplateRegistry;
 use cuttlefish_db::Database;
@@ -30,6 +30,8 @@ async fn create_test_state() -> (AppState, TempDir) {
         prompts_dir: temp_dir.path().to_path_buf(),
         default_provider: None,
         approval_registry: cuttlefish_api::create_approval_registry(),
+        persistence: None, // Persistence not needed for health tests
+        persistence_config: PersistenceConfig::default(),
     };
 
     (state, temp_dir)

@@ -110,7 +110,7 @@ impl OrchestratorAgent {
     fn build_planning_prompt(&self, input: &str) -> Result<CompletionRequest, AgentError> {
         let prompt = self
             .prompt_registry
-            .load("orchestrator")
+            .load_with_system("orchestrator")
             .map_err(|e| AgentError(format!("Failed to load orchestrator prompt: {e}")))?;
 
         Ok(CompletionRequest {

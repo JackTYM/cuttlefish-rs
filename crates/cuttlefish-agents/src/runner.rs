@@ -8,7 +8,11 @@ use cuttlefish_core::{
         sandbox::{Sandbox, SandboxId},
     },
 };
+use globset::{Glob, GlobSetBuilder};
+use ignore::WalkBuilder;
+use regex::Regex;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -238,6 +242,12 @@ impl ToolExecutor {
                     success: true,
                 }
             }
+            crate::tools::built_in::GLOB => self.execute_glob(call).await,
+            crate::tools::built_in::GREP => self.execute_grep(call).await,
+            crate::tools::built_in::EDIT_FILE_REPLACE => self.execute_edit_replace(call).await,
+            crate::tools::built_in::GIT_STATUS => self.execute_git_status(call).await,
+            crate::tools::built_in::GIT_DIFF => self.execute_git_diff(call).await,
+            crate::tools::built_in::GIT_LOG => self.execute_git_log(call).await,
             crate::tools::built_in::EDIT_FILE => {
                 let path = call.input["path"].as_str().unwrap_or("");
                 let edits_json = call.input["edits"].as_array();
@@ -320,6 +330,518 @@ impl ToolExecutor {
             }
         }
     }
+
+    /// Execute glob pattern matching.
+    async fn execute_glob(&self, call: &ToolCall) -> ToolExecutionResult {
+        let pattern = call.input["pattern"].as_str().unwrap_or("*");
+        let root_path = call.input["path"].as_str().unwrap_or(".");
+
+        // Build the glob matcher
+        let glob = match Glob::new(pattern) {
+            Ok(g) => g.compile_matcher(),
+            Err(e) => {
+                return ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Invalid glob pattern: {e}"),
+                    success: false,
+                };
+            }
+        };
+
+        let mut matches: Vec<(String, std::time::SystemTime)> = Vec::new();
+
+        // Use ignore crate to respect .gitignore
+        let walker = WalkBuilder::new(root_path)
+            .hidden(false) // Show hidden files
+            .git_ignore(true) // Respect .gitignore
+            .git_global(true)
+            .git_exclude(true)
+            .build();
+
+        for entry in walker.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() {
+                // Get relative path for matching
+                let rel_path = path
+                    .strip_prefix(root_path)
+                    .unwrap_or(path)
+                    .to_string_lossy();
+
+                if glob.is_match(&*rel_path) || glob.is_match(path) {
+                    let mtime = path
+                        .metadata()
+                        .and_then(|m| m.modified())
+                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                    matches.push((path.to_string_lossy().to_string(), mtime));
+                }
+            }
+        }
+
+        // Sort by modification time (most recent first)
+        matches.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Limit results
+        let max_results = 500;
+        let truncated = matches.len() > max_results;
+        matches.truncate(max_results);
+
+        let file_list: Vec<&str> = matches.iter().map(|(p, _)| p.as_str()).collect();
+        let mut result = file_list.join("\n");
+
+        if truncated {
+            result.push_str(&format!(
+                "\n... (truncated, showing {} of {} files)",
+                max_results,
+                matches.len()
+            ));
+        }
+
+        ToolExecutionResult {
+            id: call.id.clone(),
+            content: if matches.is_empty() {
+                format!("No files matching pattern '{}' in '{}'", pattern, root_path)
+            } else {
+                format!("Found {} files:\n{}", matches.len(), result)
+            },
+            success: true,
+        }
+    }
+
+    /// Execute grep/content search.
+    async fn execute_grep(&self, call: &ToolCall) -> ToolExecutionResult {
+        let pattern = call.input["pattern"].as_str().unwrap_or("");
+        let root_path = call.input["path"].as_str().unwrap_or(".");
+        let context_lines = call.input["context"].as_u64().unwrap_or(0) as usize;
+        let file_glob = call.input["glob"].as_str();
+        let max_results = call.input["max_results"].as_u64().unwrap_or(100) as usize;
+
+        // Compile regex
+        let regex = match Regex::new(pattern) {
+            Ok(r) => r,
+            Err(e) => {
+                return ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Invalid regex pattern: {e}"),
+                    success: false,
+                };
+            }
+        };
+
+        // Build glob matcher for file filter
+        let file_matcher = file_glob.and_then(|g| {
+            let mut builder = GlobSetBuilder::new();
+            if let Ok(glob) = Glob::new(g) {
+                builder.add(glob);
+            }
+            builder.build().ok()
+        });
+
+        let mut results: Vec<String> = Vec::new();
+        let mut match_count = 0;
+
+        // Walk files
+        let walker = WalkBuilder::new(root_path)
+            .hidden(false)
+            .git_ignore(true)
+            .build();
+
+        'outer: for entry in walker.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            // Check file glob filter
+            if let Some(ref matcher) = file_matcher {
+                let rel_path = path.strip_prefix(root_path).unwrap_or(path);
+                if !matcher.is_match(rel_path) && !matcher.is_match(path) {
+                    continue;
+                }
+            }
+
+            // Skip binary files
+            if let Ok(content) = std::fs::read_to_string(path) {
+                let lines: Vec<&str> = content.lines().collect();
+
+                for (line_num, line) in lines.iter().enumerate() {
+                    if regex.is_match(line) {
+                        match_count += 1;
+                        if results.len() >= max_results {
+                            break 'outer;
+                        }
+
+                        let mut result_block =
+                            format!("{}:{}:{}", path.display(), line_num + 1, line);
+
+                        // Add context if requested
+                        if context_lines > 0 {
+                            let start = line_num.saturating_sub(context_lines);
+                            let end = (line_num + context_lines + 1).min(lines.len());
+
+                            let context: Vec<String> = lines[start..end]
+                                .iter()
+                                .enumerate()
+                                .map(|(i, l)| {
+                                    let actual_line = start + i + 1;
+                                    let marker = if actual_line == line_num + 1 {
+                                        ">"
+                                    } else {
+                                        " "
+                                    };
+                                    format!("{} {}:{}", marker, actual_line, l)
+                                })
+                                .collect();
+
+                            result_block = format!("{}:\n{}", path.display(), context.join("\n"));
+                        }
+
+                        results.push(result_block);
+                    }
+                }
+            }
+        }
+
+        let truncated = match_count > max_results;
+        let mut output = results.join("\n---\n");
+
+        if truncated {
+            output.push_str(&format!(
+                "\n... (showing {} of {} matches)",
+                max_results, match_count
+            ));
+        }
+
+        ToolExecutionResult {
+            id: call.id.clone(),
+            content: if results.is_empty() {
+                format!("No matches for pattern '{}' in '{}'", pattern, root_path)
+            } else {
+                format!("Found {} matches:\n{}", results.len(), output)
+            },
+            success: true,
+        }
+    }
+
+    /// Execute surgical edit (old_string -> new_string replacement).
+    async fn execute_edit_replace(&self, call: &ToolCall) -> ToolExecutionResult {
+        let path = call.input["path"].as_str().unwrap_or("");
+        let old_string = call.input["old_string"].as_str().unwrap_or("");
+        let new_string = call.input["new_string"].as_str().unwrap_or("");
+        let replace_all = call.input["replace_all"].as_bool().unwrap_or(false);
+
+        if old_string.is_empty() {
+            return ToolExecutionResult {
+                id: call.id.clone(),
+                content: "Error: old_string cannot be empty".to_string(),
+                success: false,
+            };
+        }
+
+        if old_string == new_string {
+            return ToolExecutionResult {
+                id: call.id.clone(),
+                content: "Error: old_string and new_string are identical".to_string(),
+                success: false,
+            };
+        }
+
+        // Read file content
+        let content = if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+            match sb.read_file(id, Path::new(path)).await {
+                Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+                Err(e) => {
+                    return ToolExecutionResult {
+                        id: call.id.clone(),
+                        content: format!("Error reading file: {e}"),
+                        success: false,
+                    };
+                }
+            }
+        } else {
+            // Local file read for non-sandbox mode
+            match std::fs::read_to_string(path) {
+                Ok(c) => c,
+                Err(e) => {
+                    return ToolExecutionResult {
+                        id: call.id.clone(),
+                        content: format!("Error reading file: {e}"),
+                        success: false,
+                    };
+                }
+            }
+        };
+
+        // Check if old_string exists
+        if !content.contains(old_string) {
+            return ToolExecutionResult {
+                id: call.id.clone(),
+                content: format!(
+                    "Error: old_string not found in file. Make sure it matches exactly including whitespace.\nSearched for: {:?}",
+                    old_string
+                ),
+                success: false,
+            };
+        }
+
+        // Count occurrences
+        let occurrence_count = content.matches(old_string).count();
+
+        // Check for ambiguity when not replacing all
+        if !replace_all && occurrence_count > 1 {
+            return ToolExecutionResult {
+                id: call.id.clone(),
+                content: format!(
+                    "Error: old_string appears {} times in the file. Either:\n\
+                     1. Provide more context to make it unique, or\n\
+                     2. Set replace_all: true to replace all occurrences",
+                    occurrence_count
+                ),
+                success: false,
+            };
+        }
+
+        // Perform replacement
+        let new_content = if replace_all {
+            content.replace(old_string, new_string)
+        } else {
+            content.replacen(old_string, new_string, 1)
+        };
+
+        // Write back
+        if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+            match sb
+                .write_file(id, Path::new(path), new_content.as_bytes())
+                .await
+            {
+                Ok(()) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!(
+                        "Successfully replaced {} occurrence(s) in {}",
+                        if replace_all { occurrence_count } else { 1 },
+                        path
+                    ),
+                    success: true,
+                },
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error writing file: {e}"),
+                    success: false,
+                },
+            }
+        } else {
+            // Local file write for non-sandbox mode
+            match std::fs::write(path, &new_content) {
+                Ok(()) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!(
+                        "Successfully replaced {} occurrence(s) in {}",
+                        if replace_all { occurrence_count } else { 1 },
+                        path
+                    ),
+                    success: true,
+                },
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error writing file: {e}"),
+                    success: false,
+                },
+            }
+        }
+    }
+
+    /// Execute git status.
+    async fn execute_git_status(&self, call: &ToolCall) -> ToolExecutionResult {
+        let path = call.input["path"].as_str().unwrap_or(".");
+
+        // Use sandbox if available, otherwise run locally
+        let cmd = "git status --porcelain=v1";
+
+        if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+            match sb.exec(id, &format!("cd {} && {}", path, cmd)).await {
+                Ok(out) => {
+                    let status = if out.stdout.trim().is_empty() {
+                        "Working tree clean".to_string()
+                    } else {
+                        format!("Changes:\n{}", out.stdout)
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content: status,
+                        success: out.success(),
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error: {e}"),
+                    success: false,
+                },
+            }
+        } else {
+            // Local execution
+            match std::process::Command::new("git")
+                .args(["status", "--porcelain=v1"])
+                .current_dir(path)
+                .output()
+            {
+                Ok(out) => {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    let status = if stdout.trim().is_empty() {
+                        "Working tree clean".to_string()
+                    } else {
+                        format!("Changes:\n{}", stdout)
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content: status,
+                        success: out.status.success(),
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error running git: {e}"),
+                    success: false,
+                },
+            }
+        }
+    }
+
+    /// Execute git diff.
+    async fn execute_git_diff(&self, call: &ToolCall) -> ToolExecutionResult {
+        let path = call.input["path"].as_str().unwrap_or(".");
+        let staged = call.input["staged"].as_bool().unwrap_or(false);
+        let commit = call.input["commit"].as_str();
+
+        let mut args = vec!["diff"];
+        if staged {
+            args.push("--cached");
+        }
+        if let Some(c) = commit {
+            args.push(c);
+        }
+
+        if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+            let cmd = format!("cd {} && git {}", path, args.join(" "));
+            match sb.exec(id, &cmd).await {
+                Ok(out) => {
+                    let success = out.success();
+                    let content = if out.stdout.trim().is_empty() {
+                        "No changes".to_string()
+                    } else {
+                        out.stdout
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content,
+                        success,
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error: {e}"),
+                    success: false,
+                },
+            }
+        } else {
+            match std::process::Command::new("git")
+                .args(&args)
+                .current_dir(path)
+                .output()
+            {
+                Ok(out) => {
+                    let success = out.status.success();
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    let content = if stdout.trim().is_empty() {
+                        "No changes".to_string()
+                    } else {
+                        stdout.to_string()
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content,
+                        success,
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error running git: {e}"),
+                    success: false,
+                },
+            }
+        }
+    }
+
+    /// Execute git log.
+    async fn execute_git_log(&self, call: &ToolCall) -> ToolExecutionResult {
+        let path = call.input["path"].as_str().unwrap_or(".");
+        let max_count = call.input["max_count"].as_u64().unwrap_or(10);
+        let since = call.input["since"].as_str();
+        let author = call.input["author"].as_str();
+
+        let mut args = vec![
+            "log".to_string(),
+            format!("-{}", max_count),
+            "--oneline".to_string(),
+            "--decorate".to_string(),
+        ];
+
+        if let Some(s) = since {
+            args.push(format!("--since={}", s));
+        }
+        if let Some(a) = author {
+            args.push(format!("--author={}", a));
+        }
+
+        if let (Some(sb), Some(id)) = (&self.sandbox, &self.sandbox_id) {
+            let cmd = format!("cd {} && git {}", path, args.join(" "));
+            match sb.exec(id, &cmd).await {
+                Ok(out) => {
+                    let success = out.success();
+                    let content = if out.stdout.trim().is_empty() {
+                        "No commits found".to_string()
+                    } else {
+                        out.stdout
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content,
+                        success,
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error: {e}"),
+                    success: false,
+                },
+            }
+        } else {
+            let args_strs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            match std::process::Command::new("git")
+                .args(&args_strs)
+                .current_dir(path)
+                .output()
+            {
+                Ok(out) => {
+                    let success = out.status.success();
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    let content = if stdout.trim().is_empty() {
+                        "No commits found".to_string()
+                    } else {
+                        stdout.to_string()
+                    };
+                    ToolExecutionResult {
+                        id: call.id.clone(),
+                        content,
+                        success,
+                    }
+                }
+                Err(e) => ToolExecutionResult {
+                    id: call.id.clone(),
+                    content: format!("Error running git: {e}"),
+                    success: false,
+                },
+            }
+        }
+    }
 }
 
 /// Safety-gated tool executor that checks confidence gates before execution.
@@ -370,9 +892,9 @@ impl SafetyGatedExecutor {
     /// Get the action type for a tool call.
     fn get_action_type(&self, call: &ToolCall) -> ActionType {
         match call.name.as_str() {
-            crate::tools::built_in::WRITE_FILE | crate::tools::built_in::EDIT_FILE => {
-                ActionType::FileWrite
-            }
+            crate::tools::built_in::WRITE_FILE
+            | crate::tools::built_in::EDIT_FILE
+            | crate::tools::built_in::EDIT_FILE_REPLACE => ActionType::FileWrite,
             crate::tools::built_in::EXECUTE_COMMAND => {
                 let cmd = call.input["command"].as_str().unwrap_or("");
                 if cmd.starts_with("git ") {
@@ -396,7 +918,11 @@ impl SafetyGatedExecutor {
             }
             crate::tools::built_in::EDIT_FILE => {
                 let path = call.input["path"].as_str().unwrap_or("unknown");
-                format!("Edit file: {}", path)
+                format!("Edit file (hashline): {}", path)
+            }
+            crate::tools::built_in::EDIT_FILE_REPLACE => {
+                let path = call.input["path"].as_str().unwrap_or("unknown");
+                format!("Edit file (replace): {}", path)
             }
             crate::tools::built_in::EXECUTE_COMMAND => {
                 let cmd = call.input["command"].as_str().unwrap_or("unknown");
@@ -428,11 +954,17 @@ impl SafetyGatedExecutor {
 
         let action_type = self.get_action_type(call);
 
+        // Read-only tools bypass safety gates
         if matches!(
             call.name.as_str(),
             crate::tools::built_in::READ_FILE
                 | crate::tools::built_in::LIST_DIRECTORY
                 | crate::tools::built_in::SEARCH_FILES
+                | crate::tools::built_in::GLOB
+                | crate::tools::built_in::GREP
+                | crate::tools::built_in::GIT_STATUS
+                | crate::tools::built_in::GIT_DIFF
+                | crate::tools::built_in::GIT_LOG
         ) {
             return Ok(self.inner.execute(call).await);
         }

@@ -304,6 +304,157 @@ impl CuttlefishConfig {
             provider.model = Some(model.to_string());
         }
     }
+
+    /// Create configuration entirely from environment variables.
+    ///
+    /// This allows running without a config file for development/testing.
+    ///
+    /// # Environment Variables
+    ///
+    /// ## Server
+    /// - `CUTTLEFISH_HOST` - Server host (default: 127.0.0.1)
+    /// - `CUTTLEFISH_PORT` - Server port (default: 8080)
+    /// - `CUTTLEFISH_API_KEY` - API key for authentication
+    ///
+    /// ## Database
+    /// - `CUTTLEFISH_DATABASE_PATH` - Database file path (default: ./cuttlefish.db)
+    ///
+    /// ## Providers (can define multiple with numeric suffix)
+    /// - `CUTTLEFISH_PROVIDER_<NAME>_TYPE` - Provider type (anthropic, openai, bedrock, google, ollama)
+    /// - `CUTTLEFISH_PROVIDER_<NAME>_MODEL` - Model name
+    /// - `CUTTLEFISH_PROVIDER_<NAME>_REGION` - Region (for bedrock)
+    /// - `CUTTLEFISH_PROVIDER_<NAME>_BASE_URL` - Base URL (for ollama)
+    ///
+    /// ## Routing
+    /// - `CUTTLEFISH_ROUTE_DEEP` - Provider for deep tasks
+    /// - `CUTTLEFISH_ROUTE_QUICK` - Provider for quick tasks
+    /// - `CUTTLEFISH_ROUTE_ULTRABRAIN` - Provider for ultrabrain tasks
+    /// - `CUTTLEFISH_ROUTE_VISUAL` - Provider for visual tasks
+    /// - `CUTTLEFISH_ROUTE_UNSPECIFIED_HIGH` - Provider for unspecified-high tasks
+    /// - `CUTTLEFISH_ROUTE_UNSPECIFIED_LOW` - Provider for unspecified-low tasks
+    ///
+    /// ## WebUI
+    /// - `CUTTLEFISH_WEBUI_ENABLED` - Enable WebUI (default: true)
+    /// - `CUTTLEFISH_WEBUI_DIR` - WebUI static files directory
+    pub fn from_env() -> Result<Self, ConfigError> {
+        use std::env;
+
+        // Server config
+        let server = ServerConfig {
+            host: env::var("CUTTLEFISH_HOST").unwrap_or_else(|_| default_host()),
+            port: env::var("CUTTLEFISH_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or_else(default_port),
+            api_key: env::var("CUTTLEFISH_API_KEY").ok(),
+        };
+
+        // Database config
+        let database = DatabaseConfig {
+            path: env::var("CUTTLEFISH_DATABASE_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| default_db_path()),
+        };
+
+        // Parse providers from env vars
+        // Format: CUTTLEFISH_PROVIDER_<NAME>_TYPE, CUTTLEFISH_PROVIDER_<NAME>_MODEL, etc.
+        let mut providers = HashMap::new();
+        let env_vars: Vec<(String, String)> = env::vars().collect();
+
+        // Find all unique provider names
+        let mut provider_names: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        for (key, _) in &env_vars {
+            if let Some(rest) = key.strip_prefix("CUTTLEFISH_PROVIDER_")
+                && let Some(name_end) = rest.find('_')
+            {
+                let name = rest[..name_end].to_lowercase();
+                provider_names.insert(name);
+            }
+        }
+
+        for name in provider_names {
+            let prefix = format!("CUTTLEFISH_PROVIDER_{}_", name.to_uppercase());
+            let provider_type = env::var(format!("{prefix}TYPE")).ok();
+
+            if let Some(ptype) = provider_type {
+                let config = ProviderConfig {
+                    provider_type: ptype,
+                    model: env::var(format!("{prefix}MODEL")).ok(),
+                    region: env::var(format!("{prefix}REGION")).ok(),
+                    base_url: env::var(format!("{prefix}BASE_URL")).ok(),
+                };
+                providers.insert(name, config);
+            }
+        }
+
+        // Routing config - parse CUTTLEFISH_ROUTE_<CATEGORY>=<provider>:<model>
+        let mut categories = HashMap::new();
+        let route_categories = [
+            ("deep", "CUTTLEFISH_ROUTE_DEEP"),
+            ("quick", "CUTTLEFISH_ROUTE_QUICK"),
+            ("ultrabrain", "CUTTLEFISH_ROUTE_ULTRABRAIN"),
+            ("visual", "CUTTLEFISH_ROUTE_VISUAL"),
+            ("unspecified-high", "CUTTLEFISH_ROUTE_UNSPECIFIED_HIGH"),
+            ("unspecified-low", "CUTTLEFISH_ROUTE_UNSPECIFIED_LOW"),
+        ];
+
+        for (category, env_key) in route_categories {
+            if let Ok(value) = env::var(env_key) {
+                // Format: "provider:model" or just "provider" (uses provider's default model)
+                let parts: Vec<&str> = value.splitn(2, ':').collect();
+                let provider = parts[0].to_string();
+                let model = parts.get(1).map(|s| s.to_string()).unwrap_or_default();
+                categories.insert(
+                    category.to_string(),
+                    crate::routing::RouteConfig::new(provider, model),
+                );
+            }
+        }
+
+        let routing = RoutingConfig {
+            categories,
+            agents: HashMap::new(),
+        };
+
+        // WebUI config
+        let webui = if env::var("CUTTLEFISH_WEBUI_ENABLED")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(true)
+        {
+            Some(WebUiConfigToml {
+                enabled: true,
+                static_dir: env::var("CUTTLEFISH_WEBUI_DIR")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|_| default_webui_static_dir()),
+            })
+        } else {
+            Some(WebUiConfigToml {
+                enabled: false,
+                static_dir: default_webui_static_dir(),
+            })
+        };
+
+        Ok(Self {
+            server,
+            database,
+            providers,
+            agents: HashMap::new(),
+            discord: None,
+            sandbox: SandboxConfig::default(),
+            routing,
+            webui,
+            auto_update: AutoUpdateConfigToml::default(),
+        })
+    }
+
+    /// Load configuration, trying file first then falling back to env vars.
+    pub fn load_or_env() -> Result<Self, ConfigError> {
+        match Self::load() {
+            Ok(config) => Ok(config),
+            Err(_) => Self::from_env(),
+        }
+    }
 }
 
 #[cfg(test)]

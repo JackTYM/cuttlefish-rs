@@ -21,9 +21,12 @@ async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
+globset = "0.4"
+walkdir = "2"
+ignore = "0.4"
+cuttlefish-db = { path = "../cuttlefish-db" }
 
 [dev-dependencies]
 tempfile = "3"
 cuttlefish-api = { path = "../cuttlefish-api" }
-cuttlefish-db = { path = "../cuttlefish-db" }
 dashmap = "6"

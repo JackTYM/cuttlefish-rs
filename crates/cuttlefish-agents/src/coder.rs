@@ -68,7 +68,7 @@ impl Agent for CoderAgent {
 
         let prompt = self
             .prompt_registry
-            .load("coder")
+            .load_with_system("coder")
             .map_err(|e| AgentError(format!("Failed to load coder prompt: {e}")))?;
 
         let request = CompletionRequest {

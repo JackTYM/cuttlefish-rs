@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::app::{App, AppView};
@@ -85,48 +85,124 @@ fn render_main(app: &App, frame: &mut Frame, area: Rect) {
         AppView::Chat => render_chat(app, frame, area),
         AppView::Diff => render_diff(app, frame, area),
         AppView::Log => render_log(app, frame, area),
-        AppView::Mascot => render_mascot(frame, area),
+        AppView::Mascot => render_mascot(app, frame, area),
     }
 }
 
 /// Render the cuttlefish mascot.
-fn render_mascot(frame: &mut Frame, area: Rect) {
-    let widget = MascotWidget::new();
+fn render_mascot(app: &App, frame: &mut Frame, area: Rect) {
+    let widget = MascotWidget::new().with_mouth_open(app.mouth_open());
     frame.render_widget(widget, area);
 }
 
-/// Render the chat message list.
+/// Render the chat message list with mascot in top-right corner.
 fn render_chat(app: &App, frame: &mut Frame, area: Rect) {
-    let items: Vec<ListItem> = app
+    // Mascot dimensions (half-block mode: 16 chars wide × 8 chars tall)
+    let mascot_width: u16 = 17; // 16 + 1 for padding
+    let mascot_height: u16 = 9; // 8 + 1 for padding
+
+    // First render the chat block (full area)
+    let chat_block = Block::default().borders(Borders::ALL).title(format!(
+        "Chat (↑/↓ scroll, Home=bottom){}",
+        if app.chat_scroll > 0 {
+            format!(" [+{}]", app.chat_scroll)
+        } else {
+            String::new()
+        }
+    ));
+    let inner_area = chat_block.inner(area);
+    frame.render_widget(chat_block, area);
+
+    // Calculate mascot position (top-right corner, inside the border)
+    let mascot_area = if inner_area.width > mascot_width + 5 && inner_area.height > mascot_height {
+        Some(Rect::new(
+            inner_area.right().saturating_sub(mascot_width),
+            inner_area.y,
+            mascot_width,
+            mascot_height.min(inner_area.height),
+        ))
+    } else {
+        None // Too small to show mascot
+    };
+
+    // Calculate chat content area (exclude mascot space from top-right)
+    let available_height = inner_area.height as usize;
+
+    // Reduce text width when mascot is shown to avoid overlap
+    let text_area = if mascot_area.is_some() {
+        Rect::new(
+            inner_area.x,
+            inner_area.y,
+            inner_area.width.saturating_sub(mascot_width + 1),
+            inner_area.height,
+        )
+    } else {
+        inner_area
+    };
+
+    // Convert messages to lines
+    let lines: Vec<Line> = app
         .messages
         .iter()
-        .map(|msg| {
+        .flat_map(|msg| {
             let color = match msg.sender.as_str() {
                 "user" => Color::Green,
                 "orchestrator" => Color::Cyan,
                 "coder" => Color::Yellow,
                 "critic" => Color::Magenta,
+                "assistant" => Color::Cyan,
+                "system" => Color::Blue,
+                "error" => Color::Red,
                 _ => Color::White,
             };
-            let line = Line::from(vec![
-                Span::styled(
-                    format!("[{}] ", msg.sender),
-                    Style::default().fg(color).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw(&msg.content),
-            ]);
-            ListItem::new(line)
+            let prefix = format!("[{}] ", msg.sender);
+            msg.content
+                .lines()
+                .enumerate()
+                .map(move |(i, line)| {
+                    if i == 0 {
+                        Line::from(vec![
+                            Span::styled(
+                                prefix.clone(),
+                                Style::default().fg(color).add_modifier(Modifier::BOLD),
+                            ),
+                            Span::raw(line.to_string()),
+                        ])
+                    } else {
+                        let indent = " ".repeat(prefix.len());
+                        Line::from(vec![Span::raw(indent), Span::raw(line.to_string())])
+                    }
+                })
+                .collect::<Vec<_>>()
         })
         .collect();
 
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Chat"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-    frame.render_widget(list, area);
+    // Calculate scroll position
+    let total_lines = lines.len();
+    let scroll_offset = if total_lines > available_height {
+        let max_scroll = total_lines.saturating_sub(available_height);
+        max_scroll.saturating_sub(app.chat_scroll as usize)
+    } else {
+        0
+    };
+
+    // Render chat content (in reduced area to avoid mascot)
+    let chat_content = Paragraph::new(lines)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll_offset as u16, 0));
+    frame.render_widget(chat_content, text_area);
+
+    // Render mascot on top (in top-right corner) with mouth animation
+    if let Some(mascot_rect) = mascot_area {
+        let mascot = MascotWidget::compact().with_mouth_open(app.mouth_open());
+        frame.render_widget(mascot, mascot_rect);
+    }
 }
 
 /// Render the diff view.
 fn render_diff(app: &App, frame: &mut Frame, area: Rect) {
+    let available_height = area.height.saturating_sub(2) as usize;
+
     let lines: Vec<Line> = app
         .diff_content
         .lines()
@@ -144,23 +220,34 @@ fn render_diff(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
+    let total_lines = lines.len();
+    let scroll_offset = if total_lines > available_height {
+        let max_scroll = total_lines.saturating_sub(available_height);
+        max_scroll.saturating_sub(app.diff_scroll as usize)
+    } else {
+        0
+    };
+
     let diff_widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title("Diff"))
-        .wrap(Wrap { trim: false });
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            "Diff (↑/↓ scroll){}",
+            if app.diff_scroll > 0 {
+                format!(" [+{}]", app.diff_scroll)
+            } else {
+                String::new()
+            }
+        )))
+        .wrap(Wrap { trim: false })
+        .scroll((scroll_offset as u16, 0));
     frame.render_widget(diff_widget, area);
 }
 
 /// Render the build log view.
 fn render_log(app: &App, frame: &mut Frame, area: Rect) {
-    // Show last N lines that fit in the area
-    let available_lines = area.height as usize - 2;
-    let start = if app.log_lines.len() > available_lines {
-        app.log_lines.len() - available_lines
-    } else {
-        0
-    };
+    let available_height = area.height.saturating_sub(2) as usize;
 
-    let lines: Vec<Line> = app.log_lines[start..]
+    let lines: Vec<Line> = app
+        .log_lines
         .iter()
         .map(|line| {
             let color = if line.contains("error") || line.contains("FAILED") {
@@ -176,8 +263,24 @@ fn render_log(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    let log_widget =
-        Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Build Log"));
+    let total_lines = lines.len();
+    let scroll_offset = if total_lines > available_height {
+        let max_scroll = total_lines.saturating_sub(available_height);
+        max_scroll.saturating_sub(app.log_scroll as usize)
+    } else {
+        0
+    };
+
+    let log_widget = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            "Build Log (↑/↓ scroll){}",
+            if app.log_scroll > 0 {
+                format!(" [+{}]", app.log_scroll)
+            } else {
+                String::new()
+            }
+        )))
+        .scroll((scroll_offset as u16, 0));
     frame.render_widget(log_widget, area);
 }
 

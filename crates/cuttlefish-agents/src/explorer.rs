@@ -64,7 +64,7 @@ impl Agent for ExplorerAgent {
 
         let system_prompt = self
             .prompt_registry
-            .load("explorer")
+            .load_with_system("explorer")
             .map(|p| p.body)
             .unwrap_or_else(|_| Self::DEFAULT_SYSTEM_PROMPT.to_string());
 

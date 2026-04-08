@@ -18,6 +18,12 @@
 //!
 //! You are the orchestrator agent...
 //! ```
+//!
+//! # System Template Integration
+//!
+//! The registry supports a `system.md` template that uses the `PromptTemplate` engine
+//! for placeholder replacement and section overrides. Use `load_with_context()` to
+//! compose prompts with runtime environment values.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -25,6 +31,8 @@ use std::sync::RwLock;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::prompt_template::{PromptContext, PromptTemplate};
 
 /// Error type for prompt operations.
 #[derive(Error, Debug)]
@@ -70,10 +78,17 @@ pub struct AgentPrompt {
 ///
 /// The registry uses a `RwLock` to cache loaded prompts, avoiding repeated
 /// file reads for the same agent.
+///
+/// The registry supports a "system" prompt that serves as a base for all agents.
+/// When using `load_with_system`, the system prompt body is prepended to the
+/// agent-specific prompt.
 pub struct PromptRegistry {
     prompts_dir: PathBuf,
     cache: RwLock<HashMap<String, AgentPrompt>>,
 }
+
+/// The name of the system base prompt file (system.md).
+pub const SYSTEM_PROMPT_NAME: &str = "system";
 
 impl PromptRegistry {
     /// Creates a new `PromptRegistry` with the given prompts directory.
@@ -203,6 +218,168 @@ impl PromptRegistry {
             .write()
             .expect("RwLock poisoned - concurrent panic occurred");
         cache.clear();
+    }
+
+    /// Loads an agent prompt with the system base prompt prepended.
+    ///
+    /// This composes the full prompt by:
+    /// 1. Loading the system base prompt (system.md) as a template
+    /// 2. Rendering it with default runtime context (working dir, platform, etc.)
+    /// 3. Loading the agent-specific prompt
+    /// 4. Combining them: rendered system + agent body
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_name` - The name of the agent (e.g., "orchestrator").
+    ///
+    /// # Returns
+    ///
+    /// The composed `AgentPrompt` with system + agent content, or the agent
+    /// prompt alone if the system prompt is not found.
+    pub fn load_with_system(&self, agent_name: &str) -> Result<AgentPrompt, PromptError> {
+        // Use default context with current working directory
+        let ctx = Self::create_default_context(&std::env::current_dir().unwrap_or_default());
+        self.load_with_system_and_context(agent_name, &ctx)
+    }
+
+    /// Loads an agent prompt with the system base prompt and custom context.
+    ///
+    /// This is the full-featured version that allows customizing placeholder values.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_name` - The name of the agent (e.g., "orchestrator").
+    /// * `ctx` - The context containing placeholder values and section overrides.
+    ///
+    /// # Returns
+    ///
+    /// The composed `AgentPrompt` with rendered system + agent content.
+    pub fn load_with_system_and_context(
+        &self,
+        agent_name: &str,
+        ctx: &PromptContext,
+    ) -> Result<AgentPrompt, PromptError> {
+        let agent_prompt = self.load(agent_name)?;
+
+        // Try to load and render system.md with the template engine
+        let system_path = self.prompts_dir.join("system.md");
+        let rendered_system = if system_path.exists() {
+            let system_content = std::fs::read_to_string(&system_path)?;
+            let template = PromptTemplate::new(system_content);
+            template.render(ctx)
+        } else {
+            // No system.md, return agent prompt as-is
+            return Ok(agent_prompt);
+        };
+
+        // Compose: rendered system + separator + agent body
+        let composed_body = format!(
+            "{}\n\n---\n\n# Agent: {}\n\n{}",
+            rendered_system, agent_prompt.metadata.name, agent_prompt.body
+        );
+
+        Ok(AgentPrompt {
+            metadata: agent_prompt.metadata,
+            body: composed_body,
+        })
+    }
+
+    /// Loads just the system base prompt.
+    ///
+    /// This is useful when you want to build custom prompts that include
+    /// the system foundation but with different agent-specific content.
+    pub fn load_system(&self) -> Result<AgentPrompt, PromptError> {
+        self.load(SYSTEM_PROMPT_NAME)
+    }
+
+    /// Composes a custom prompt with the system base.
+    ///
+    /// # Arguments
+    ///
+    /// * `custom_content` - Custom prompt content to append after system.
+    /// * `agent_name` - Name for the agent section header.
+    ///
+    /// # Returns
+    ///
+    /// A string containing the system prompt followed by the custom content.
+    pub fn compose_with_system(
+        &self,
+        custom_content: &str,
+        agent_name: &str,
+    ) -> Result<String, PromptError> {
+        let system_prompt = self.load_system()?;
+
+        Ok(format!(
+            "{}\n\n---\n\n# Agent: {}\n\n{}",
+            system_prompt.body, agent_name, custom_content
+        ))
+    }
+
+    /// Loads an agent prompt with the system template rendered using the given context.
+    ///
+    /// This is the recommended method for loading prompts in production. It:
+    /// 1. Loads `system.md` as a `PromptTemplate`
+    /// 2. Renders it with the provided `PromptContext` (placeholder replacement, sections)
+    /// 3. Appends the agent-specific prompt body
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_name` - The name of the agent (e.g., "orchestrator").
+    /// * `ctx` - The context containing placeholder values and section overrides.
+    ///
+    /// # Returns
+    ///
+    /// The composed prompt string with all placeholders replaced.
+    pub fn load_with_context(
+        &self,
+        agent_name: &str,
+        ctx: &PromptContext,
+    ) -> Result<String, PromptError> {
+        let agent_prompt = self.load(agent_name)?;
+
+        // Try to load and render system.md with the template engine
+        let system_path = self.prompts_dir.join("system.md");
+        let rendered_system = if system_path.exists() {
+            let system_content = std::fs::read_to_string(&system_path)?;
+            let template = PromptTemplate::new(system_content);
+            template.render(ctx)
+        } else {
+            // No system.md, return empty string
+            String::new()
+        };
+
+        // Compose: rendered system + separator + agent body
+        if rendered_system.is_empty() {
+            Ok(agent_prompt.body)
+        } else {
+            Ok(format!(
+                "{}\n\n---\n\n# Agent: {}\n\n{}",
+                rendered_system, agent_prompt.metadata.name, agent_prompt.body
+            ))
+        }
+    }
+
+    /// Creates a default `PromptContext` with common runtime values.
+    ///
+    /// This populates placeholders like `%WORKING_DIR%`, `%PLATFORM%`, etc.
+    pub fn create_default_context(working_dir: &Path) -> PromptContext {
+        PromptContext::new()
+            .working_dir(working_dir.display().to_string())
+            .platform(std::env::consts::OS)
+            .set(
+                "SHELL",
+                std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string()),
+            )
+            .set("OS_VERSION", std::env::consts::OS)
+            .set("IS_GIT", "true") // Will be overridden by caller if needed
+            .set("ADDITIONAL_DIRS", "")
+            .set("MODEL_ID", "unknown")
+            .set("MODEL_MARKETING_NAME", "AI Assistant")
+            .set("KNOWLEDGE_CUTOFF", "2024")
+            .set("LANGUAGE", "en")
+            .set("MCP_INSTRUCTIONS", "")
+            .set("MEMORY", "")
+            .set("CUSTOM_INSTRUCTIONS", "")
     }
 }
 
@@ -375,5 +552,133 @@ Minimal body."#;
         let prompt = registry.load("minimal").expect("Failed to load prompt");
 
         assert!(prompt.metadata.tools.is_empty());
+    }
+
+    #[test]
+    fn test_load_with_system_renders_template() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Create system.md with sections and placeholders
+        let system_content = r#"---
+name: system
+description: Base system prompt
+version: 1.0.0
+---
+
+<!-- SECTION:identity -->
+You are an AI assistant running on %PLATFORM%.
+Working directory: %WORKING_DIR%
+<!-- /SECTION:identity -->
+
+<!-- SECTION:rules -->
+Follow these rules.
+<!-- /SECTION:rules -->
+"#;
+        fs::write(temp_dir.path().join("system.md"), system_content).expect("write system.md");
+
+        // Create agent prompt
+        let agent_content = r#"---
+name: test_agent
+description: Test agent
+tools: []
+category: deep
+---
+
+You are the test agent."#;
+        create_test_prompt(temp_dir.path(), "test_agent", agent_content);
+
+        let registry = PromptRegistry::new(temp_dir.path());
+        let prompt = registry
+            .load_with_system("test_agent")
+            .expect("Failed to load prompt");
+
+        // Verify system content was included
+        assert!(prompt.body.contains("You are an AI assistant"));
+        // Verify placeholders were replaced
+        assert!(!prompt.body.contains("%PLATFORM%"));
+        assert!(!prompt.body.contains("%WORKING_DIR%"));
+        // Verify section markers were removed
+        assert!(!prompt.body.contains("<!-- SECTION:"));
+        // Verify agent content was appended
+        assert!(prompt.body.contains("You are the test agent"));
+        // Verify agent header was added
+        assert!(prompt.body.contains("# Agent: test_agent"));
+    }
+
+    #[test]
+    fn test_load_with_system_and_context_custom_placeholders() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        let system_content = r#"---
+name: system
+description: Base system prompt
+version: 1.0.0
+---
+
+Project: %PROJECT_NAME%
+Model: %MODEL_MARKETING_NAME%
+"#;
+        fs::write(temp_dir.path().join("system.md"), system_content).expect("write system.md");
+
+        let agent_content = r#"---
+name: coder
+description: Coder
+tools: []
+category: deep
+---
+
+Code here."#;
+        create_test_prompt(temp_dir.path(), "coder", agent_content);
+
+        let registry = PromptRegistry::new(temp_dir.path());
+        let ctx = PromptContext::new()
+            .set("PROJECT_NAME", "MyProject")
+            .set("MODEL_MARKETING_NAME", "Claude");
+
+        let prompt = registry
+            .load_with_system_and_context("coder", &ctx)
+            .expect("load");
+
+        assert!(prompt.body.contains("Project: MyProject"));
+        assert!(prompt.body.contains("Model: Claude"));
+    }
+
+    #[test]
+    fn test_load_with_system_no_system_file() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+
+        // Only create agent prompt, no system.md
+        let agent_content = r#"---
+name: standalone
+description: Standalone agent
+tools: []
+category: deep
+---
+
+Standalone content."#;
+        create_test_prompt(temp_dir.path(), "standalone", agent_content);
+
+        let registry = PromptRegistry::new(temp_dir.path());
+        let prompt = registry
+            .load_with_system("standalone")
+            .expect("Failed to load prompt");
+
+        // Should just return agent body without system prefix
+        assert_eq!(prompt.body, "Standalone content.");
+    }
+
+    #[test]
+    fn test_create_default_context() {
+        let ctx = PromptRegistry::create_default_context(std::path::Path::new("/test/dir"));
+
+        // Verify key placeholders are set
+        assert!(ctx.placeholders.contains_key("WORKING_DIR"));
+        assert!(ctx.placeholders.contains_key("PLATFORM"));
+        assert!(ctx.placeholders.contains_key("SHELL"));
+
+        assert_eq!(
+            ctx.placeholders.get("WORKING_DIR"),
+            Some(&"/test/dir".to_string())
+        );
     }
 }
