@@ -11,6 +11,7 @@ members = [
     "crates/cuttlefish-api",
     "crates/cuttlefish-tui",
     "crates/cuttlefish-tunnel",
+    "crates/cuttlefish-mcp",
 ]
 resolver = "2"
 

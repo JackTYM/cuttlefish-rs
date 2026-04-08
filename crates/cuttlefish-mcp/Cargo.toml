@@ -1,0 +1,26 @@
+[package]
+name = "cuttlefish-mcp"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94.0"
+description = "MCP (Model Context Protocol) client for Cuttlefish"
+
+[lints]
+workspace = true
+
+[dependencies]
+cuttlefish-core = { path = "../cuttlefish-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+tracing = { workspace = true }
+thiserror = { workspace = true }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+futures = "0.3"
+tokio-stream = "0.1"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest-eventsource = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
