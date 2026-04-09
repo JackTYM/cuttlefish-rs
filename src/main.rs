@@ -282,6 +282,17 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Clean up old processed messages from queue (older than 7 days)
+    match cuttlefish_db::message_queue::cleanup_old_messages(db.pool(), 7).await {
+        Ok(count) if count > 0 => {
+            info!(count, "Cleaned up old processed messages from queue");
+        }
+        Ok(_) => {}
+        Err(e) => {
+            warn!(error = %e, "Failed to clean up old messages");
+        }
+    }
+
     // Initialize session persistence
     let persistence_config = PersistenceConfig {
         journal_dir: config

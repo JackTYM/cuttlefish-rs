@@ -18,7 +18,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::routes::{AppState, ProjectSession};
-use cuttlefish_db::workflow_state;
+use cuttlefish_db::{drafts, message_queue, workflow_state};
 
 /// Inbound message from client to server.
 #[derive(Debug, Clone, Deserialize)]
@@ -53,6 +53,18 @@ pub enum ClientMessage {
     /// Unsubscribe from project updates.
     Unsubscribe {
         /// Project ID to unsubscribe from.
+        project_id: String,
+    },
+    /// Save draft prompt (debounced from client).
+    SaveDraft {
+        /// Project ID.
+        project_id: String,
+        /// Draft content.
+        content: String,
+    },
+    /// Get current draft for a project.
+    GetDraft {
+        /// Project ID.
         project_id: String,
     },
 }
@@ -168,6 +180,20 @@ pub enum ServerMessage {
         /// Error message.
         message: String,
     },
+    /// Draft prompt restored (sent on subscribe if draft exists).
+    DraftRestored {
+        /// Project ID.
+        project_id: String,
+        /// Draft content.
+        content: String,
+    },
+    /// Message was queued (workflow is busy).
+    MessageQueued {
+        /// Project ID.
+        project_id: String,
+        /// Queue position (1 = next to process).
+        position: i64,
+    },
 }
 
 impl ServerMessage {
@@ -231,33 +257,133 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             &content[..content.len().min(50)]
                         );
 
-                        // Send log entry about receiving the message
-                        let _ = tx
-                            .send(ServerMessage::LogEntry {
-                                id: Uuid::new_v4().to_string(),
-                                timestamp: chrono::Utc::now().to_rfc3339(),
-                                agent: "orchestrator".to_string(),
-                                action: "Received chat message".to_string(),
-                                level: "info".to_string(),
-                                project: project_id.clone(),
-                                context: Some(content[..content.len().min(100)].to_string()),
-                                stack_trace: None,
-                            })
-                            .await;
+                        // Clear any saved draft since the message is being sent
+                        let _ = drafts::clear_draft(state.db.pool(), &project_id).await;
 
-                        // Execute streaming response for real-time token display
-                        if let Err(e) =
-                            execute_streaming(&state, &project_id, &content, tx.clone()).await
+                        // Check if a workflow is currently running for this project
+                        let is_running = match workflow_state::get_workflow_state(
+                            state.db.pool(),
+                            &project_id,
+                        )
+                        .await
                         {
-                            error!("Streaming execution error: {}", e);
-                            if tx
-                                .send(ServerMessage::Error {
-                                    message: e.to_string(),
-                                })
-                                .await
-                                .is_err()
+                            Ok(Some(ws)) => {
+                                workflow_state::WorkflowStatus::parse(&ws.status)
+                                    == workflow_state::WorkflowStatus::Running
+                            }
+                            _ => false,
+                        };
+
+                        if is_running {
+                            // Queue the message for later processing
+                            let msg_id = Uuid::new_v4().to_string();
+                            if let Err(e) = message_queue::queue_message(
+                                state.db.pool(),
+                                &msg_id,
+                                &project_id,
+                                &content,
+                            )
+                            .await
                             {
-                                break;
+                                error!("Failed to queue message: {}", e);
+                            } else {
+                                // Get queue position
+                                let position =
+                                    message_queue::count_pending(state.db.pool(), &project_id)
+                                        .await
+                                        .unwrap_or(1);
+
+                                let _ = tx
+                                    .send(ServerMessage::MessageQueued {
+                                        project_id: project_id.clone(),
+                                        position,
+                                    })
+                                    .await;
+
+                                let _ = tx
+                                    .send(ServerMessage::LogEntry {
+                                        id: Uuid::new_v4().to_string(),
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        agent: "orchestrator".to_string(),
+                                        action: format!(
+                                            "Message queued (position {})",
+                                            position
+                                        ),
+                                        level: "info".to_string(),
+                                        project: project_id.clone(),
+                                        context: Some(
+                                            content[..content.len().min(100)].to_string(),
+                                        ),
+                                        stack_trace: None,
+                                    })
+                                    .await;
+                            }
+                        } else {
+                            // Send log entry about receiving the message
+                            let _ = tx
+                                .send(ServerMessage::LogEntry {
+                                    id: Uuid::new_v4().to_string(),
+                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                    agent: "orchestrator".to_string(),
+                                    action: "Received chat message".to_string(),
+                                    level: "info".to_string(),
+                                    project: project_id.clone(),
+                                    context: Some(content[..content.len().min(100)].to_string()),
+                                    stack_trace: None,
+                                })
+                                .await;
+
+                            // Execute streaming response for real-time token display
+                            if let Err(e) =
+                                execute_streaming(&state, &project_id, &content, tx.clone()).await
+                            {
+                                error!("Streaming execution error: {}", e);
+                                if tx
+                                    .send(ServerMessage::Error {
+                                        message: e.to_string(),
+                                    })
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            }
+
+                            // Process any queued messages
+                            while let Ok(Some(queued)) =
+                                message_queue::get_next_pending(state.db.pool(), &project_id).await
+                            {
+                                let _ = tx
+                                    .send(ServerMessage::LogEntry {
+                                        id: Uuid::new_v4().to_string(),
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        agent: "orchestrator".to_string(),
+                                        action: "Processing queued message".to_string(),
+                                        level: "info".to_string(),
+                                        project: project_id.clone(),
+                                        context: Some(
+                                            queued.content[..queued.content.len().min(100)]
+                                                .to_string(),
+                                        ),
+                                        stack_trace: None,
+                                    })
+                                    .await;
+
+                                // Mark as processed before executing
+                                let _ =
+                                    message_queue::mark_processed(state.db.pool(), &queued.id)
+                                        .await;
+
+                                if let Err(e) = execute_streaming(
+                                    &state,
+                                    &project_id,
+                                    &queued.content,
+                                    tx.clone(),
+                                )
+                                .await
+                                {
+                                    error!("Queued message execution error: {}", e);
+                                }
                             }
                         }
                     }
@@ -270,6 +396,18 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         }
                         // Add client to session
                         add_client_to_session(&state, &project_id, tx.clone());
+
+                        // Restore draft if one exists
+                        if let Ok(Some(draft)) =
+                            drafts::get_draft(state.db.pool(), &project_id).await
+                        {
+                            let _ = tx
+                                .send(ServerMessage::DraftRestored {
+                                    project_id: project_id.clone(),
+                                    content: draft.content,
+                                })
+                                .await;
+                        }
                     }
                     Ok(ClientMessage::Unsubscribe { project_id }) => {
                         info!("Client unsubscribed from project {}", project_id);
@@ -278,6 +416,41 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         }
                         // Note: We don't remove from session here as it's complex
                         // Sessions clean up on disconnect
+                    }
+                    Ok(ClientMessage::SaveDraft {
+                        project_id,
+                        content,
+                    }) => {
+                        debug!("Saving draft for project {}", project_id);
+                        if let Err(e) =
+                            drafts::save_draft(state.db.pool(), &project_id, &content).await
+                        {
+                            warn!("Failed to save draft: {}", e);
+                        }
+                    }
+                    Ok(ClientMessage::GetDraft { project_id }) => {
+                        match drafts::get_draft(state.db.pool(), &project_id).await {
+                            Ok(Some(draft)) => {
+                                let _ = tx
+                                    .send(ServerMessage::DraftRestored {
+                                        project_id: project_id.clone(),
+                                        content: draft.content,
+                                    })
+                                    .await;
+                            }
+                            Ok(None) => {
+                                // No draft, send empty
+                                let _ = tx
+                                    .send(ServerMessage::DraftRestored {
+                                        project_id: project_id.clone(),
+                                        content: String::new(),
+                                    })
+                                    .await;
+                            }
+                            Err(e) => {
+                                warn!("Failed to get draft: {}", e);
+                            }
+                        }
                     }
                     Ok(ClientMessage::Approve { action_id }) => {
                         info!("Action approved: {}", action_id);

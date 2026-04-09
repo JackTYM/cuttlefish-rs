@@ -11,12 +11,16 @@ pub mod api_keys;
 pub mod approvals;
 /// Authentication-related database operations.
 pub mod auth;
+/// Draft prompt persistence for multi-client UX.
+pub mod drafts;
 /// Async handoff system for collaboration.
 pub mod handoffs;
 /// Project invite database operations.
 pub mod invites;
 /// Database model types for all tables.
 pub mod models;
+/// Message queue persistence for queueing messages while agent is busy.
+pub mod message_queue;
 /// Organization API key pool management.
 pub mod org_api_keys;
 /// Organization-level configuration management.
@@ -238,6 +242,8 @@ impl Database {
         org_api_keys::create_org_api_keys_table(pool).await?;
         approvals::create_pending_approvals_table(pool).await?;
         workflow_state::create_workflow_state_table(pool).await?;
+        drafts::create_draft_prompts_table(pool).await?;
+        message_queue::create_message_queue_table(pool).await?;
 
         Ok(())
     }
