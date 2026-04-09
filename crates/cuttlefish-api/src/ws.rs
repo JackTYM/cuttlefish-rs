@@ -18,6 +18,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::routes::{AppState, ProjectSession};
+use cuttlefish_db::workflow_state;
 
 /// Inbound message from client to server.
 #[derive(Debug, Clone, Deserialize)]
@@ -381,6 +382,18 @@ async fn execute_streaming(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let provider = get_provider(state)?;
 
+    // Track workflow state for persistence
+    if let Err(e) = workflow_state::start_workflow(
+        state.db.pool(),
+        project_id,
+        input,
+        1, // Single streaming response = 1 iteration
+    )
+    .await
+    {
+        warn!(error = %e, "Failed to track workflow state");
+    }
+
     // Create user message
     let user_message = Message {
         role: MessageRole::User,
@@ -580,6 +593,11 @@ async fn execute_streaming(
             stack_trace: None,
         })
         .await;
+
+    // Mark workflow as completed
+    if let Err(e) = workflow_state::complete_workflow(state.db.pool(), project_id).await {
+        warn!(error = %e, "Failed to mark workflow as completed");
+    }
 
     Ok(())
 }

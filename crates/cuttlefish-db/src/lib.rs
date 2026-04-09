@@ -33,6 +33,8 @@ pub mod sessions;
 pub mod sharing;
 /// Usage tracking for API cost monitoring.
 pub mod usage;
+/// Workflow state persistence.
+pub mod workflow_state;
 
 use sqlx::{Row, SqlitePool};
 use std::path::Path;
@@ -235,6 +237,7 @@ impl Database {
         org_config::create_org_configs_table(pool).await?;
         org_api_keys::create_org_api_keys_table(pool).await?;
         approvals::create_pending_approvals_table(pool).await?;
+        workflow_state::create_workflow_state_table(pool).await?;
 
         Ok(())
     }

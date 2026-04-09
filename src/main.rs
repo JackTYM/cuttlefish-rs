@@ -268,6 +268,20 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Mark any running workflows as interrupted (from previous session)
+    match cuttlefish_db::workflow_state::mark_running_as_interrupted(db.pool()).await {
+        Ok(count) if count > 0 => {
+            warn!(
+                count,
+                "Found workflows that were running when server stopped - marked as interrupted"
+            );
+        }
+        Ok(_) => {}
+        Err(e) => {
+            warn!(error = %e, "Failed to check for interrupted workflows");
+        }
+    }
+
     // Initialize session persistence
     let persistence_config = PersistenceConfig {
         journal_dir: config
