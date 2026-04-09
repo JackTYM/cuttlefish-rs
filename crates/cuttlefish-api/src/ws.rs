@@ -393,7 +393,10 @@ async fn execute_streaming(
     // Save user message to persistence (if available)
     if let Some(ref persistence) = state.persistence {
         let mut p = persistence.lock().await;
-        match p.save_message(project_id, &user_message, user_token_count, None).await {
+        match p
+            .save_message(project_id, &user_message, user_token_count, None)
+            .await
+        {
             Ok(msg_id) => debug!("User message persisted: {}", msg_id),
             Err(e) => warn!("Failed to persist user message: {}", e),
         }
@@ -549,12 +552,15 @@ async fn execute_streaming(
         let assistant_token_count = (full_content.len() / 4).max(1) as i64;
         if let Some(ref persistence) = state.persistence {
             let mut p = persistence.lock().await;
-            match p.save_message(
-                project_id,
-                &assistant_message,
-                assistant_token_count,
-                state.default_provider.as_deref(),
-            ).await {
+            match p
+                .save_message(
+                    project_id,
+                    &assistant_message,
+                    assistant_token_count,
+                    state.default_provider.as_deref(),
+                )
+                .await
+            {
                 Ok(msg_id) => debug!("Assistant message persisted: {}", msg_id),
                 Err(e) => warn!("Failed to persist assistant message: {}", e),
             }

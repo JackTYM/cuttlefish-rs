@@ -7,6 +7,8 @@
 pub mod activity;
 /// API key database operations.
 pub mod api_keys;
+/// Pending approval persistence for safety workflow.
+pub mod approvals;
 /// Authentication-related database operations.
 pub mod auth;
 /// Async handoff system for collaboration.
@@ -232,6 +234,7 @@ impl Database {
         organization::create_organizations_tables(pool).await?;
         org_config::create_org_configs_table(pool).await?;
         org_api_keys::create_org_api_keys_table(pool).await?;
+        approvals::create_pending_approvals_table(pool).await?;
 
         Ok(())
     }

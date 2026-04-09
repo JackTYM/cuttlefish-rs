@@ -67,7 +67,9 @@ impl StdioTransport {
             cmd.env(key, value);
         }
 
-        let mut child = cmd.spawn().map_err(|e| McpError::Transport(e.to_string()))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| McpError::Transport(e.to_string()))?;
 
         let stdin = child
             .stdin

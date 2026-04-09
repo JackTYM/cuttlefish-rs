@@ -59,7 +59,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 pub use approval_registry::{
     ApprovalDecision, ApprovalRegistry, DEFAULT_APPROVAL_TIMEOUT_SECS, PendingApproval,
-    SharedApprovalRegistry, create_approval_registry,
+    SharedApprovalRegistry, create_approval_registry, create_approval_registry_with_db,
 };
 pub use auth::{auth_middleware, generate_api_key};
 pub use auth_routes::AuthState;

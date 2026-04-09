@@ -113,7 +113,11 @@ impl McpClient {
     }
 
     /// Call a tool.
-    pub async fn call_tool(&self, name: &str, arguments: Option<Value>) -> Result<CallToolResult, McpError> {
+    pub async fn call_tool(
+        &self,
+        name: &str,
+        arguments: Option<Value>,
+    ) -> Result<CallToolResult, McpError> {
         self.ensure_initialized()?;
 
         let params = CallToolParams {
@@ -161,7 +165,11 @@ impl McpClient {
         let response = self.transport.request(request).await?;
         let result = self.parse_response::<ReadResourceResult>(response)?;
 
-        debug!("Read resource '{}', {} contents", uri, result.contents.len());
+        debug!(
+            "Read resource '{}', {} contents",
+            uri,
+            result.contents.len()
+        );
         Ok(result)
     }
 
@@ -178,7 +186,11 @@ impl McpClient {
     }
 
     /// Get a prompt.
-    pub async fn get_prompt(&self, name: &str, arguments: Option<Value>) -> Result<GetPromptResult, McpError> {
+    pub async fn get_prompt(
+        &self,
+        name: &str,
+        arguments: Option<Value>,
+    ) -> Result<GetPromptResult, McpError> {
         self.ensure_initialized()?;
 
         let params = GetPromptParams {
@@ -233,9 +245,9 @@ impl McpClient {
             });
         }
 
-        let result = response.result.ok_or_else(|| {
-            McpError::InvalidResponse("Missing result in response".to_string())
-        })?;
+        let result = response
+            .result
+            .ok_or_else(|| McpError::InvalidResponse("Missing result in response".to_string()))?;
 
         serde_json::from_value(result)
             .map_err(|e| McpError::InvalidResponse(format!("Failed to parse result: {}", e)))

@@ -5,7 +5,7 @@
 use cuttlefish_agents::{ConversationPersistence, PersistenceConfig, TokioMessageBus};
 use cuttlefish_api::{
     ApiConfig, AuthConfig, WebUiConfig, build_full_app, build_full_app_with_webui,
-    create_approval_registry, routes::AppState,
+    create_approval_registry_with_db, routes::AppState,
 };
 use cuttlefish_core::config::CuttlefishConfig;
 use cuttlefish_core::traits::provider::ModelProvider;
@@ -253,11 +253,27 @@ async fn main() -> anyhow::Result<()> {
     let template_registry = Arc::new(TemplateRegistry::new());
     let message_bus = Arc::new(TokioMessageBus::new());
     let active_sessions = Arc::new(DashMap::new());
-    let approval_registry = create_approval_registry();
+
+    // Create approval registry with database persistence
+    let approval_registry = create_approval_registry_with_db(db.pool().clone());
+
+    // Restore any pending approvals from previous session
+    match approval_registry.restore_from_db().await {
+        Ok(count) if count > 0 => {
+            info!(count, "Restored pending approvals from previous session");
+        }
+        Ok(_) => {}
+        Err(e) => {
+            warn!(error = %e, "Failed to restore pending approvals from database");
+        }
+    }
 
     // Initialize session persistence
     let persistence_config = PersistenceConfig {
-        journal_dir: config.database.path.parent()
+        journal_dir: config
+            .database
+            .path
+            .parent()
             .map(|p| p.join("journals"))
             .unwrap_or_else(|| PathBuf::from("data/journals")),
         ..PersistenceConfig::default()
@@ -269,7 +285,10 @@ async fn main() -> anyhow::Result<()> {
             Some(Arc::new(Mutex::new(p)))
         }
         Err(e) => {
-            warn!("Failed to initialize session persistence: {}. Messages will not be persisted.", e);
+            warn!(
+                "Failed to initialize session persistence: {}. Messages will not be persisted.",
+                e
+            );
             None
         }
     };

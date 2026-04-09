@@ -3,15 +3,20 @@
 //! This module provides:
 //! - `PendingApproval` - An action awaiting user approval
 //! - `ApprovalRegistry` - Registry tracking pending approvals with async resolution
+//!
+//! Approvals are persisted to the database so they survive server restarts.
 
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, oneshot};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use cuttlefish_agents::{ActionType, ConfidenceScore, RiskFactor};
+use cuttlefish_db::approvals as db;
 
 /// Default timeout for pending approvals (5 minutes).
 pub const DEFAULT_APPROVAL_TIMEOUT_SECS: u64 = 300;
@@ -136,6 +141,9 @@ struct ApprovalState {
 }
 
 /// Registry for tracking pending approvals.
+///
+/// The registry maintains both an in-memory map for fast access and async resolution,
+/// and persists approvals to the database so they survive server restarts.
 pub struct ApprovalRegistry {
     /// Map of action_id -> approval state.
     pending: DashMap<String, ApprovalState>,
@@ -143,10 +151,12 @@ pub struct ApprovalRegistry {
     new_approval_tx: broadcast::Sender<PendingApproval>,
     /// Broadcast channel for notifying about resolved approvals.
     resolved_tx: broadcast::Sender<(String, ApprovalDecision)>,
+    /// Database pool for persistence.
+    db_pool: Option<SqlitePool>,
 }
 
 impl ApprovalRegistry {
-    /// Create a new approval registry.
+    /// Create a new approval registry without database persistence.
     pub fn new() -> Self {
         let (new_approval_tx, _) = broadcast::channel(100);
         let (resolved_tx, _) = broadcast::channel(100);
@@ -154,15 +164,141 @@ impl ApprovalRegistry {
             pending: DashMap::new(),
             new_approval_tx,
             resolved_tx,
+            db_pool: None,
         }
+    }
+
+    /// Create a new approval registry with database persistence.
+    pub fn with_db(db_pool: SqlitePool) -> Self {
+        let (new_approval_tx, _) = broadcast::channel(100);
+        let (resolved_tx, _) = broadcast::channel(100);
+        Self {
+            pending: DashMap::new(),
+            new_approval_tx,
+            resolved_tx,
+            db_pool: Some(db_pool),
+        }
+    }
+
+    /// Restore pending approvals from the database.
+    ///
+    /// Call this on server startup to reload approvals that were pending
+    /// before the server was shut down or crashed.
+    ///
+    /// Returns the number of approvals restored.
+    pub async fn restore_from_db(&self) -> Result<usize, sqlx::Error> {
+        let pool = match &self.db_pool {
+            Some(p) => p,
+            None => {
+                debug!("No database configured, skipping approval restoration");
+                return Ok(0);
+            }
+        };
+
+        // First, expire any timed-out approvals
+        let expired = db::expire_timed_out_approvals(pool).await?;
+        if expired > 0 {
+            info!(count = expired, "Marked timed-out approvals as expired");
+        }
+
+        // Load all pending approvals
+        let records = db::get_all_pending(pool).await?;
+        let count = records.len();
+
+        for record in records {
+            // Parse the created_at timestamp to calculate elapsed time
+            let created_at = chrono::DateTime::parse_from_rfc3339(&record.created_at)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
+
+            let elapsed = chrono::Utc::now()
+                .signed_duration_since(created_at)
+                .to_std()
+                .unwrap_or(Duration::ZERO);
+
+            let timeout = Duration::from_secs(record.timeout_secs as u64);
+
+            // Skip if already expired
+            if elapsed >= timeout {
+                warn!(
+                    action_id = %record.id,
+                    "Skipping expired approval during restoration"
+                );
+                continue;
+            }
+
+            // Reconstruct the PendingApproval
+            let approval = PendingApproval {
+                action_id: record.id.clone(),
+                project_id: record.project_id,
+                action_type: parse_action_type(&record.action_type),
+                description: record.description,
+                path: record.path,
+                command: record.command,
+                confidence: ConfidenceScore::new(record.confidence as f32, vec![], "restored"),
+                risk_factors: parse_risk_factors(record.risk_factors.as_deref()),
+                created_at: Instant::now() - elapsed, // Approximate the original instant
+                timeout,
+                diff: record.diff_preview,
+            };
+
+            // Create oneshot channel (but we can't restore the waiter, so this is for new waiters)
+            let (decision_tx, _decision_rx) = oneshot::channel();
+
+            // Broadcast that this approval is pending (for any connected clients)
+            let _ = self.new_approval_tx.send(approval.clone());
+
+            self.pending.insert(
+                record.id,
+                ApprovalState {
+                    approval,
+                    decision_tx,
+                },
+            );
+        }
+
+        if count > 0 {
+            info!(count, "Restored pending approvals from database");
+        }
+
+        Ok(count)
     }
 
     /// Register a pending approval and wait for a decision.
     ///
     /// Returns when the user approves, rejects, or the timeout is reached.
+    /// The approval is persisted to the database (if configured) before waiting.
     pub async fn request_approval(&self, approval: PendingApproval) -> ApprovalDecision {
         let action_id = approval.action_id.clone();
         let timeout = approval.timeout;
+
+        // Persist to database first (write-ahead)
+        if let Some(pool) = &self.db_pool {
+            let risk_factors_json = serde_json::to_string(&approval.risk_factors).ok();
+            let created_at = chrono::Utc::now().to_rfc3339();
+
+            if let Err(e) = db::insert_pending_approval(
+                pool,
+                &approval.action_id,
+                &approval.project_id,
+                &format!("{:?}", approval.action_type),
+                &approval.description,
+                approval.path.as_deref(),
+                approval.command.as_deref(),
+                approval.confidence.value() as f64,
+                risk_factors_json.as_deref(),
+                approval.diff.as_deref(),
+                timeout.as_secs() as i64,
+                &created_at,
+            )
+            .await
+            {
+                error!(error = %e, action_id = %action_id, "Failed to persist approval to database");
+                // Continue anyway - we can still process in-memory
+            } else {
+                debug!(action_id = %action_id, "Persisted approval to database");
+            }
+        }
 
         // Create oneshot channel for the decision
         let (decision_tx, decision_rx) = oneshot::channel();
@@ -190,6 +326,12 @@ impl ApprovalRegistry {
             _ = tokio::time::sleep(timeout) => {
                 // Remove expired approval
                 self.pending.remove(&action_id);
+
+                // Update database
+                if let Some(pool) = &self.db_pool {
+                    let _ = db::expire_timed_out_approvals(pool).await;
+                }
+
                 ApprovalDecision::TimedOut
             }
         };
@@ -203,8 +345,32 @@ impl ApprovalRegistry {
     /// Approve a pending action.
     ///
     /// Returns `true` if the action was found and approved, `false` if not found.
+    /// Also updates the database if configured.
     pub fn approve(&self, action_id: &str) -> bool {
+        self.approve_with_user(action_id, None)
+    }
+
+    /// Approve a pending action with user attribution.
+    ///
+    /// Returns `true` if the action was found and approved, `false` if not found.
+    pub fn approve_with_user(&self, action_id: &str, user_id: Option<&str>) -> bool {
         if let Some((_, state)) = self.pending.remove(action_id) {
+            // Update database
+            if let Some(pool) = &self.db_pool {
+                let pool = pool.clone();
+                let action_id = action_id.to_string();
+                let user_id = user_id.map(String::from);
+                tokio::spawn(async move {
+                    if let Err(e) =
+                        db::approve_approval(&pool, &action_id, user_id.as_deref()).await
+                    {
+                        error!(error = %e, action_id = %action_id, "Failed to update approval in database");
+                    } else {
+                        debug!(action_id = %action_id, "Updated approval status in database");
+                    }
+                });
+            }
+
             let _ = state.decision_tx.send(ApprovalDecision::Approved);
             true
         } else {
@@ -215,8 +381,43 @@ impl ApprovalRegistry {
     /// Reject a pending action.
     ///
     /// Returns `true` if the action was found and rejected, `false` if not found.
+    /// Also updates the database if configured.
     pub fn reject(&self, action_id: &str, reason: Option<String>) -> bool {
+        self.reject_with_user(action_id, reason, None)
+    }
+
+    /// Reject a pending action with user attribution.
+    ///
+    /// Returns `true` if the action was found and rejected, `false` if not found.
+    pub fn reject_with_user(
+        &self,
+        action_id: &str,
+        reason: Option<String>,
+        user_id: Option<&str>,
+    ) -> bool {
         if let Some((_, state)) = self.pending.remove(action_id) {
+            // Update database
+            if let Some(pool) = &self.db_pool {
+                let pool = pool.clone();
+                let action_id = action_id.to_string();
+                let reason_clone = reason.clone();
+                let user_id = user_id.map(String::from);
+                tokio::spawn(async move {
+                    if let Err(e) = db::reject_approval(
+                        &pool,
+                        &action_id,
+                        user_id.as_deref(),
+                        reason_clone.as_deref(),
+                    )
+                    .await
+                    {
+                        error!(error = %e, action_id = %action_id, "Failed to update rejection in database");
+                    } else {
+                        debug!(action_id = %action_id, "Updated rejection status in database");
+                    }
+                });
+            }
+
             let _ = state
                 .decision_tx
                 .send(ApprovalDecision::Rejected { reason });
@@ -291,9 +492,31 @@ impl Default for ApprovalRegistry {
 /// Shared approval registry wrapped in Arc.
 pub type SharedApprovalRegistry = Arc<ApprovalRegistry>;
 
-/// Create a new shared approval registry.
+/// Create a new shared approval registry without database persistence.
 pub fn create_approval_registry() -> SharedApprovalRegistry {
     Arc::new(ApprovalRegistry::new())
+}
+
+/// Create a new shared approval registry with database persistence.
+pub fn create_approval_registry_with_db(db_pool: SqlitePool) -> SharedApprovalRegistry {
+    Arc::new(ApprovalRegistry::with_db(db_pool))
+}
+
+/// Parse action type from string representation.
+fn parse_action_type(s: &str) -> ActionType {
+    match s {
+        "FileWrite" => ActionType::FileWrite,
+        "FileDelete" => ActionType::FileDelete,
+        "BashCommand" => ActionType::BashCommand,
+        "GitOperation" => ActionType::GitOperation,
+        _ => ActionType::FileWrite, // Default fallback
+    }
+}
+
+/// Parse risk factors from JSON string.
+fn parse_risk_factors(json: Option<&str>) -> Vec<RiskFactor> {
+    json.and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

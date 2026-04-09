@@ -3,6 +3,7 @@
 //! This module provides confidence scoring to help determine whether
 //! an action should be auto-approved, require user confirmation, or be blocked.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// A confidence score for an agent action (0.0 to 1.0).
@@ -142,7 +143,7 @@ impl fmt::Display for ConfidenceFactor {
 }
 
 /// Risk factors that can reduce confidence in an action.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RiskFactor {
     /// Action modifies an existing file (vs creating new).
     ModifiesExisting,
