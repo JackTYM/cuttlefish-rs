@@ -248,42 +248,24 @@ fn render_chat(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    // Calculate visual line count by simulating word wrapping
-    // ratatui wraps on word boundaries when possible, so we estimate conservatively
-    let text_width = text_area.width as usize;
-    let visual_lines: usize = if text_width == 0 {
-        lines.len()
-    } else {
-        lines
-            .iter()
-            .map(|line| {
-                // Count actual characters (not bytes) for accurate width
-                let line_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
-                if line_len == 0 {
-                    1 // Empty lines still take 1 row
-                } else {
-                    // Ceiling division: how many rows needed for this line
-                    (line_len + text_width - 1) / text_width
-                }
-            })
-            .sum()
-    };
+    // Without wrapping, each logical line = 1 visual line (truncated if too long)
+    // This gives us reliable scroll calculations
+    let total_lines = lines.len();
 
-    // Calculate scroll position based on visual lines
+    // Calculate scroll position
     // chat_scroll=0 means "at bottom" (show newest messages)
     // Higher chat_scroll means "scrolled up" (show older messages)
-    let scroll_offset: u16 = if visual_lines > available_height {
-        let max_scroll = visual_lines.saturating_sub(available_height);
+    let scroll_offset: u16 = if total_lines > available_height {
+        let max_scroll = total_lines.saturating_sub(available_height);
         let offset = max_scroll.saturating_sub(app.chat_scroll as usize);
         offset.min(u16::MAX as usize) as u16
     } else {
         0
     };
 
-    // Render chat content (in reduced area to avoid mascot)
-    let chat_content = Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .scroll((scroll_offset, 0));
+    // Render chat content without wrapping - long lines are truncated
+    // This ensures scroll position is always accurate
+    let chat_content = Paragraph::new(lines).scroll((scroll_offset, 0));
     frame.render_widget(chat_content, text_area);
 
     // Render mascot on top (in top-right corner) with mouth animation
