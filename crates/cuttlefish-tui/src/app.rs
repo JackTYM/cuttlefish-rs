@@ -40,6 +40,8 @@ pub enum AppView {
     Diff,
     /// Build log viewer.
     Log,
+    /// Runtime view - process logs and port forwarding.
+    Runtime,
     /// Help screen showing available commands.
     Help,
     /// History mode - browse past messages and restore.
@@ -248,6 +250,77 @@ pub struct CreateProjectState {
     pub local_path: String,
 }
 
+/// Status of a port forward.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortForwardStatus {
+    /// Not connected.
+    Disconnected,
+    /// Attempting to connect.
+    Connecting,
+    /// Connected and forwarding.
+    Active,
+    /// Error state.
+    Error,
+}
+
+impl PortForwardStatus {
+    /// Get emoji indicator.
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            PortForwardStatus::Disconnected => "⚪",
+            PortForwardStatus::Connecting => "🟡",
+            PortForwardStatus::Active => "🟢",
+            PortForwardStatus::Error => "🔴",
+        }
+    }
+}
+
+/// A port forward configuration.
+#[derive(Debug, Clone)]
+pub struct PortForward {
+    /// Unique ID for this forward.
+    pub id: String,
+    /// Remote port on the container/server.
+    pub remote_port: u16,
+    /// Local port to bind to.
+    pub local_port: u16,
+    /// Current status.
+    pub status: PortForwardStatus,
+    /// Error message if status is Error.
+    pub error: Option<String>,
+}
+
+/// Focus area within the Runtime view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeFocus {
+    /// Process logs pane.
+    #[default]
+    Logs,
+    /// Port forwards list.
+    Ports,
+    /// Add port forward input.
+    AddPort,
+}
+
+/// State for the runtime view.
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeState {
+    /// Process stdout/stderr logs.
+    pub process_logs: Vec<String>,
+    /// Scroll offset for process logs.
+    pub log_scroll: u16,
+    /// Active port forwards.
+    pub port_forwards: Vec<PortForward>,
+    /// Selected port forward index.
+    pub port_selected: usize,
+    /// Current focus area.
+    pub focus: RuntimeFocus,
+    /// Input for new port forward (remote:local format).
+    pub port_input: String,
+    /// Whether the process is running.
+    pub process_running: bool,
+}
+
 /// Application state for the TUI.
 pub struct App {
     /// Whether the app should exit.
@@ -289,6 +362,10 @@ pub struct App {
     /// State for the create project wizard.
     pub create_project: CreateProjectState,
 
+    // Runtime view state
+    /// State for the runtime view (process logs, port forwards).
+    pub runtime: RuntimeState,
+
     // History mode state
     /// Last Esc key press timestamp (for double-tap detection).
     pub last_esc_time: Option<std::time::Instant>,
@@ -325,6 +402,8 @@ impl App {
             history_pos: None,
             // Create project wizard
             create_project: CreateProjectState::default(),
+            // Runtime view
+            runtime: RuntimeState::default(),
             // History mode
             last_esc_time: None,
             history_selected: 0,
@@ -341,7 +420,8 @@ impl App {
             self.view = match self.view {
                 AppView::Chat => AppView::Diff,
                 AppView::Diff => AppView::Log,
-                AppView::Log => AppView::Help,
+                AppView::Log => AppView::Runtime,
+                AppView::Runtime => AppView::Help,
                 AppView::Help => AppView::Dashboard,
                 AppView::Dashboard => AppView::Chat,
                 AppView::History => AppView::Chat,
@@ -365,7 +445,8 @@ impl App {
                 AppView::Chat => AppView::Dashboard,
                 AppView::Diff => AppView::Chat,
                 AppView::Log => AppView::Diff,
-                AppView::Help => AppView::Log,
+                AppView::Runtime => AppView::Log,
+                AppView::Help => AppView::Runtime,
                 AppView::Dashboard => AppView::Help,
                 AppView::History => AppView::Chat,
                 AppView::CreateProject => AppView::Dashboard,
@@ -720,6 +801,9 @@ impl App {
             AppView::Log => {
                 self.log_scroll = self.log_scroll.saturating_add(amount);
             }
+            AppView::Runtime => {
+                self.runtime.log_scroll = self.runtime.log_scroll.saturating_add(amount);
+            }
             AppView::Dashboard => {
                 self.select_prev_project();
             }
@@ -745,6 +829,9 @@ impl App {
             AppView::Log => {
                 self.log_scroll = self.log_scroll.saturating_sub(amount);
             }
+            AppView::Runtime => {
+                self.runtime.log_scroll = self.runtime.log_scroll.saturating_sub(amount);
+            }
             AppView::Dashboard => {
                 self.select_next_project();
             }
@@ -764,6 +851,7 @@ impl App {
             AppView::Chat => self.chat_scroll = 0,
             AppView::Diff => self.diff_scroll = 0,
             AppView::Log => self.log_scroll = 0,
+            AppView::Runtime => self.runtime.log_scroll = 0,
             AppView::History => self.history_selected = 0,
             AppView::Dashboard | AppView::Help | AppView::CreateProject => {}
         }

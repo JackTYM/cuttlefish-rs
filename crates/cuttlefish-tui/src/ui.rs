@@ -63,6 +63,11 @@ fn render_header(app: &App, frame: &mut Frame, area: Rect) {
             } else {
                 Span::styled(" Log ", inactive_style)
             },
+            if app.view == AppView::Runtime {
+                Span::styled("[Runtime]", active_style)
+            } else {
+                Span::styled(" Runtime ", inactive_style)
+            },
         ]
     } else {
         vec![]
@@ -154,6 +159,7 @@ fn render_main(app: &App, frame: &mut Frame, area: Rect) {
         AppView::Chat => render_chat(app, frame, area),
         AppView::Diff => render_diff(app, frame, area),
         AppView::Log => render_log(app, frame, area),
+        AppView::Runtime => render_runtime(app, frame, area),
         AppView::Help => render_help(frame, area),
         AppView::History => render_history(app, frame, area),
         AppView::CreateProject => render_create_project(app, frame, area),
@@ -242,25 +248,34 @@ fn render_chat(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    // Calculate visual line count (accounting for line wrapping)
+    // Calculate visual line count by simulating word wrapping
+    // ratatui wraps on word boundaries when possible, so we estimate conservatively
     let text_width = text_area.width as usize;
-    let visual_lines: usize = lines
-        .iter()
-        .map(|line| {
-            let line_width: usize = line.spans.iter().map(|s| s.content.len()).sum();
-            if line_width == 0 || text_width == 0 {
-                1
-            } else {
-                // Each line takes at least 1 visual line, plus extra for wrapping
-                (line_width + text_width - 1) / text_width
-            }
-        })
-        .sum();
+    let visual_lines: usize = if text_width == 0 {
+        lines.len()
+    } else {
+        lines
+            .iter()
+            .map(|line| {
+                // Count actual characters (not bytes) for accurate width
+                let line_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+                if line_len == 0 {
+                    1 // Empty lines still take 1 row
+                } else {
+                    // Ceiling division: how many rows needed for this line
+                    (line_len + text_width - 1) / text_width
+                }
+            })
+            .sum()
+    };
 
     // Calculate scroll position based on visual lines
-    let scroll_offset = if visual_lines > available_height {
+    // chat_scroll=0 means "at bottom" (show newest messages)
+    // Higher chat_scroll means "scrolled up" (show older messages)
+    let scroll_offset: u16 = if visual_lines > available_height {
         let max_scroll = visual_lines.saturating_sub(available_height);
-        max_scroll.saturating_sub(app.chat_scroll as usize)
+        let offset = max_scroll.saturating_sub(app.chat_scroll as usize);
+        offset.min(u16::MAX as usize) as u16
     } else {
         0
     };
@@ -268,7 +283,7 @@ fn render_chat(app: &App, frame: &mut Frame, area: Rect) {
     // Render chat content (in reduced area to avoid mascot)
     let chat_content = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
-        .scroll((scroll_offset as u16, 0));
+        .scroll((scroll_offset, 0));
     frame.render_widget(chat_content, text_area);
 
     // Render mascot on top (in top-right corner) with mouth animation
@@ -361,6 +376,147 @@ fn render_log(app: &App, frame: &mut Frame, area: Rect) {
         )))
         .scroll((scroll_offset as u16, 0));
     frame.render_widget(log_widget, area);
+}
+
+/// Render the runtime view with process logs and port forwarding.
+fn render_runtime(app: &App, frame: &mut Frame, area: Rect) {
+    use crate::app::{PortForwardStatus, RuntimeFocus};
+
+    // Split into two panes: logs (left/top) and ports (right/bottom)
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
+        .split(area);
+
+    // Left pane: Process logs
+    let logs_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(
+            "Process Logs {} (↑/↓ scroll){}",
+            if app.runtime.process_running {
+                "[Running]"
+            } else {
+                "[Stopped]"
+            },
+            if app.runtime.log_scroll > 0 {
+                format!(" [+{}]", app.runtime.log_scroll)
+            } else {
+                String::new()
+            }
+        ))
+        .border_style(if app.runtime.focus == RuntimeFocus::Logs {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        });
+
+    let log_inner = logs_block.inner(chunks[0]);
+    let available_height = log_inner.height as usize;
+
+    let log_lines: Vec<Line> = app
+        .runtime
+        .process_logs
+        .iter()
+        .map(|line| {
+            let color = if line.contains("ERROR") || line.contains("error") {
+                Color::Red
+            } else if line.contains("WARN") || line.contains("warn") {
+                Color::Yellow
+            } else if line.contains("INFO") || line.contains("info") {
+                Color::Cyan
+            } else {
+                Color::White
+            };
+            Line::from(Span::styled(line.clone(), Style::default().fg(color)))
+        })
+        .collect();
+
+    let total_lines = log_lines.len();
+    let scroll_offset = if total_lines > available_height {
+        let max_scroll = total_lines.saturating_sub(available_height);
+        max_scroll.saturating_sub(app.runtime.log_scroll as usize)
+    } else {
+        0
+    };
+
+    let logs_widget = Paragraph::new(log_lines)
+        .block(logs_block)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll_offset as u16, 0));
+    frame.render_widget(logs_widget, chunks[0]);
+
+    // Right pane: Port forwards
+    let ports_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(5), Constraint::Length(3)])
+        .split(chunks[1]);
+
+    let ports_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Port Forwards │ A=Add  D=Delete  Enter=Toggle")
+        .border_style(if app.runtime.focus == RuntimeFocus::Ports {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        });
+    let ports_inner = ports_block.inner(ports_chunks[0]);
+    frame.render_widget(ports_block, ports_chunks[0]);
+
+    if app.runtime.port_forwards.is_empty() {
+        let hint = Paragraph::new("No port forwards configured.\nPress 'A' to add one.")
+            .style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(hint, ports_inner);
+    } else {
+        let port_lines: Vec<Line> = app
+            .runtime
+            .port_forwards
+            .iter()
+            .enumerate()
+            .map(|(i, pf)| {
+                let selected = i == app.runtime.port_selected;
+                let status_color = match pf.status {
+                    PortForwardStatus::Active => Color::Green,
+                    PortForwardStatus::Connecting => Color::Yellow,
+                    PortForwardStatus::Error => Color::Red,
+                    PortForwardStatus::Disconnected => Color::DarkGray,
+                };
+                let prefix = if selected { "> " } else { "  " };
+                let text = format!(
+                    "{}{}:{} -> localhost:{}",
+                    pf.status.emoji(),
+                    pf.remote_port,
+                    pf.local_port,
+                    pf.local_port
+                );
+                let style = if selected {
+                    Style::default().fg(status_color).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(status_color)
+                };
+                Line::from(vec![Span::raw(prefix), Span::styled(text, style)])
+            })
+            .collect();
+
+        let ports_list = Paragraph::new(port_lines);
+        frame.render_widget(ports_list, ports_inner);
+    }
+
+    // Input area for adding ports
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Add Port (remote:local)")
+        .border_style(if app.runtime.focus == RuntimeFocus::AddPort {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        });
+    let input_hint = if app.runtime.port_input.is_empty() {
+        Span::styled("e.g., 3000:3000", Style::default().fg(Color::DarkGray))
+    } else {
+        Span::styled(&app.runtime.port_input, Style::default().fg(Color::Yellow))
+    };
+    let input_widget = Paragraph::new(Line::from(input_hint)).block(input_block);
+    frame.render_widget(input_widget, ports_chunks[1]);
 }
 
 /// Render the project dashboard view.
