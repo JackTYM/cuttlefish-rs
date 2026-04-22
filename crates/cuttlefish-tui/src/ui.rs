@@ -242,10 +242,24 @@ fn render_chat(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    // Calculate scroll position
-    let total_lines = lines.len();
-    let scroll_offset = if total_lines > available_height {
-        let max_scroll = total_lines.saturating_sub(available_height);
+    // Calculate visual line count (accounting for line wrapping)
+    let text_width = text_area.width as usize;
+    let visual_lines: usize = lines
+        .iter()
+        .map(|line| {
+            let line_width: usize = line.spans.iter().map(|s| s.content.len()).sum();
+            if line_width == 0 || text_width == 0 {
+                1
+            } else {
+                // Each line takes at least 1 visual line, plus extra for wrapping
+                (line_width + text_width - 1) / text_width
+            }
+        })
+        .sum();
+
+    // Calculate scroll position based on visual lines
+    let scroll_offset = if visual_lines > available_height {
+        let max_scroll = visual_lines.saturating_sub(available_height);
         max_scroll.saturating_sub(app.chat_scroll as usize)
     } else {
         0
