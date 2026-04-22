@@ -32,6 +32,7 @@ async fn create_test_state() -> (AppState, TempDir) {
         approval_registry: cuttlefish_api::create_approval_registry(),
         persistence: None, // Persistence not needed for health tests
         persistence_config: PersistenceConfig::default(),
+        auth_config: None, // No auth for health tests
     };
 
     (state, temp_dir)

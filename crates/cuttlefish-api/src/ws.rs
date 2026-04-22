@@ -4,10 +4,11 @@ use std::sync::Arc;
 
 use axum::{
     extract::{
-        State,
+        Query, State,
         ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
     },
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use cuttlefish_agents::{PromptRegistry, TokioMessageBus, WorkflowEngine};
 use cuttlefish_core::traits::provider::{CompletionRequest, Message, MessageRole};
@@ -67,6 +68,27 @@ pub enum ClientMessage {
         /// Project ID.
         project_id: String,
     },
+    /// Request list of templates.
+    ListTemplates,
+    /// Request list of projects.
+    ListProjects,
+    /// Create a new project.
+    CreateProject {
+        /// Project name.
+        name: String,
+        /// Template name.
+        template: String,
+        /// Execution mode (cloud, build_remote_run_local, local).
+        execution_mode: String,
+        /// Local path for local mode.
+        #[serde(default)]
+        local_path: Option<String>,
+    },
+    /// Delete a project.
+    DeleteProject {
+        /// Project ID.
+        project_id: String,
+    },
 }
 
 /// Risk factor for a pending action.
@@ -77,6 +99,46 @@ pub struct RiskFactor {
     pub factor_type: String,
     /// Description of the risk.
     pub description: String,
+}
+
+/// Template info for list response.
+#[derive(Debug, Clone, Serialize)]
+pub struct TemplateListItem {
+    /// Template name/ID.
+    pub name: String,
+    /// Template description.
+    pub description: String,
+    /// Category (builtin, user, community).
+    pub category: String,
+    /// Language/framework.
+    pub language: String,
+    /// Tags for filtering.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
+/// Project info for list response.
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectListItem {
+    /// Project ID.
+    pub id: String,
+    /// Project name.
+    pub name: String,
+    /// Template name used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_name: Option<String>,
+    /// Execution mode (cloud, build_remote_run_local, local).
+    pub execution_mode: String,
+    /// Running status (idle, building, running, error, stopped).
+    pub running_status: String,
+    /// Local path for local mode.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_path: Option<String>,
+    /// Tunnel URL for cloud mode.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_url: Option<String>,
+    /// Relative time since last activity (e.g., "2m ago").
+    pub last_activity: String,
 }
 
 /// Outbound message from server to client.
@@ -194,6 +256,28 @@ pub enum ServerMessage {
         /// Queue position (1 = next to process).
         position: i64,
     },
+    /// List of available templates.
+    TemplateList {
+        /// Available templates.
+        templates: Vec<TemplateListItem>,
+    },
+    /// List of projects.
+    ProjectList {
+        /// User's projects.
+        projects: Vec<ProjectListItem>,
+    },
+    /// Project was created successfully.
+    ProjectCreated {
+        /// New project ID.
+        project_id: String,
+        /// Project name.
+        name: String,
+    },
+    /// Project was deleted.
+    ProjectDeleted {
+        /// Deleted project ID.
+        project_id: String,
+    },
 }
 
 impl ServerMessage {
@@ -204,9 +288,73 @@ impl ServerMessage {
     }
 }
 
+/// Query parameters for WebSocket connection.
+#[derive(Debug, Deserialize)]
+pub struct WsQueryParams {
+    /// Authentication token (JWT or API key).
+    token: Option<String>,
+}
+
 /// Handle a WebSocket upgrade request.
-pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+///
+/// Validates authentication via query parameter `?token=xxx` if auth is configured.
+/// Accepts JWT tokens or API keys.
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    Query(params): Query<WsQueryParams>,
+    State(state): State<AppState>,
+) -> Response {
+    // If auth is configured, validate the token
+    if let Some(ref auth_config) = state.auth_config {
+        match validate_ws_token(&params.token, auth_config).await {
+            Ok(_user_id) => {
+                debug!("WebSocket authenticated");
+            }
+            Err(err) => {
+                warn!("WebSocket authentication failed: {}", err);
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    format!("Authentication required: {}", err),
+                )
+                    .into_response();
+            }
+        }
+    }
+
     ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+/// Validate a WebSocket token against auth config.
+async fn validate_ws_token(
+    token: &Option<String>,
+    auth_config: &crate::middleware::AuthConfig,
+) -> Result<String, &'static str> {
+    let token = token.as_ref().ok_or("Missing token parameter")?;
+
+    // Try as legacy API key first
+    if let Some(ref legacy_key) = auth_config.legacy_api_key
+        && token == legacy_key
+    {
+        return Ok("system".to_string());
+    }
+
+    // Try as JWT
+    if let Ok(claims) = cuttlefish_core::auth::validate_token(token, &auth_config.jwt_secret)
+        && claims.token_type == cuttlefish_core::auth::TokenType::Access
+    {
+        return Ok(claims.sub);
+    }
+
+    // Try as user API key (hash and lookup)
+    if let Some(ref db) = auth_config.db {
+        let key_hash = cuttlefish_core::auth::hash_api_key(token);
+        if let Ok(Some(api_key)) = cuttlefish_db::api_keys::get_api_key_by_hash(db, &key_hash).await
+        {
+            return Ok(api_key.user_id);
+        }
+    }
+
+    Err("Invalid token")
 }
 
 /// Handle an established WebSocket connection.
@@ -261,18 +409,16 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         let _ = drafts::clear_draft(state.db.pool(), &project_id).await;
 
                         // Check if a workflow is currently running for this project
-                        let is_running = match workflow_state::get_workflow_state(
-                            state.db.pool(),
-                            &project_id,
-                        )
-                        .await
-                        {
-                            Ok(Some(ws)) => {
-                                workflow_state::WorkflowStatus::parse(&ws.status)
-                                    == workflow_state::WorkflowStatus::Running
-                            }
-                            _ => false,
-                        };
+                        let is_running =
+                            match workflow_state::get_workflow_state(state.db.pool(), &project_id)
+                                .await
+                            {
+                                Ok(Some(ws)) => {
+                                    workflow_state::WorkflowStatus::parse(&ws.status)
+                                        == workflow_state::WorkflowStatus::Running
+                                }
+                                _ => false,
+                            };
 
                         if is_running {
                             // Queue the message for later processing
@@ -305,10 +451,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                         id: Uuid::new_v4().to_string(),
                                         timestamp: chrono::Utc::now().to_rfc3339(),
                                         agent: "orchestrator".to_string(),
-                                        action: format!(
-                                            "Message queued (position {})",
-                                            position
-                                        ),
+                                        action: format!("Message queued (position {})", position),
                                         level: "info".to_string(),
                                         project: project_id.clone(),
                                         context: Some(
@@ -370,9 +513,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                     .await;
 
                                 // Mark as processed before executing
-                                let _ =
-                                    message_queue::mark_processed(state.db.pool(), &queued.id)
-                                        .await;
+                                let _ = message_queue::mark_processed(state.db.pool(), &queued.id)
+                                    .await;
 
                                 if let Err(e) = execute_streaming(
                                     &state,
@@ -449,6 +591,165 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             }
                             Err(e) => {
                                 warn!("Failed to get draft: {}", e);
+                            }
+                        }
+                    }
+                    Ok(ClientMessage::ListTemplates) => {
+                        debug!("Client requested template list");
+                        let templates = state
+                            .template_registry
+                            .list()
+                            .into_iter()
+                            .map(|t| TemplateListItem {
+                                name: t.manifest.name,
+                                description: t.manifest.description,
+                                category: match &t.source {
+                                    cuttlefish_core::TemplateSource::Local(_) => {
+                                        "builtin".to_string()
+                                    }
+                                    cuttlefish_core::TemplateSource::Remote(_) => {
+                                        "community".to_string()
+                                    }
+                                },
+                                language: t.manifest.language,
+                                tags: t.manifest.tags,
+                            })
+                            .collect();
+
+                        if tx
+                            .send(ServerMessage::TemplateList { templates })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(ClientMessage::ListProjects) => {
+                        debug!("Client requested project list");
+                        match state.db.list_projects_dashboard().await {
+                            Ok(projects) => {
+                                let project_items: Vec<ProjectListItem> = projects
+                                    .into_iter()
+                                    .map(|p| ProjectListItem {
+                                        id: p.id.clone(),
+                                        name: p.name.clone(),
+                                        template_name: p.template_source.clone(),
+                                        execution_mode: if p.execution_mode.is_empty() {
+                                            "cloud".to_string()
+                                        } else {
+                                            p.execution_mode.clone()
+                                        },
+                                        running_status: if p.running_status.is_empty() {
+                                            "idle".to_string()
+                                        } else {
+                                            p.running_status.clone()
+                                        },
+                                        local_path: p.local_path.clone(),
+                                        tunnel_url: p.tunnel_subdomain.as_ref().map(|sub| {
+                                            format!("https://{}.cuttlefish.dev", sub)
+                                        }),
+                                        last_activity: p.last_activity_relative(),
+                                    })
+                                    .collect();
+
+                                if tx
+                                    .send(ServerMessage::ProjectList {
+                                        projects: project_items,
+                                    })
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to list projects: {}", e);
+                                let _ = tx
+                                    .send(ServerMessage::Error {
+                                        message: format!("Failed to list projects: {e}"),
+                                    })
+                                    .await;
+                            }
+                        }
+                    }
+                    Ok(ClientMessage::CreateProject {
+                        name,
+                        template,
+                        execution_mode,
+                        local_path,
+                    }) => {
+                        info!("Creating project: {} with template {}", name, template);
+                        let project_id = Uuid::new_v4().to_string();
+
+                        match state
+                            .db
+                            .create_project_full(
+                                &project_id,
+                                &name,
+                                "", // description
+                                Some(&template),
+                                &execution_mode,
+                                local_path.as_deref(),
+                                None, // tunnel_subdomain
+                                Some(&template), // template_source
+                            )
+                            .await
+                        {
+                            Ok(_) => {
+                                let _ = tx
+                                    .send(ServerMessage::ProjectCreated {
+                                        project_id: project_id.clone(),
+                                        name: name.clone(),
+                                    })
+                                    .await;
+
+                                let _ = tx
+                                    .send(ServerMessage::LogEntry {
+                                        id: Uuid::new_v4().to_string(),
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        agent: "system".to_string(),
+                                        action: format!(
+                                            "Created project '{}' with template '{}'",
+                                            name, template
+                                        ),
+                                        level: "info".to_string(),
+                                        project: project_id,
+                                        context: None,
+                                        stack_trace: None,
+                                    })
+                                    .await;
+                            }
+                            Err(e) => {
+                                error!("Failed to create project: {}", e);
+                                let _ = tx
+                                    .send(ServerMessage::Error {
+                                        message: format!("Failed to create project: {e}"),
+                                    })
+                                    .await;
+                            }
+                        }
+                    }
+                    Ok(ClientMessage::DeleteProject { project_id }) => {
+                        info!("Archiving project: {}", project_id);
+                        // Archive instead of hard delete for safety
+                        match state.db.update_project_status(&project_id, "archived").await {
+                            Ok(_) => {
+                                // Remove from active sessions if present
+                                state.active_sessions.remove(&project_id);
+
+                                let _ = tx
+                                    .send(ServerMessage::ProjectDeleted {
+                                        project_id: project_id.clone(),
+                                    })
+                                    .await;
+                            }
+                            Err(e) => {
+                                error!("Failed to archive project: {}", e);
+                                let _ = tx
+                                    .send(ServerMessage::Error {
+                                        message: format!("Failed to delete project: {e}"),
+                                    })
+                                    .await;
                             }
                         }
                     }

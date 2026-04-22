@@ -25,9 +25,20 @@ clap = { version = "4", features = ["derive", "env"] }
 url = "2"
 uuid = { version = "1", features = ["v4"] }
 anyhow = "1"
+chrono = "0.4"
 # Update checker dependencies
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 regex = "1"
 flate2 = "1"
 tar = "0.4"
 zip = "2"
+
+# Local mode dependencies (optional feature)
+cuttlefish-core = { path = "../cuttlefish-core", optional = true }
+cuttlefish-db = { path = "../cuttlefish-db", optional = true }
+cuttlefish-providers = { path = "../cuttlefish-providers", optional = true }
+cuttlefish-agents = { path = "../cuttlefish-agents", optional = true }
+
+[features]
+default = ["local"]
+local = ["dep:cuttlefish-core", "dep:cuttlefish-db", "dep:cuttlefish-providers", "dep:cuttlefish-agents"]

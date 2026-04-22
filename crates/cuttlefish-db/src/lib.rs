@@ -17,10 +17,10 @@ pub mod drafts;
 pub mod handoffs;
 /// Project invite database operations.
 pub mod invites;
-/// Database model types for all tables.
-pub mod models;
 /// Message queue persistence for queueing messages while agent is busy.
 pub mod message_queue;
+/// Database model types for all tables.
+pub mod models;
 /// Organization API key pool management.
 pub mod org_api_keys;
 /// Organization-level configuration management.
@@ -35,6 +35,8 @@ pub mod roles;
 pub mod sessions;
 /// Project sharing database operations.
 pub mod sharing;
+/// Session snapshots for point-in-time recovery.
+pub mod snapshots;
 /// Usage tracking for API cost monitoring.
 pub mod usage;
 /// Workflow state persistence.
@@ -244,6 +246,57 @@ impl Database {
         workflow_state::create_workflow_state_table(pool).await?;
         drafts::create_draft_prompts_table(pool).await?;
         message_queue::create_message_queue_table(pool).await?;
+        snapshots::create_snapshots_table(pool).await?;
+
+        // Add new project columns for execution mode and enhanced metadata
+        // Using separate ALTER TABLE statements since SQLite doesn't support multiple ADD COLUMN
+        sqlx::query(
+            "ALTER TABLE projects ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'cloud'",
+        )
+        .execute(pool)
+        .await
+        .ok(); // Ignore error if column already exists
+
+        sqlx::query("ALTER TABLE projects ADD COLUMN local_path TEXT")
+            .execute(pool)
+            .await
+            .ok();
+
+        sqlx::query(
+            "ALTER TABLE projects ADD COLUMN running_status TEXT NOT NULL DEFAULT 'idle'",
+        )
+        .execute(pool)
+        .await
+        .ok();
+
+        sqlx::query("ALTER TABLE projects ADD COLUMN tunnel_subdomain TEXT")
+            .execute(pool)
+            .await
+            .ok();
+
+        sqlx::query("ALTER TABLE projects ADD COLUMN last_activity_at TEXT")
+            .execute(pool)
+            .await
+            .ok();
+
+        sqlx::query("ALTER TABLE projects ADD COLUMN template_source TEXT")
+            .execute(pool)
+            .await
+            .ok();
+
+        sqlx::query(
+            "ALTER TABLE projects ADD COLUMN template_verified INTEGER NOT NULL DEFAULT 0",
+        )
+        .execute(pool)
+        .await
+        .ok();
+
+        // Index for faster project listing by activity
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_projects_last_activity ON projects(last_activity_at DESC)",
+        )
+        .execute(pool)
+        .await?;
 
         Ok(())
     }
@@ -297,6 +350,137 @@ impl Database {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Create a project with full configuration options.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_project_full(
+        &self,
+        id: &str,
+        name: &str,
+        description: &str,
+        template_name: Option<&str>,
+        execution_mode: &str,
+        local_path: Option<&str>,
+        tunnel_subdomain: Option<&str>,
+        template_source: Option<&str>,
+    ) -> Result<models::Project, sqlx::Error> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query_as::<_, models::Project>(
+            r#"INSERT INTO projects
+               (id, name, description, template_name, execution_mode, local_path,
+                tunnel_subdomain, template_source, last_activity_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               RETURNING *"#,
+        )
+        .bind(id)
+        .bind(name)
+        .bind(description)
+        .bind(template_name)
+        .bind(execution_mode)
+        .bind(local_path)
+        .bind(tunnel_subdomain)
+        .bind(template_source)
+        .bind(&now)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    /// List all projects for the dashboard, sorted by last activity.
+    pub async fn list_projects_dashboard(&self) -> Result<Vec<models::Project>, sqlx::Error> {
+        sqlx::query_as::<_, models::Project>(
+            r#"SELECT * FROM projects
+               WHERE status != 'archived'
+               ORDER BY
+                 CASE running_status
+                   WHEN 'running' THEN 0
+                   WHEN 'building' THEN 1
+                   ELSE 2
+                 END,
+                 last_activity_at DESC NULLS LAST,
+                 created_at DESC"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Update project running status.
+    pub async fn update_project_running_status(
+        &self,
+        id: &str,
+        running_status: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE projects SET running_status = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(running_status)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update project last activity timestamp.
+    pub async fn touch_project_activity(&self, id: &str) -> Result<(), sqlx::Error> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("UPDATE projects SET last_activity_at = ?, updated_at = datetime('now') WHERE id = ?")
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Update project execution mode.
+    pub async fn update_project_execution_mode(
+        &self,
+        id: &str,
+        execution_mode: &str,
+        local_path: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE projects SET execution_mode = ?, local_path = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(execution_mode)
+        .bind(local_path)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update project tunnel subdomain.
+    pub async fn update_project_tunnel(
+        &self,
+        id: &str,
+        tunnel_subdomain: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE projects SET tunnel_subdomain = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(tunnel_subdomain)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Check if a project name is available.
+    pub async fn is_project_name_available(&self, name: &str) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query("SELECT COUNT(*) as count FROM projects WHERE name = ?")
+            .bind(name)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.get::<i64, _>("count") == 0)
+    }
+
+    /// Check if a tunnel subdomain is available.
+    pub async fn is_subdomain_available(&self, subdomain: &str) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query("SELECT COUNT(*) as count FROM projects WHERE tunnel_subdomain = ?")
+            .bind(subdomain)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.get::<i64, _>("count") == 0)
     }
 
     /// Insert a conversation message.

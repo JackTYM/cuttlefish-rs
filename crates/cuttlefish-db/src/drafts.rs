@@ -75,11 +75,9 @@ pub async fn clear_draft(pool: &SqlitePool, project_id: &str) -> Result<bool, sq
 
 /// Get all draft prompts (for debugging/admin).
 pub async fn get_all_drafts(pool: &SqlitePool) -> Result<Vec<DraftPromptRecord>, sqlx::Error> {
-    sqlx::query_as::<_, DraftPromptRecord>(
-        "SELECT * FROM draft_prompts ORDER BY updated_at DESC",
-    )
-    .fetch_all(pool)
-    .await
+    sqlx::query_as::<_, DraftPromptRecord>("SELECT * FROM draft_prompts ORDER BY updated_at DESC")
+        .fetch_all(pool)
+        .await
 }
 
 #[cfg(test)]

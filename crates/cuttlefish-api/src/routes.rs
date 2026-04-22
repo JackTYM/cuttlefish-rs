@@ -17,6 +17,7 @@ use serde::Serialize;
 use tokio::sync::{Mutex, mpsc};
 
 use crate::approval_registry::SharedApprovalRegistry;
+use crate::middleware::AuthConfig;
 use crate::ws::ServerMessage;
 
 /// A session for a specific project, tracking active clients and workflow state.
@@ -103,6 +104,8 @@ pub struct AppState {
     pub persistence: Option<Arc<Mutex<ConversationPersistence>>>,
     /// Persistence configuration.
     pub persistence_config: PersistenceConfig,
+    /// Authentication configuration for WebSocket connections.
+    pub auth_config: Option<AuthConfig>,
 }
 
 /// Health check response.

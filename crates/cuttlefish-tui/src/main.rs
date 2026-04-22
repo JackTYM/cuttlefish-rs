@@ -1,9 +1,12 @@
 //! Cuttlefish terminal user interface.
 //!
-//! A lightweight TUI client that connects to a remote Cuttlefish server
-//! via WebSocket for real-time chat, build logs, and file diffs.
+//! A lightweight TUI client that can operate in two modes:
+//! - **Remote mode**: Connects to a Cuttlefish server via WebSocket
+//! - **Local mode**: Runs agents directly in-process (no server required)
 
 mod app;
+#[cfg(feature = "local")]
+mod local;
 mod mascot;
 mod ui;
 mod updater;
@@ -31,7 +34,23 @@ struct Cli {
     #[arg(long, default_value = "ws://localhost:8080")]
     server: String,
 
-    /// API key for authentication.
+    /// Run in local mode (no server required).
+    /// Uses providers configured in cuttlefish.toml.
+    #[cfg(feature = "local")]
+    #[arg(long)]
+    local: bool,
+
+    /// Path to config file (for local mode).
+    #[cfg(feature = "local")]
+    #[arg(long, default_value = "cuttlefish.toml")]
+    config: std::path::PathBuf,
+
+    /// Working directory for local mode.
+    #[cfg(feature = "local")]
+    #[arg(long)]
+    workdir: Option<std::path::PathBuf>,
+
+    /// API key for authentication (remote mode).
     #[arg(long, env = "CUTTLEFISH_API_KEY")]
     api_key: Option<String>,
 
@@ -70,6 +89,71 @@ enum ClientMessage {
         /// Project ID to subscribe to.
         project_id: String,
     },
+    /// Unsubscribe from project updates.
+    Unsubscribe {
+        /// Project ID to unsubscribe from.
+        project_id: String,
+    },
+    /// Request list of templates.
+    ListTemplates,
+    /// Request list of projects.
+    ListProjects,
+    /// Create a new project.
+    CreateProject {
+        /// Project name.
+        name: String,
+        /// Template name.
+        template: String,
+        /// Execution mode (cloud, build_remote_run_local, local).
+        execution_mode: String,
+        /// Local path for local mode.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        local_path: Option<String>,
+    },
+    /// Delete a project.
+    DeleteProject {
+        /// Project ID to delete.
+        project_id: String,
+    },
+}
+
+/// Template info from server.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+struct TemplateData {
+    /// Template name/ID.
+    name: String,
+    /// Template description.
+    description: String,
+    /// Category (builtin, user, community).
+    category: String,
+    /// Language/framework.
+    language: String,
+    /// Tags for filtering.
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+/// Project info from server.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+struct ProjectData {
+    /// Project ID.
+    id: String,
+    /// Project name.
+    name: String,
+    /// Template name used.
+    template_name: Option<String>,
+    /// Execution mode.
+    execution_mode: Option<String>,
+    /// Running status.
+    running_status: Option<String>,
+    /// Local path.
+    local_path: Option<String>,
+    /// Tunnel URL.
+    tunnel_url: Option<String>,
+    /// Last activity time (relative).
+    last_activity: Option<String>,
 }
 
 /// Inbound message from server.
@@ -131,6 +215,28 @@ enum ServerMessage {
         /// Project name.
         project: String,
     },
+    /// List of available templates.
+    TemplateList {
+        /// Templates.
+        templates: Vec<TemplateData>,
+    },
+    /// List of projects.
+    ProjectList {
+        /// Projects list.
+        projects: Vec<ProjectData>,
+    },
+    /// Project created confirmation.
+    ProjectCreated {
+        /// Project ID.
+        project_id: String,
+        /// Project name.
+        name: String,
+    },
+    /// Project deleted confirmation.
+    ProjectDeleted {
+        /// Project ID.
+        project_id: String,
+    },
     /// Pong response.
     Pong,
     /// Error message.
@@ -191,7 +297,15 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    // Run the app
+    // Run in local or remote mode
+    #[cfg(feature = "local")]
+    let result = if cli.local {
+        run_local_mode(&mut terminal, &mut app, &cli).await
+    } else {
+        run_app(&mut terminal, &mut app, ws_url).await
+    };
+
+    #[cfg(not(feature = "local"))]
     let result = run_app(&mut terminal, &mut app, ws_url).await;
 
     // Restore terminal
@@ -219,10 +333,44 @@ fn build_ws_url(server: &str, api_key: Option<&str>) -> anyhow::Result<Url> {
     url.set_path("/ws");
 
     if let Some(key) = api_key {
-        url.query_pairs_mut().append_pair("key", key);
+        url.query_pairs_mut().append_pair("token", key);
     }
 
     Ok(url)
+}
+
+/// Run in local mode (in-process agents, no server).
+#[cfg(feature = "local")]
+async fn run_local_mode(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
+    cli: &Cli,
+) -> anyhow::Result<()> {
+    let workdir = cli
+        .workdir
+        .clone()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+
+    app.add_message("system", "Initializing local mode...");
+    terminal.draw(|f| ui::render(app, f))?;
+
+    // Initialize local runtime
+    let runtime = match local::LocalRuntime::new(&cli.config, &workdir).await {
+        Ok(rt) => rt,
+        Err(e) => {
+            app.add_message("error", format!("Failed to initialize local mode: {}", e));
+            app.add_message("system", "Tip: Create a cuttlefish.toml with provider configuration");
+            app.add_message("system", "Example:");
+            app.add_message("system", "  [providers.anthropic]");
+            app.add_message("system", "  provider_type = \"anthropic\"");
+            app.add_message("system", "  model = \"claude-sonnet-4-6\"");
+
+            // Run in disconnected mode so user can see the error
+            return run_disconnected(terminal, app).await;
+        }
+    };
+
+    local::run_local(terminal, app, runtime).await
 }
 
 /// Run the main application event loop.
@@ -278,27 +426,172 @@ async fn run_disconnected(
 
             match key.code {
                 KeyCode::Tab => app.next_view(),
-                KeyCode::Char(c) => app.input.push(c),
-                KeyCode::Backspace => {
-                    app.input.pop();
-                }
-                KeyCode::Enter => {
-                    if !app.input.is_empty() {
-                        let input = std::mem::take(&mut app.input);
-                        app.add_message("user", &input);
-                        app.add_message("system", "Not connected to server");
+                KeyCode::Char(c) => {
+                    match app.view {
+                        app::AppView::History => {}
+                        app::AppView::Dashboard => {
+                            // N to create new project, D to delete
+                            if c == 'n' || c == 'N' {
+                                app.start_create_project();
+                            } else if c == 'd' || c == 'D' {
+                                if let Some(project_id) = app.delete_selected_project() {
+                                    app.add_message("system", format!("Deleted project: {}", project_id));
+                                }
+                            }
+                        }
+                        app::AppView::CreateProject => {
+                            // Text input for name step
+                            if app.create_project.step == app::CreateProjectStep::Name {
+                                app.create_project.name.push(c);
+                                app.create_project.name_message.clear();
+                            }
+                        }
+                        _ => {
+                            app.input.push(c);
+                        }
                     }
                 }
-                KeyCode::Up | KeyCode::PageUp => {
-                    let amount = if key.code == KeyCode::PageUp { 10 } else { 1 };
-                    app.scroll_up(amount);
+                KeyCode::Backspace => {
+                    match app.view {
+                        app::AppView::History | app::AppView::Dashboard => {}
+                        app::AppView::CreateProject => {
+                            if app.create_project.step == app::CreateProjectStep::Name {
+                                app.create_project.name.pop();
+                            }
+                        }
+                        _ => {
+                            app.input.pop();
+                        }
+                    }
                 }
-                KeyCode::Down | KeyCode::PageDown => {
-                    let amount = if key.code == KeyCode::PageDown { 10 } else { 1 };
-                    app.scroll_down(amount);
+                KeyCode::Enter => {
+                    match app.view {
+                        app::AppView::History => {
+                            if app.show_restore_options {
+                                if let Some((option, msg_index)) = app.confirm_restore() {
+                                    app.add_message(
+                                        "system",
+                                        format!(
+                                            "Restore {} at message {} (not yet implemented)",
+                                            option.label(),
+                                            msg_index
+                                        ),
+                                    );
+                                    app.exit_history_mode();
+                                }
+                            } else {
+                                app.show_restore_popup();
+                            }
+                        }
+                        app::AppView::Dashboard => {
+                            // Open selected project
+                            if let Some(proj) = app.selected_project().cloned() {
+                                app.open_project(&proj.id);
+                            }
+                        }
+                        app::AppView::CreateProject => {
+                            // Advance wizard or complete
+                            if app.create_project_advance() {
+                                // Wizard complete - create the project locally
+                                let name = app.create_project.name.clone();
+                                let template = app.selected_template().map(|t| t.name.clone());
+                                let mode = app.selected_execution_mode();
+                                let local_path = if mode == app::ExecutionMode::Local {
+                                    Some(app.create_project.local_path.clone())
+                                } else {
+                                    None
+                                };
+
+                                // Create project info and add to list
+                                let project_id = uuid::Uuid::new_v4().to_string();
+                                app.projects.push(app::ProjectInfo {
+                                    id: project_id.clone(),
+                                    name: name.clone(),
+                                    template_name: template.clone(),
+                                    execution_mode: mode,
+                                    running_status: app::RunningStatus::Idle,
+                                    local_path,
+                                    tunnel_url: if mode == app::ExecutionMode::Cloud {
+                                        Some(format!("https://{}.cuttlefish.ai", name))
+                                    } else {
+                                        None
+                                    },
+                                    last_activity: "now".to_string(),
+                                    active: true,
+                                });
+
+                                // Mark other projects as inactive
+                                for p in app.projects.iter_mut() {
+                                    if p.id != project_id {
+                                        p.active = false;
+                                    }
+                                }
+
+                                app.add_message("system", format!("Created project: {}", name));
+                                app.open_project(&project_id);
+                            }
+                        }
+                        _ => {
+                            if !app.input.is_empty() {
+                                let input = std::mem::take(&mut app.input);
+                                app.add_to_history(&input);
+
+                                if let Some(cmd) = app.handle_command(&input) {
+                                    match cmd {
+                                        app::SlashCommand::Help => app.go_to_view(app::AppView::Help),
+                                        app::SlashCommand::ListProjects => {
+                                            app.go_to_view(app::AppView::Dashboard)
+                                        }
+                                        app::SlashCommand::ClearChat => app.clear_chat(),
+                                        app::SlashCommand::Quit => return Ok(()),
+                                        _ => {
+                                            app.add_message("system", "Not connected to server");
+                                        }
+                                    }
+                                } else {
+                                    app.add_message("user", &input);
+                                    app.add_message("system", "Not connected to server");
+                                }
+                            }
+                        }
+                    }
                 }
+                KeyCode::Up => {
+                    match app.view {
+                        app::AppView::History => app.history_prev(),
+                        app::AppView::Dashboard => app.select_prev_project(),
+                        app::AppView::CreateProject => app.create_project_prev(),
+                        _ => {
+                            if app.input.is_empty() {
+                                app.history_up();
+                            } else {
+                                app.scroll_up(1);
+                            }
+                        }
+                    }
+                }
+                KeyCode::Down => {
+                    match app.view {
+                        app::AppView::History => app.history_next(),
+                        app::AppView::Dashboard => app.select_next_project(),
+                        app::AppView::CreateProject => app.create_project_next(),
+                        _ => {
+                            if app.input.is_empty() {
+                                app.history_down();
+                            } else {
+                                app.scroll_down(1);
+                            }
+                        }
+                    }
+                }
+                KeyCode::PageUp => app.scroll_up(10),
+                KeyCode::PageDown => app.scroll_down(10),
                 KeyCode::Home => app.scroll_to_bottom(),
-                KeyCode::Esc => return Ok(()),
+                KeyCode::Esc => {
+                    if app.handle_esc() {
+                        return Ok(());
+                    }
+                }
                 _ => {}
             }
         }
@@ -322,6 +615,10 @@ where
 {
     // Channel for sending messages to WebSocket
     let (tx, mut cmd_rx) = tokio::sync::mpsc::channel::<ClientMessage>(32);
+
+    // Request project list and templates for dashboard
+    let _ = tx.send(ClientMessage::ListProjects).await;
+    let _ = tx.send(ClientMessage::ListTemplates).await;
 
     // Subscribe to project if we have one
     if let Some(ref project_id) = app.project_id {
@@ -351,40 +648,199 @@ where
 
                         match key.code {
                             KeyCode::Tab => app.next_view(),
-                            KeyCode::Char(c) => app.input.push(c),
-                            KeyCode::Backspace => { app.input.pop(); }
-                            KeyCode::Enter => {
-                                if !app.input.is_empty() {
-                                    let input = std::mem::take(&mut app.input);
-                                    app.add_message("user", &input);
-
-                                    // Get or create project ID
-                                    let project_id = app.project_id
-                                        .clone()
-                                        .unwrap_or_else(|| {
-                                            let id = uuid::Uuid::new_v4().to_string();
-                                            app.project_id = Some(id.clone());
-                                            id
-                                        });
-
-                                    // Send chat message
-                                    let msg = ClientMessage::Chat {
-                                        project_id,
-                                        content: input,
-                                    };
-                                    let _ = tx.send(msg).await;
+                            KeyCode::Char(c) => {
+                                match app.view {
+                                    app::AppView::History => {}
+                                    app::AppView::Dashboard => {
+                                        if c == 'n' || c == 'N' {
+                                            app.start_create_project();
+                                            // Request templates from server
+                                            let _ = tx.send(ClientMessage::ListTemplates).await;
+                                        } else if c == 'd' || c == 'D' {
+                                            if let Some(project_id) = app.delete_selected_project() {
+                                                // Send delete request to server
+                                                let _ = tx.send(ClientMessage::DeleteProject {
+                                                    project_id,
+                                                }).await;
+                                            }
+                                        }
+                                    }
+                                    app::AppView::CreateProject => {
+                                        if app.create_project.step == app::CreateProjectStep::Name {
+                                            app.create_project.name.push(c);
+                                            app.create_project.name_message.clear();
+                                        }
+                                    }
+                                    _ => {
+                                        app.input.push(c);
+                                    }
                                 }
                             }
-                            KeyCode::Up | KeyCode::PageUp => {
-                                let amount = if key.code == KeyCode::PageUp { 10 } else { 1 };
-                                app.scroll_up(amount);
+                            KeyCode::Backspace => {
+                                match app.view {
+                                    app::AppView::History | app::AppView::Dashboard => {}
+                                    app::AppView::CreateProject => {
+                                        if app.create_project.step == app::CreateProjectStep::Name {
+                                            app.create_project.name.pop();
+                                        }
+                                    }
+                                    _ => {
+                                        app.input.pop();
+                                    }
+                                }
                             }
-                            KeyCode::Down | KeyCode::PageDown => {
-                                let amount = if key.code == KeyCode::PageDown { 10 } else { 1 };
-                                app.scroll_down(amount);
+                            KeyCode::Enter => {
+                                match app.view {
+                                    app::AppView::History => {
+                                        if app.show_restore_options {
+                                            if let Some((option, msg_index)) = app.confirm_restore() {
+                                                app.add_message(
+                                                    "system",
+                                                    format!(
+                                                        "Restore {} at message {} (not yet implemented)",
+                                                        option.label(),
+                                                        msg_index
+                                                    ),
+                                                );
+                                                app.exit_history_mode();
+                                            }
+                                        } else {
+                                            app.show_restore_popup();
+                                        }
+                                    }
+                                    app::AppView::Dashboard => {
+                                        if let Some(proj) = app.selected_project().cloned() {
+                                            // Unsubscribe from old project
+                                            if let Some(ref old_id) = app.project_id {
+                                                let _ = tx.send(ClientMessage::Unsubscribe {
+                                                    project_id: old_id.clone(),
+                                                }).await;
+                                            }
+                                            // Open and subscribe to project
+                                            app.open_project(&proj.id);
+                                            let _ = tx.send(ClientMessage::Subscribe {
+                                                project_id: proj.id,
+                                            }).await;
+                                        }
+                                    }
+                                    app::AppView::CreateProject => {
+                                        if app.create_project_advance() {
+                                            // Wizard complete - send create project to server
+                                            let name = app.create_project.name.clone();
+                                            let template = app
+                                                .selected_template()
+                                                .map(|t| t.name.clone())
+                                                .unwrap_or_else(|| "blank".to_string());
+                                            let mode = app.selected_execution_mode();
+                                            let local_path = if mode == app::ExecutionMode::Local {
+                                                Some(app.create_project.local_path.clone())
+                                            } else {
+                                                None
+                                            };
+
+                                            // Send create project request to server
+                                            let _ = tx.send(ClientMessage::CreateProject {
+                                                name: name.clone(),
+                                                template,
+                                                execution_mode: mode.as_str().to_string(),
+                                                local_path,
+                                            }).await;
+
+                                            app.add_message("system", format!("Creating project: {}...", name));
+                                            // Server will respond with ProjectCreated which will
+                                            // add the project to the list and open it
+                                            app.view = app::AppView::Dashboard;
+                                        }
+                                    }
+                                    _ => {
+                                        if !app.input.is_empty() {
+                                            let input = std::mem::take(&mut app.input);
+                                            app.add_to_history(&input);
+
+                                            if let Some(cmd) = app.handle_command(&input) {
+                                                match cmd {
+                                                    app::SlashCommand::Help => app.go_to_view(app::AppView::Help),
+                                                    app::SlashCommand::ListProjects => {
+                                                        let _ = tx.send(ClientMessage::ListProjects).await;
+                                                        app.go_to_view(app::AppView::Dashboard);
+                                                    }
+                                                    app::SlashCommand::NewProject { name: _ } => {
+                                                        // Start the create project wizard instead
+                                                        app.start_create_project();
+                                                        let _ = tx.send(ClientMessage::ListTemplates).await;
+                                                    }
+                                                    app::SlashCommand::SwitchProject { id } => {
+                                                        if let Some(ref old_id) = app.project_id {
+                                                            let _ = tx.send(ClientMessage::Unsubscribe {
+                                                                project_id: old_id.clone(),
+                                                            }).await;
+                                                        }
+                                                        app.project_id = Some(id.clone());
+                                                        let _ = tx.send(ClientMessage::Subscribe {
+                                                            project_id: id.clone(),
+                                                        }).await;
+                                                        app.add_message("system", format!("Switched to project: {}", id));
+                                                    }
+                                                    app::SlashCommand::ClearChat => app.clear_chat(),
+                                                    app::SlashCommand::Quit => return Ok(()),
+                                                }
+                                            } else if !input.starts_with('/') {
+                                                app.add_message("user", &input);
+
+                                                let project_id = app.project_id
+                                                    .clone()
+                                                    .unwrap_or_else(|| {
+                                                        let id = uuid::Uuid::new_v4().to_string();
+                                                        app.project_id = Some(id.clone());
+                                                        id
+                                                    });
+
+                                                let msg = ClientMessage::Chat {
+                                                    project_id,
+                                                    content: input,
+                                                };
+                                                let _ = tx.send(msg).await;
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                            KeyCode::Up => {
+                                match app.view {
+                                    app::AppView::History => app.history_prev(),
+                                    app::AppView::Dashboard => app.select_prev_project(),
+                                    app::AppView::CreateProject => app.create_project_prev(),
+                                    _ => {
+                                        if app.input.is_empty() {
+                                            app.history_up();
+                                        } else {
+                                            app.scroll_up(1);
+                                        }
+                                    }
+                                }
+                            }
+                            KeyCode::Down => {
+                                match app.view {
+                                    app::AppView::History => app.history_next(),
+                                    app::AppView::Dashboard => app.select_next_project(),
+                                    app::AppView::CreateProject => app.create_project_next(),
+                                    _ => {
+                                        if app.input.is_empty() {
+                                            app.history_down();
+                                        } else {
+                                            app.scroll_down(1);
+                                        }
+                                    }
+                                }
+                            }
+                            KeyCode::PageUp => app.scroll_up(10),
+                            KeyCode::PageDown => app.scroll_down(10),
                             KeyCode::Home => app.scroll_to_bottom(),
-                            KeyCode::Esc => return Ok(()),
+                            KeyCode::Esc => {
+                                if app.handle_esc() {
+                                    return Ok(());
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -544,6 +1000,96 @@ fn handle_server_message(app: &mut App, text: &str) {
         } => {
             app.add_log_line(format!("[{level}] [{project}] {agent}: {action}"));
         }
+        ServerMessage::TemplateList { templates } => {
+            // Update templates in create project wizard
+            app.create_project.templates = templates
+                .into_iter()
+                .map(|t| app::TemplateInfo {
+                    name: t.name,
+                    description: t.description,
+                    category: t.category,
+                    language: t.language,
+                })
+                .collect();
+            // Add blank template if not present
+            if !app
+                .create_project
+                .templates
+                .iter()
+                .any(|t| t.name == "blank")
+            {
+                app.create_project.templates.push(app::TemplateInfo {
+                    name: "blank".to_string(),
+                    description: "Empty project, you define everything".to_string(),
+                    category: "builtin".to_string(),
+                    language: "Any".to_string(),
+                });
+            }
+        }
+        ServerMessage::ProjectList { projects } => {
+            app.projects = projects
+                .into_iter()
+                .map(|p| app::ProjectInfo {
+                    id: p.id.clone(),
+                    name: p.name,
+                    template_name: p.template_name,
+                    execution_mode: p
+                        .execution_mode
+                        .map(|m| app::ExecutionMode::from_str(&m))
+                        .unwrap_or_default(),
+                    running_status: p
+                        .running_status
+                        .map(|s| app::RunningStatus::from_str(&s))
+                        .unwrap_or_default(),
+                    local_path: p.local_path,
+                    tunnel_url: p.tunnel_url,
+                    last_activity: p.last_activity.unwrap_or_else(|| "unknown".to_string()),
+                    active: app.project_id.as_ref().is_some_and(|id| *id == p.id),
+                })
+                .collect();
+            app.projects_selected = 0;
+        }
+        ServerMessage::ProjectCreated { project_id, name } => {
+            app.add_message("system", format!("Created project: {}", name));
+            // Mark all existing projects as inactive
+            for p in app.projects.iter_mut() {
+                p.active = false;
+            }
+            // Add new project as active using wizard state
+            let mode = app.selected_execution_mode();
+            let local_path = if mode == app::ExecutionMode::Local {
+                Some(app.create_project.local_path.clone())
+            } else {
+                None
+            };
+            app.projects.push(app::ProjectInfo {
+                id: project_id.clone(),
+                name: name.clone(),
+                template_name: app.selected_template().map(|t| t.name.clone()),
+                execution_mode: mode,
+                running_status: app::RunningStatus::Idle,
+                local_path,
+                tunnel_url: None,
+                last_activity: "now".to_string(),
+                active: true,
+            });
+            // Open the project and switch to chat view
+            // Note: subscription is handled separately in the event loop
+            app.open_project(&project_id);
+        }
+        ServerMessage::ProjectDeleted { project_id } => {
+            app.add_message("system", format!("Deleted project: {}", project_id));
+            // Remove from local list
+            app.projects.retain(|p| p.id != project_id);
+            // Clear active project if it was deleted
+            if app.project_id.as_ref().is_some_and(|id| *id == project_id) {
+                app.project_id = None;
+            }
+            // Adjust selection
+            if app.projects_selected >= app.projects.len() && app.projects_selected > 0 {
+                app.projects_selected -= 1;
+            }
+        }
         ServerMessage::Pong => {
             // Connection alive, no action needed
         }
@@ -566,7 +1112,7 @@ mod tests {
     #[test]
     fn test_build_ws_url_with_api_key() {
         let url = build_ws_url("localhost:8080", Some("test-key")).unwrap();
-        assert_eq!(url.as_str(), "ws://localhost:8080/ws?key=test-key");
+        assert_eq!(url.as_str(), "ws://localhost:8080/ws?token=test-key");
     }
 
     #[test]

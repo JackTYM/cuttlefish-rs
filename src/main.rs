@@ -318,6 +318,15 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Create auth config first so we can share it with AppState and ApiConfig
+    let jwt_secret = std::env::var("CUTTLEFISH_JWT_SECRET")
+        .unwrap_or_else(|_| api_key.clone())
+        .into_bytes();
+
+    let auth_config = AuthConfig::new(jwt_secret)
+        .with_legacy_api_key(api_key.clone())
+        .with_db((*pool).clone());
+
     let state = AppState {
         api_key: api_key.clone(),
         template_registry,
@@ -330,15 +339,8 @@ async fn main() -> anyhow::Result<()> {
         approval_registry,
         persistence,
         persistence_config,
+        auth_config: Some(auth_config.clone()),
     };
-
-    let jwt_secret = std::env::var("CUTTLEFISH_JWT_SECRET")
-        .unwrap_or_else(|_| api_key.clone())
-        .into_bytes();
-
-    let auth_config = AuthConfig::new(jwt_secret)
-        .with_legacy_api_key(api_key)
-        .with_db((*pool).clone());
 
     let projects_dir = std::env::var("CUTTLEFISH_PROJECTS_DIR")
         .map(PathBuf::from)

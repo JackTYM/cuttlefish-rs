@@ -1445,8 +1445,13 @@ name = "cuttlefish-tui"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "crossterm",
+ "cuttlefish-agents",
+ "cuttlefish-core",
+ "cuttlefish-db",
+ "cuttlefish-providers",
  "flate2",
  "futures",
  "ratatui",

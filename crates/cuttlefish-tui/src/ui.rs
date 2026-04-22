@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use crate::app::{App, AppView};
@@ -31,68 +31,133 @@ pub fn render(app: &App, frame: &mut Frame) {
 
 /// Render the header bar.
 fn render_header(app: &App, frame: &mut Frame, area: Rect) {
-    let status = if app.connected {
-        "🟢 Connected"
+    let status = if app.connected { "🟢" } else { "🔴" };
+
+    // Active tab styling
+    let active_style = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let inactive_style = Style::default().fg(Color::DarkGray);
+
+    let tab_dashboard = if app.view == AppView::Dashboard {
+        Span::styled("[Projects]", active_style)
     } else {
-        "🔴 Disconnected"
-    };
-    let project = app.project_id.as_deref().unwrap_or("No project");
-    let tab_chat = if app.view == AppView::Chat {
-        "[Chat]"
-    } else {
-        " Chat "
-    };
-    let tab_diff = if app.view == AppView::Diff {
-        "[Diff]"
-    } else {
-        " Diff "
-    };
-    let tab_log = if app.view == AppView::Log {
-        "[Log] "
-    } else {
-        " Log  "
-    };
-    let tab_mascot = if app.view == AppView::Mascot {
-        "[Mascot]"
-    } else {
-        " Mascot "
+        Span::styled(" Projects ", inactive_style)
     };
 
-    let header = Paragraph::new(Line::from(vec![
+    // Only show project-specific tabs if we have a project
+    let project_tabs: Vec<Span> = if app.project_id.is_some() {
+        vec![
+            if app.view == AppView::Chat {
+                Span::styled("[Chat]", active_style)
+            } else {
+                Span::styled(" Chat ", inactive_style)
+            },
+            if app.view == AppView::Diff {
+                Span::styled("[Diff]", active_style)
+            } else {
+                Span::styled(" Diff ", inactive_style)
+            },
+            if app.view == AppView::Log {
+                Span::styled("[Log]", active_style)
+            } else {
+                Span::styled(" Log ", inactive_style)
+            },
+        ]
+    } else {
+        vec![]
+    };
+
+    let tab_help = if app.view == AppView::Help {
+        Span::styled("[?]", active_style)
+    } else {
+        Span::styled(" ? ", inactive_style)
+    };
+
+    // Special mode indicators
+    let mode_indicator = match app.view {
+        AppView::History => Span::styled(
+            " [HISTORY] ",
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
+        AppView::CreateProject => Span::styled(
+            " [NEW PROJECT] ",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        _ => Span::raw(""),
+    };
+
+    // Project name display
+    let project_display = if let Some(ref id) = app.project_id {
+        // Find project name from list
+        let name = app
+            .projects
+            .iter()
+            .find(|p| p.id == *id)
+            .map(|p| p.name.as_str())
+            .unwrap_or(id.as_str());
+        Span::styled(name, Style::default().fg(Color::Yellow))
+    } else {
+        Span::styled("No project", Style::default().fg(Color::DarkGray))
+    };
+
+    // Context-sensitive hints
+    let nav_hint = match app.view {
+        AppView::Dashboard => {
+            Span::styled(" │ Enter=Open N=New ?=Help", Style::default().fg(Color::DarkGray))
+        }
+        AppView::History => {
+            Span::styled(" │ Esc=back ↑↓=select Enter=restore", Style::default().fg(Color::DarkGray))
+        }
+        AppView::CreateProject => {
+            Span::styled(" │ Esc=back Enter=continue", Style::default().fg(Color::DarkGray))
+        }
+        AppView::Chat => {
+            Span::styled(" │ Tab ↹ │ Esc Esc=history", Style::default().fg(Color::DarkGray))
+        }
+        _ => {
+            Span::styled(" │ Tab ↹", Style::default().fg(Color::DarkGray))
+        }
+    };
+
+    // Build header
+    let mut spans = vec![
         Span::styled(
-            "🐙 Cuttlefish ",
+            "🐙 ",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw("| "),
-        Span::styled(tab_chat, Style::default().fg(Color::White)),
-        Span::styled(tab_diff, Style::default().fg(Color::White)),
-        Span::styled(tab_log, Style::default().fg(Color::White)),
-        Span::styled(tab_mascot, Style::default().fg(Color::White)),
-        Span::raw(" | "),
-        Span::raw(project),
-        Span::raw(" | "),
-        Span::raw(status),
-        Span::raw(" | Tab: switch view | Ctrl-C: quit"),
-    ]));
+        tab_dashboard,
+    ];
+    spans.extend(project_tabs);
+    spans.push(tab_help);
+    spans.push(mode_indicator);
+    spans.push(Span::raw(" │ "));
+    spans.push(project_display);
+    spans.push(Span::raw(" "));
+    spans.push(Span::raw(status));
+    spans.push(nav_hint);
+
+    let header = Paragraph::new(Line::from(spans));
     frame.render_widget(header, area);
 }
 
 /// Render the main content area based on current view.
 fn render_main(app: &App, frame: &mut Frame, area: Rect) {
     match app.view {
+        AppView::Dashboard => render_dashboard(app, frame, area),
         AppView::Chat => render_chat(app, frame, area),
         AppView::Diff => render_diff(app, frame, area),
         AppView::Log => render_log(app, frame, area),
-        AppView::Mascot => render_mascot(app, frame, area),
+        AppView::Help => render_help(frame, area),
+        AppView::History => render_history(app, frame, area),
+        AppView::CreateProject => render_create_project(app, frame, area),
     }
-}
-
-/// Render the cuttlefish mascot.
-fn render_mascot(app: &App, frame: &mut Frame, area: Rect) {
-    let widget = MascotWidget::new().with_mouth_open(app.mouth_open());
-    frame.render_widget(widget, area);
 }
 
 /// Render the chat message list with mascot in top-right corner.
@@ -284,16 +349,499 @@ fn render_log(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(log_widget, area);
 }
 
+/// Render the project dashboard view.
+fn render_dashboard(app: &App, frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Projects │ ↑↓=Select  Enter=Open  N=New  D=Delete")
+        .border_style(Style::default().fg(Color::Cyan));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if app.projects.is_empty() {
+        let empty_msg = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  No projects yet",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Press N to create your first project",
+                Style::default().fg(Color::Cyan),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Or connect to a server with existing projects",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]);
+        frame.render_widget(empty_msg, inner);
+        return;
+    }
+
+    // Render each project as a card-like row
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, proj) in app.projects.iter().enumerate() {
+        let is_selected = i == app.projects_selected;
+
+        // Selection marker and status emoji
+        let marker = if is_selected { "▶ " } else { "  " };
+        let status_emoji = proj.running_status.emoji();
+
+        // Project name with styling
+        let name_style = if is_selected {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else if proj.active {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        // First line: status + name + activity
+        lines.push(Line::from(vec![
+            Span::raw(marker),
+            Span::raw(status_emoji),
+            Span::raw(" "),
+            Span::styled(&proj.name, name_style),
+            Span::styled(
+                format!("  {}", proj.last_activity),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]));
+
+        // Second line: template + mode + path/url
+        let template = proj
+            .template_name
+            .as_deref()
+            .unwrap_or("no template");
+        let mode = proj.execution_mode.label();
+
+        let location = match proj.execution_mode {
+            crate::app::ExecutionMode::Cloud => {
+                proj.tunnel_url.as_deref().unwrap_or("").to_string()
+            }
+            crate::app::ExecutionMode::Local | crate::app::ExecutionMode::BuildRemoteRunLocal => {
+                proj.local_path.as_deref().unwrap_or("").to_string()
+            }
+        };
+
+        let indent = if is_selected { "    " } else { "    " };
+        lines.push(Line::from(vec![
+            Span::styled(indent, Style::default()),
+            Span::styled(template, Style::default().fg(Color::Yellow)),
+            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(mode, Style::default().fg(Color::Magenta)),
+            if !location.is_empty() {
+                Span::styled(format!(" │ {}", location), Style::default().fg(Color::DarkGray))
+            } else {
+                Span::raw("")
+            },
+        ]));
+
+        // Add spacing between projects
+        lines.push(Line::from(""));
+    }
+
+    let list = Paragraph::new(lines);
+    frame.render_widget(list, inner);
+}
+
+/// Render the create project wizard.
+fn render_create_project(app: &App, frame: &mut Frame, area: Rect) {
+    use crate::app::{CreateProjectStep, ExecutionMode};
+
+    let step_num = match app.create_project.step {
+        CreateProjectStep::Name => 1,
+        CreateProjectStep::Template => 2,
+        CreateProjectStep::Mode => 3,
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!("Create New Project │ Step {} of 3", step_num))
+        .border_style(Style::default().fg(Color::Green));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    match app.create_project.step {
+        CreateProjectStep::Name => {
+            let lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Name your project",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(
+                        format!("  {}█  ", app.create_project.name),
+                        Style::default().fg(Color::Cyan).bg(Color::DarkGray),
+                    ),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  This will be used for the project directory and tunnel URL.",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                if !app.create_project.name.is_empty() {
+                    Line::from(Span::styled(
+                        format!("  URL: {}.cuttlefish.ai", app.create_project.name),
+                        Style::default().fg(Color::Yellow),
+                    ))
+                } else {
+                    Line::from("")
+                },
+                Line::from(""),
+                if !app.create_project.name_message.is_empty() {
+                    Line::from(Span::styled(
+                        format!("  {}", app.create_project.name_message),
+                        Style::default().fg(Color::Red),
+                    ))
+                } else {
+                    Line::from("")
+                },
+            ];
+            frame.render_widget(Paragraph::new(lines), inner);
+        }
+
+        CreateProjectStep::Template => {
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Choose a template",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+            ];
+
+            for (i, template) in app.create_project.templates.iter().enumerate() {
+                let is_selected = i == app.create_project.template_selected;
+                let marker = if is_selected { "  ▶ " } else { "    " };
+                let style = if is_selected {
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(marker, style),
+                    Span::styled(&template.name, style),
+                    Span::styled(
+                        format!("  ({})", template.language),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                ]));
+                lines.push(Line::from(Span::styled(
+                    format!("      {}", template.description),
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+
+            frame.render_widget(Paragraph::new(lines), inner);
+        }
+
+        CreateProjectStep::Mode => {
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Where should it run?",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+            ];
+
+            let modes = ExecutionMode::all();
+            let icons = ["☁️ ", "📦 ", "🔧 "];
+
+            for (i, mode) in modes.iter().enumerate() {
+                let is_selected = i == app.create_project.mode_selected;
+                let marker = if is_selected { "  ▶ " } else { "    " };
+                let style = if is_selected {
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(marker, style),
+                    Span::raw(icons[i]),
+                    Span::styled(mode.label(), style),
+                    if i == 0 {
+                        Span::styled(" (recommended)", Style::default().fg(Color::Green))
+                    } else {
+                        Span::raw("")
+                    },
+                ]));
+                lines.push(Line::from(Span::styled(
+                    format!("      {}", mode.description()),
+                    Style::default().fg(Color::DarkGray),
+                )));
+                lines.push(Line::from(""));
+            }
+
+            // Show local path input if Local mode is selected
+            if app.create_project.mode_selected == 2 {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    "  Local path:",
+                    Style::default().fg(Color::White),
+                )));
+                lines.push(Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled(
+                        &app.create_project.local_path,
+                        Style::default().fg(Color::Yellow),
+                    ),
+                ]));
+            }
+
+            frame.render_widget(Paragraph::new(lines), inner);
+        }
+    }
+}
+
+/// Render the help view.
+fn render_help(frame: &mut Frame, area: Rect) {
+    let help_text = vec![
+        Line::from(Span::styled(
+            "Cuttlefish TUI - Quick Reference",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Navigation",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  Tab          Cycle through views"),
+        Line::from("  ↑/↓          Scroll or select items"),
+        Line::from("  PageUp/Down  Scroll faster"),
+        Line::from("  Home         Jump to bottom"),
+        Line::from("  Ctrl-C/Esc   Quit"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Slash Commands",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  /help, /h    Show this help"),
+        Line::from("  /projects, /p  List projects"),
+        Line::from("  /new <name>  Create a new project"),
+        Line::from("  /switch <id> Switch to a project"),
+        Line::from("  /clear       Clear chat history"),
+        Line::from("  /chat        Go to chat view"),
+        Line::from("  /diff        Go to diff view"),
+        Line::from("  /log         Go to log view"),
+        Line::from("  /quit, /q    Exit the TUI"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Input History",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  ↑/↓ (empty)  Browse previous inputs"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Tip: Just start typing to chat with the AI!",
+            Style::default().fg(Color::Green),
+        )),
+    ];
+
+    let help_widget = Paragraph::new(help_text)
+        .block(Block::default().borders(Borders::ALL).title("Help"))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(help_widget, area);
+}
+
+/// Render the history mode view with message selection and restore options.
+fn render_history(app: &App, frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("History - Select a message to restore (↑/↓ select, Enter restore, Esc cancel)")
+        .border_style(Style::default().fg(Color::Magenta));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if app.messages.is_empty() {
+        let empty_msg = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "No messages in history.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ]);
+        frame.render_widget(empty_msg, inner);
+        return;
+    }
+
+    // Calculate how many messages we can show
+    let available_height = inner.height as usize;
+    let msg_count = app.messages.len();
+
+    // Build lines for each message (reversed order - most recent first)
+    let mut lines: Vec<Line> = Vec::new();
+    for (rev_idx, msg) in app.messages.iter().rev().enumerate() {
+        let is_selected = rev_idx == app.history_selected;
+        let has_snapshot = app.message_has_snapshot(msg_count.saturating_sub(1 + rev_idx));
+
+        // Selection marker
+        let marker = if is_selected { "▶ " } else { "  " };
+
+        // Snapshot indicator
+        let snapshot_marker = if has_snapshot { "⬤ " } else { "  " };
+
+        // Message preview (truncate long messages)
+        let preview: String = msg
+            .content
+            .chars()
+            .take(60)
+            .collect::<String>()
+            .replace('\n', " ");
+        let preview = if msg.content.len() > 60 {
+            format!("{}...", preview)
+        } else {
+            preview
+        };
+
+        // Role color
+        let role_color = match msg.sender.as_str() {
+            "user" => Color::Green,
+            "assistant" | "coder" | "orchestrator" => Color::Cyan,
+            "system" => Color::Blue,
+            "error" => Color::Red,
+            _ => Color::White,
+        };
+
+        // Build the line
+        let style = if is_selected {
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+
+        let snapshot_style = if has_snapshot {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(marker, style),
+            Span::styled(snapshot_marker, snapshot_style),
+            Span::styled(
+                format!("[{}] ", msg.sender),
+                Style::default().fg(role_color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(preview, style),
+        ]));
+    }
+
+    // Calculate scroll to keep selected item visible
+    let scroll_offset = if app.history_selected >= available_height {
+        app.history_selected - available_height + 1
+    } else {
+        0
+    };
+
+    let history_list = Paragraph::new(lines).scroll((scroll_offset as u16, 0));
+    frame.render_widget(history_list, inner);
+
+    // Render restore options popup if showing
+    if app.show_restore_options {
+        render_restore_popup(app, frame, area);
+    }
+}
+
+/// Render the restore options popup.
+fn render_restore_popup(app: &App, frame: &mut Frame, area: Rect) {
+    use crate::app::RestoreOption;
+
+    // Calculate popup size and position (centered)
+    let popup_width = 35u16;
+    let popup_height = 8u16;
+    let popup_x = area.x + (area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = area.y + (area.height.saturating_sub(popup_height)) / 2;
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    // Clear the popup area with a block
+    let popup_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Restore Options")
+        .border_style(Style::default().fg(Color::Cyan))
+        .style(Style::default().bg(Color::Black));
+
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(popup_block.clone(), popup_area);
+
+    let inner = popup_block.inner(popup_area);
+
+    // Render options
+    let options: Vec<Line> = RestoreOption::all()
+        .iter()
+        .enumerate()
+        .map(|(i, opt)| {
+            let is_selected = i == app.restore_option_selected;
+            let marker = if is_selected { "▶ " } else { "  " };
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            Line::from(Span::styled(format!("{}{}", marker, opt.label()), style))
+        })
+        .collect();
+
+    let options_widget = Paragraph::new(options);
+    frame.render_widget(options_widget, inner);
+}
+
 /// Render the input box.
 fn render_input(app: &App, frame: &mut Frame, area: Rect) {
-    let input_text = format!("│ {} ", app.input);
-    let input_widget = Paragraph::new(input_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Input (Enter to send)"),
+    let hint = if app.input.is_empty() {
+        Span::styled(
+            " Type a message or /help for commands",
+            Style::default().fg(Color::DarkGray),
         )
-        .style(Style::default().fg(Color::Yellow));
+    } else if app.input.starts_with('/') {
+        Span::styled(" (command)", Style::default().fg(Color::Cyan))
+    } else {
+        Span::raw("")
+    };
+
+    let input_content = if app.input.is_empty() {
+        Line::from(hint)
+    } else {
+        Line::from(vec![
+            Span::styled(&app.input, Style::default().fg(Color::Yellow)),
+            hint,
+        ])
+    };
+
+    let input_widget = Paragraph::new(input_content).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Input (Enter ↵)"),
+    );
     frame.render_widget(input_widget, area);
 }
 
@@ -305,8 +853,8 @@ mod tests {
     #[test]
     fn test_app_view_default() {
         let app = App::default();
-        // Verify no panic from view default
-        assert_eq!(app.view, AppView::Chat);
+        // Verify no panic from view default - Dashboard is the new default
+        assert_eq!(app.view, AppView::Dashboard);
     }
 
     #[test]

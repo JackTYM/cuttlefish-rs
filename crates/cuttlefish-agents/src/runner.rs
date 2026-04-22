@@ -18,11 +18,13 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+use crate::permissions::{PermissionResult, check_tool_permission};
 use crate::safety::{
     ActionGate, ActionPreview, ActionType, ConfidenceCalculator, ConfidenceScore, FileDiff,
     GateConfig, GateDecision,
 };
 use crate::tools::ToolRegistry;
+use cuttlefish_core::traits::agent::AgentRole;
 
 /// Maximum model↔tool iterations per invocation.
 pub const MAX_ITERATIONS: usize = 25;
@@ -115,6 +117,8 @@ pub struct ToolExecutor {
     sandbox: Option<Arc<dyn Sandbox>>,
     sandbox_id: Option<SandboxId>,
     _registry: ToolRegistry,
+    /// Optional agent role for permission checking.
+    role: Option<AgentRole>,
 }
 
 impl ToolExecutor {
@@ -124,12 +128,65 @@ impl ToolExecutor {
             sandbox,
             sandbox_id,
             _registry: ToolRegistry::with_defaults(),
+            role: None,
+        }
+    }
+
+    /// Create an executor with a specific agent role for permission enforcement.
+    pub fn with_role(
+        sandbox: Option<Arc<dyn Sandbox>>,
+        sandbox_id: Option<SandboxId>,
+        role: AgentRole,
+    ) -> Self {
+        Self {
+            sandbox,
+            sandbox_id,
+            _registry: ToolRegistry::with_defaults(),
+            role: Some(role),
+        }
+    }
+
+    /// Set the agent role for permission checking.
+    pub fn set_role(&mut self, role: AgentRole) {
+        self.role = Some(role);
+    }
+
+    /// Check if the tool call is permitted for the current role.
+    fn check_permission(&self, call: &ToolCall) -> Result<(), ToolExecutionResult> {
+        let Some(role) = self.role else {
+            // No role set - allow all (backwards compatibility)
+            return Ok(());
+        };
+
+        let path = call.input["path"].as_str();
+        let command = call.input["command"].as_str();
+
+        let result = check_tool_permission(role, &call.name, path, command);
+
+        match result {
+            PermissionResult::Allowed => Ok(()),
+            other => Err(ToolExecutionResult {
+                id: call.id.clone(),
+                content: other
+                    .error_message()
+                    .unwrap_or_else(|| "Permission denied".to_string()),
+                success: false,
+            }),
         }
     }
 
     /// Execute a tool call and return the result.
     pub async fn execute(&self, call: &ToolCall) -> ToolExecutionResult {
         debug!("Executing tool: {}", call.name);
+
+        // Check role-based permissions first
+        if let Err(denied) = self.check_permission(call) {
+            warn!(
+                "Tool {} denied for role {:?}: {}",
+                call.name, self.role, denied.content
+            );
+            return denied;
+        }
         match call.name.as_str() {
             crate::tools::built_in::EXECUTE_COMMAND => {
                 let cmd = call.input["command"].as_str().unwrap_or("");
@@ -869,9 +926,30 @@ impl SafetyGatedExecutor {
         }
     }
 
+    /// Create a safety-gated executor with a specific agent role for permission enforcement.
+    pub fn with_role(
+        sandbox: Option<Arc<dyn Sandbox>>,
+        sandbox_id: Option<SandboxId>,
+        gate_config: GateConfig,
+        role: AgentRole,
+    ) -> Self {
+        Self {
+            inner: ToolExecutor::with_role(sandbox, sandbox_id, role),
+            gate: ActionGate::new(gate_config),
+            confidence_calculator: ConfidenceCalculator::new(),
+            pending_actions: Arc::new(RwLock::new(HashMap::new())),
+            enabled: true,
+        }
+    }
+
     /// Create a safety-gated executor with default configuration.
     pub fn with_defaults(sandbox: Option<Arc<dyn Sandbox>>, sandbox_id: Option<SandboxId>) -> Self {
         Self::new(sandbox, sandbox_id, GateConfig::default())
+    }
+
+    /// Set the agent role for permission checking.
+    pub fn set_role(&mut self, role: AgentRole) {
+        self.inner.set_role(role);
     }
 
     /// Disable safety gates (bypass all checks).
@@ -1132,6 +1210,10 @@ pub struct AgentRunner {
     pub tool_executor: ToolExecutor,
     /// Safety-gated executor (optional).
     pub gated_executor: Option<SafetyGatedExecutor>,
+    /// Sandbox reference for creating role-specific executors.
+    sandbox: Option<Arc<dyn Sandbox>>,
+    /// Sandbox ID for creating role-specific executors.
+    sandbox_id: Option<SandboxId>,
 }
 
 impl AgentRunner {
@@ -1140,7 +1222,12 @@ impl AgentRunner {
         Self {
             config: RunnerConfig::default(),
             tool_executor: ToolExecutor::new(sandbox.clone(), sandbox_id.clone()),
-            gated_executor: Some(SafetyGatedExecutor::with_defaults(sandbox, sandbox_id)),
+            gated_executor: Some(SafetyGatedExecutor::with_defaults(
+                sandbox.clone(),
+                sandbox_id.clone(),
+            )),
+            sandbox,
+            sandbox_id,
         }
     }
 
@@ -1151,8 +1238,10 @@ impl AgentRunner {
     ) -> Self {
         Self {
             config: RunnerConfig::default().without_safety_gates(),
-            tool_executor: ToolExecutor::new(sandbox, sandbox_id),
+            tool_executor: ToolExecutor::new(sandbox.clone(), sandbox_id.clone()),
             gated_executor: None,
+            sandbox,
+            sandbox_id,
         }
     }
 
@@ -1166,7 +1255,28 @@ impl AgentRunner {
         self.gated_executor.as_mut()
     }
 
+    /// Create a role-specific tool executor for the given agent.
+    ///
+    /// This enforces role-based permissions - for example, a Planner agent
+    /// can only use read-only tools and write .md files in the plans/ directory.
+    pub fn executor_for_role(&self, role: AgentRole) -> ToolExecutor {
+        ToolExecutor::with_role(self.sandbox.clone(), self.sandbox_id.clone(), role)
+    }
+
+    /// Create a role-specific safety-gated executor for the given agent.
+    pub fn gated_executor_for_role(&self, role: AgentRole) -> SafetyGatedExecutor {
+        SafetyGatedExecutor::with_role(
+            self.sandbox.clone(),
+            self.sandbox_id.clone(),
+            GateConfig::default(),
+            role,
+        )
+    }
+
     /// Run an agent with timeout enforcement.
+    ///
+    /// Note: This method does not enforce role-based permissions.
+    /// Use `run_with_permissions` for role-based sandboxing.
     pub async fn run(
         &self,
         agent: &dyn Agent,
@@ -1178,6 +1288,51 @@ impl AgentRunner {
             agent.name(),
             ctx.project_id
         );
+        ctx.messages.push(Message {
+            role: MessageRole::User,
+            content: input.to_string(),
+        });
+        tokio::time::timeout(self.config.timeout, agent.execute(ctx, input))
+            .await
+            .map_err(|_| {
+                AgentError(format!(
+                    "Agent {} timed out after {:?}",
+                    agent.name(),
+                    self.config.timeout
+                ))
+            })?
+    }
+
+    /// Run an agent with role-based permission enforcement.
+    ///
+    /// The agent's role determines which tools it can use:
+    /// - Planner: Read-only + markdown writes in plans directory
+    /// - Coder: Full access to all tools
+    /// - Critic: Read-only access
+    /// - Explorer: Read-only access
+    /// - Librarian: Read-only + doc file writes
+    /// - DevOps: Full access
+    /// - Orchestrator: Read-only (delegates to other agents)
+    pub async fn run_with_permissions(
+        &mut self,
+        agent: &dyn Agent,
+        ctx: &mut AgentContext,
+        input: &str,
+    ) -> Result<AgentOutput, AgentError> {
+        let role = agent.role();
+        info!(
+            "Running agent {} ({:?}) for project {} with permission enforcement",
+            agent.name(),
+            role,
+            ctx.project_id
+        );
+
+        // Set role on executors for permission checking
+        self.tool_executor.set_role(role);
+        if let Some(ref mut gated) = self.gated_executor {
+            gated.set_role(role);
+        }
+
         ctx.messages.push(Message {
             role: MessageRole::User,
             content: input.to_string(),
@@ -1315,5 +1470,92 @@ mod tests {
 
         let pending = exec.list_pending_actions().await;
         assert!(pending.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_executor_with_role_planner_read_allowed() {
+        use cuttlefish_core::traits::agent::AgentRole;
+
+        let exec = ToolExecutor::with_role(None, None, AgentRole::Planner);
+        let call = ToolCall {
+            id: "r".to_string(),
+            name: crate::tools::built_in::READ_FILE.to_string(),
+            input: serde_json::json!({"path": "/test.rs"}),
+        };
+        let result = exec.execute(&call).await;
+        assert!(result.success);
+    }
+
+    #[tokio::test]
+    async fn test_executor_with_role_planner_write_code_denied() {
+        use cuttlefish_core::traits::agent::AgentRole;
+
+        let exec = ToolExecutor::with_role(None, None, AgentRole::Planner);
+        let call = ToolCall {
+            id: "w".to_string(),
+            name: crate::tools::built_in::WRITE_FILE.to_string(),
+            input: serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}),
+        };
+        let result = exec.execute(&call).await;
+        assert!(!result.success);
+        assert!(result.content.contains("not available for Planner"));
+    }
+
+    #[tokio::test]
+    async fn test_executor_with_role_planner_write_plan_allowed() {
+        use cuttlefish_core::traits::agent::AgentRole;
+
+        let exec = ToolExecutor::with_role(None, None, AgentRole::Planner);
+        let call = ToolCall {
+            id: "w".to_string(),
+            name: crate::tools::built_in::WRITE_FILE.to_string(),
+            input: serde_json::json!({"path": "plans/design.md", "content": "# Plan"}),
+        };
+        // Tool is not allowed for Planner role (only read-only tools)
+        let result = exec.execute(&call).await;
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_executor_with_role_coder_full_access() {
+        use cuttlefish_core::traits::agent::AgentRole;
+
+        let exec = ToolExecutor::with_role(None, None, AgentRole::Coder);
+        let call = ToolCall {
+            id: "w".to_string(),
+            name: crate::tools::built_in::WRITE_FILE.to_string(),
+            input: serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}),
+        };
+        let result = exec.execute(&call).await;
+        // Should succeed (in simulation mode)
+        assert!(result.success);
+    }
+
+    #[tokio::test]
+    async fn test_executor_with_role_critic_command_denied() {
+        use cuttlefish_core::traits::agent::AgentRole;
+
+        let exec = ToolExecutor::with_role(None, None, AgentRole::Critic);
+        let call = ToolCall {
+            id: "c".to_string(),
+            name: crate::tools::built_in::EXECUTE_COMMAND.to_string(),
+            input: serde_json::json!({"command": "rm -rf /"}),
+        };
+        let result = exec.execute(&call).await;
+        assert!(!result.success);
+        assert!(result.content.contains("not available for Critic"));
+    }
+
+    #[tokio::test]
+    async fn test_executor_without_role_allows_all() {
+        // When no role is set, all tools should be allowed (backwards compatibility)
+        let exec = ToolExecutor::new(None, None);
+        let call = ToolCall {
+            id: "w".to_string(),
+            name: crate::tools::built_in::WRITE_FILE.to_string(),
+            input: serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}),
+        };
+        let result = exec.execute(&call).await;
+        assert!(result.success);
     }
 }

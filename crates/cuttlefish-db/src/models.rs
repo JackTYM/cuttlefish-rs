@@ -2,6 +2,111 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Execution mode for a project - determines where code lives, builds, and runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionMode {
+    /// Everything on server. Web apps get tunnel URL, TUI apps stream interactively.
+    #[default]
+    Cloud,
+    /// Code & build on server, only binary sent to user to run locally.
+    BuildRemoteRunLocal,
+    /// Code syncs to local machine, build & run locally. Requires toolchain.
+    Local,
+}
+
+impl ExecutionMode {
+    /// Convert to database string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ExecutionMode::Cloud => "cloud",
+            ExecutionMode::BuildRemoteRunLocal => "build_remote_run_local",
+            ExecutionMode::Local => "local",
+        }
+    }
+
+    /// Parse from database string.
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "cloud" => ExecutionMode::Cloud,
+            "build_remote_run_local" => ExecutionMode::BuildRemoteRunLocal,
+            "local" => ExecutionMode::Local,
+            _ => ExecutionMode::Cloud, // Default fallback
+        }
+    }
+
+    /// Get a human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            ExecutionMode::Cloud => "Cloud",
+            ExecutionMode::BuildRemoteRunLocal => "Build Remote → Run Local",
+            ExecutionMode::Local => "Local",
+        }
+    }
+
+    /// Get a short description.
+    pub fn description(&self) -> &'static str {
+        match self {
+            ExecutionMode::Cloud => "Build & run on server",
+            ExecutionMode::BuildRemoteRunLocal => "Build on server, run binary locally",
+            ExecutionMode::Local => "Sync code, build & run locally",
+        }
+    }
+}
+
+/// Running status of a project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RunningStatus {
+    /// Project is not currently running.
+    #[default]
+    Idle,
+    /// Project is being built.
+    Building,
+    /// Project is running.
+    Running,
+    /// Project encountered an error.
+    Error,
+    /// Project was explicitly stopped.
+    Stopped,
+}
+
+impl RunningStatus {
+    /// Convert to database string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RunningStatus::Idle => "idle",
+            RunningStatus::Building => "building",
+            RunningStatus::Running => "running",
+            RunningStatus::Error => "error",
+            RunningStatus::Stopped => "stopped",
+        }
+    }
+
+    /// Parse from database string.
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "idle" => RunningStatus::Idle,
+            "building" => RunningStatus::Building,
+            "running" => RunningStatus::Running,
+            "error" => RunningStatus::Error,
+            "stopped" => RunningStatus::Stopped,
+            _ => RunningStatus::Idle,
+        }
+    }
+
+    /// Get emoji indicator for display.
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            RunningStatus::Idle => "⚪",
+            RunningStatus::Building => "🟡",
+            RunningStatus::Running => "🟢",
+            RunningStatus::Error => "🔴",
+            RunningStatus::Stopped => "⚫",
+        }
+    }
+}
+
 /// A project managed by Cuttlefish.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Project {
@@ -27,6 +132,66 @@ pub struct Project {
     pub created_at: String,
     /// Timestamp when the project was last updated (ISO 8601 format).
     pub updated_at: String,
+    /// Execution mode (cloud, build_remote_run_local, local).
+    #[sqlx(default)]
+    pub execution_mode: String,
+    /// Local filesystem path (for local mode).
+    pub local_path: Option<String>,
+    /// Current running status (idle, building, running, error, stopped).
+    #[sqlx(default)]
+    pub running_status: String,
+    /// Tunnel subdomain for cloud mode (e.g., "my-app" -> my-app.cuttlefish.ai).
+    pub tunnel_subdomain: Option<String>,
+    /// Timestamp of last user activity.
+    pub last_activity_at: Option<String>,
+    /// Template source (local, community:user/name, builtin:name).
+    pub template_source: Option<String>,
+    /// Whether the template has been verified (for community templates).
+    #[sqlx(default)]
+    pub template_verified: i64,
+}
+
+impl Project {
+    /// Get the execution mode as an enum.
+    pub fn execution_mode(&self) -> ExecutionMode {
+        ExecutionMode::from_str(&self.execution_mode)
+    }
+
+    /// Get the running status as an enum.
+    pub fn running_status(&self) -> RunningStatus {
+        RunningStatus::from_str(&self.running_status)
+    }
+
+    /// Get the tunnel URL if in cloud mode.
+    pub fn tunnel_url(&self) -> Option<String> {
+        self.tunnel_subdomain
+            .as_ref()
+            .map(|sub| format!("https://{}.cuttlefish.ai", sub))
+    }
+
+    /// Format last activity as relative time (e.g., "2m ago", "3d ago").
+    pub fn last_activity_relative(&self) -> String {
+        let Some(ref timestamp) = self.last_activity_at else {
+            return "never".to_string();
+        };
+
+        let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(timestamp) else {
+            return "unknown".to_string()
+        };
+
+        let now = chrono::Utc::now();
+        let duration = now.signed_duration_since(parsed);
+
+        if duration.num_seconds() < 60 {
+            "now".to_string()
+        } else if duration.num_minutes() < 60 {
+            format!("{}m", duration.num_minutes())
+        } else if duration.num_hours() < 24 {
+            format!("{}h", duration.num_hours())
+        } else {
+            format!("{}d", duration.num_days())
+        }
+    }
 }
 
 /// A conversation message associated with a project.

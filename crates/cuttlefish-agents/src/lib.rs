@@ -20,6 +20,8 @@ pub mod librarian;
 pub mod memory;
 /// Orchestrator agent that plans and delegates work.
 pub mod orchestrator;
+/// Agent role permissions for tool sandboxing.
+pub mod permissions;
 /// Planner agent that creates detailed implementation plans.
 pub mod planner;
 /// Runtime prompt loading from YAML frontmatter markdown files.
@@ -54,6 +56,7 @@ pub use memory::{
     redact_sensitive, why,
 };
 pub use orchestrator::OrchestratorAgent;
+pub use permissions::{PermissionResult, RolePermissions, check_tool_permission};
 pub use planner::PlannerAgent;
 pub use prompt_registry::{AgentPrompt, PromptError, PromptMetadata, PromptRegistry};
 pub use prompt_template::{PromptContext, PromptTemplate, load_system_template};
