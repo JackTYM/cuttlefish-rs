@@ -252,6 +252,7 @@ pub async fn run_local(
 
                         match key.code {
                             KeyCode::Tab => app.next_view(),
+                            KeyCode::BackTab => app.prev_view(),
                             KeyCode::Char(c) => {
                                 match app.view {
                                     AppView::History | AppView::Dashboard => {

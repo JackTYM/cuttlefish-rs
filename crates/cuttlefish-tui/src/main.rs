@@ -426,6 +426,7 @@ async fn run_disconnected(
 
             match key.code {
                 KeyCode::Tab => app.next_view(),
+                KeyCode::BackTab => app.prev_view(),
                 KeyCode::Char(c) => {
                     match app.view {
                         app::AppView::History => {}
@@ -648,6 +649,7 @@ where
 
                         match key.code {
                             KeyCode::Tab => app.next_view(),
+                            KeyCode::BackTab => app.prev_view(),
                             KeyCode::Char(c) => {
                                 match app.view {
                                     app::AppView::History => {}

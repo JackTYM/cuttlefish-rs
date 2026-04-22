@@ -357,6 +357,29 @@ impl App {
         }
     }
 
+    /// Cycle to the previous view tab (Shift+Tab).
+    pub fn prev_view(&mut self) {
+        // Only cycle views when we have an active project
+        if self.project_id.is_some() {
+            self.view = match self.view {
+                AppView::Chat => AppView::Dashboard,
+                AppView::Diff => AppView::Chat,
+                AppView::Log => AppView::Diff,
+                AppView::Help => AppView::Log,
+                AppView::Dashboard => AppView::Help,
+                AppView::History => AppView::Chat,
+                AppView::CreateProject => AppView::Dashboard,
+            };
+        } else {
+            // Without a project, only Dashboard and Help make sense
+            self.view = match self.view {
+                AppView::Dashboard => AppView::Help,
+                AppView::Help => AppView::Dashboard,
+                _ => AppView::Dashboard,
+            };
+        }
+    }
+
     /// Handle Esc key press. Returns true if we should exit the app.
     pub fn handle_esc(&mut self) -> bool {
         let now = std::time::Instant::now();
